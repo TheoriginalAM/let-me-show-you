@@ -1,0 +1,32 @@
+{
+  "name": "let-me-show-you",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Let Me Show You — screen-recording SaaS (letmeshowyou.com.au)",
+  "packageManager": "pnpm@11.1.2",
+  "engines": {
+    "node": ">=18.18.0"
+  },
+  "scripts": {
+    "dev:desktop": "pnpm --filter @lmsy/desktop dev",
+    "dev:web": "pnpm --filter @lmsy/web dev",
+    "build:desktop": "pnpm --filter @lmsy/desktop build",
+    "build:web": "pnpm --filter @lmsy/web build",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@next/eslint-plugin-next": "^15.1.4",
+    "eslint": "^9.18.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "eslint-plugin-react-refresh": "^0.4.18",
+    "globals": "^15.14.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.20.0"
+  }
+}

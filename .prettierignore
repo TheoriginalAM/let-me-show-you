@@ -1,0 +1,9 @@
+node_modules
+dist
+out
+build
+release
+.next
+pnpm-lock.yaml
+apps/web/next-env.d.ts
+*.log

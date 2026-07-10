@@ -1,0 +1,86 @@
+:root {
+  --bg: #0b0b12;
+  --card: #14141f;
+  --border: #262637;
+  --fg: #f4f4f8;
+  --muted: #9a9ab0;
+  --accent: #8b8bff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.app {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 2rem;
+}
+
+.card {
+  width: 100%;
+  max-width: 30rem;
+  padding: 2.5rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+}
+
+.eyebrow {
+  margin: 0 0 0.75rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+}
+
+h1 {
+  margin: 0;
+  font-size: 2.25rem;
+  letter-spacing: -0.02em;
+}
+
+.tagline {
+  margin: 0.5rem 0 2rem;
+  color: var(--muted);
+}
+
+.meta {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+  margin: 0;
+}
+
+.meta dt {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.meta dd {
+  margin: 0.25rem 0 0;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.share {
+  margin: 1.75rem 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85rem;
+  color: var(--accent);
+}
