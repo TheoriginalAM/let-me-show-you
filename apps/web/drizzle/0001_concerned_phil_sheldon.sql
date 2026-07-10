@@ -1,0 +1,2 @@
+CREATE INDEX "video_views_video_id_idx" ON "video_views" USING btree ("video_id");--> statement-breakpoint
+CREATE INDEX "videos_owner_id_created_at_idx" ON "videos" USING btree ("owner_id","created_at" DESC NULLS LAST);

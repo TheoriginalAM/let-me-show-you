@@ -7,3 +7,7 @@ release
 pnpm-lock.yaml
 apps/web/next-env.d.ts
 *.log
+
+# Generated code (Drizzle migrations + Better Auth schema)
+apps/web/drizzle
+apps/web/src/db/auth-schema.ts
