@@ -1,12 +1,18 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { authClient } from '@/lib/auth-client'
 
-export default function LoginPage() {
+/** Only allow same-origin relative redirects (no open redirect). */
+function safeRedirect(value: string | null): string {
+  return value && value.startsWith('/') && !value.startsWith('//') ? value : '/dashboard'
+}
+
+function LoginForm() {
   const router = useRouter()
+  const redirectTo = safeRedirect(useSearchParams().get('redirect'))
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -23,7 +29,7 @@ export default function LoginPage() {
       setError(error.message ?? 'Sign in failed')
       return
     }
-    router.push('/dashboard')
+    router.push(redirectTo)
     router.refresh()
   }
 
@@ -34,7 +40,7 @@ export default function LoginPage() {
       return
     }
     setPending(true)
-    const { error } = await authClient.signIn.magicLink({ email, callbackURL: '/dashboard' })
+    const { error } = await authClient.signIn.magicLink({ email, callbackURL: redirectTo })
     setPending(false)
     if (error) {
       setError(error.message ?? 'Could not send magic link')
@@ -103,5 +109,13 @@ export default function LoginPage() {
         </Link>
       </p>
     </main>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginForm />
+    </Suspense>
   )
 }

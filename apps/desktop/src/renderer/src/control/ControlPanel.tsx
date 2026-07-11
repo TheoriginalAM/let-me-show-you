@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { capture } from '../capture'
 import { useRecorderStore, type DeviceOption } from '../store'
 import { PermissionGate } from './PermissionGate'
@@ -9,6 +9,7 @@ import { RecordingBar } from './RecordingBar'
 import { ProcessingScreen } from './ProcessingScreen'
 import { ReadyScreen } from './ReadyScreen'
 import { ErrorScreen } from './ErrorScreen'
+import { Settings } from './Settings'
 
 async function enumerate(): Promise<{ mics: DeviceOption[]; cameras: DeviceOption[] }> {
   const devices = await navigator.mediaDevices.enumerateDevices()
@@ -35,6 +36,7 @@ export function ControlPanel() {
   const status = useRecorderStore((s) => s.status)
   const selectedSourceId = useRecorderStore((s) => s.selectedSourceId)
   const selectedCameraId = useRecorderStore((s) => s.selectedCameraId)
+  const [showSettings, setShowSettings] = useState(false)
 
   const refreshPermissions = useCallback(async () => {
     useRecorderStore.getState().setPermissions(await window.recorder.getPermissions())
@@ -79,6 +81,20 @@ export function ControlPanel() {
     // The tray "Stop Recording" asks the renderer to stop the live MediaRecorder.
     const unsubscribeStop = window.recorder.onRequestStop(() => capture.stop())
 
+    // Auth + upload state.
+    const store = useRecorderStore.getState()
+    const unsubscribeAuth = window.recorder.onAuthState((s) =>
+      useRecorderStore.getState().setAuth(s),
+    )
+    const unsubscribeSignIn = window.recorder.onSignInStatus((s) =>
+      useRecorderStore.getState().setSignIn(s),
+    )
+    const unsubscribeUpload = window.recorder.onUploadStatus((s) =>
+      useRecorderStore.getState().setUpload(s),
+    )
+    void window.recorder.getAuthState().then(store.setAuth)
+    void window.recorder.getUploadStatus().then(store.setUpload)
+
     // Sync current recording state on mount (robust to renderer reloads).
     void window.recorder.getRecordingStatus().then((snapshot) => {
       if (!gotLivePush) useRecorderStore.getState().setStatus(snapshot)
@@ -93,6 +109,9 @@ export function ControlPanel() {
       navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange)
       unsubscribe()
       unsubscribeStop()
+      unsubscribeAuth()
+      unsubscribeSignIn()
+      unsubscribeUpload()
     }
   }, [refreshPermissions, refreshDevices])
 
@@ -134,17 +153,28 @@ export function ControlPanel() {
       <header className="titlebar">
         <span className="title-dot" />
         <span className="title-text">Let Me Show You</span>
-        <button
-          className="win-close no-drag"
-          title="Hide to tray"
-          onClick={() => void window.recorder.hideControlWindow()}
-        >
-          ×
-        </button>
+        <div className="titlebar-actions">
+          <button
+            className={`win-icon no-drag ${showSettings ? 'active' : ''}`}
+            title="Settings"
+            onClick={() => setShowSettings((value) => !value)}
+          >
+            ⚙
+          </button>
+          <button
+            className="win-close no-drag"
+            title="Hide to tray"
+            onClick={() => void window.recorder.hideControlWindow()}
+          >
+            ×
+          </button>
+        </div>
       </header>
 
       <main className="panel-body">
-        {state === 'recording' || state === 'paused' ? (
+        {showSettings ? (
+          <Settings onClose={() => setShowSettings(false)} />
+        ) : state === 'recording' || state === 'paused' ? (
           <RecordingBar />
         ) : state === 'processing' ? (
           <ProcessingScreen />

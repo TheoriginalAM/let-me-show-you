@@ -1,5 +1,12 @@
 import { create } from 'zustand'
-import type { CaptureSource, MediaPermissions, RecordingStatus } from '@shared/ipc'
+import type {
+  AuthState,
+  CaptureSource,
+  MediaPermissions,
+  RecordingStatus,
+  SignInStatus,
+  UploadStatus,
+} from '@shared/ipc'
 
 export interface DeviceOption {
   deviceId: string
@@ -15,6 +22,14 @@ const idleStatus: RecordingStatus = {
   error: null,
 }
 
+const idleUpload: UploadStatus = { phase: 'idle', progress: 0, shareUrl: null, message: null }
+const idleSignIn: SignInStatus = {
+  phase: 'idle',
+  userCode: null,
+  verificationUri: null,
+  message: null,
+}
+
 interface RecorderStore {
   permissions: MediaPermissions | null
   sources: CaptureSource[]
@@ -25,6 +40,9 @@ interface RecorderStore {
   selectedMicId: string | null
   selectedCameraId: string | null // null = camera off
   status: RecordingStatus
+  auth: AuthState
+  signIn: SignInStatus
+  upload: UploadStatus
 
   setPermissions: (permissions: MediaPermissions) => void
   setSources: (sources: CaptureSource[]) => void
@@ -34,6 +52,9 @@ interface RecorderStore {
   selectMic: (id: string | null) => void
   selectCamera: (id: string | null) => void
   setStatus: (status: RecordingStatus) => void
+  setAuth: (auth: AuthState) => void
+  setSignIn: (signIn: SignInStatus) => void
+  setUpload: (upload: UploadStatus) => void
 }
 
 export const useRecorderStore = create<RecorderStore>((set) => ({
@@ -46,6 +67,9 @@ export const useRecorderStore = create<RecorderStore>((set) => ({
   selectedMicId: null,
   selectedCameraId: null,
   status: idleStatus,
+  auth: { signedIn: false },
+  signIn: idleSignIn,
+  upload: idleUpload,
 
   setPermissions: (permissions) => set({ permissions }),
   setSources: (sources) =>
@@ -73,4 +97,7 @@ export const useRecorderStore = create<RecorderStore>((set) => ({
   selectMic: (selectedMicId) => set({ selectedMicId }),
   selectCamera: (selectedCameraId) => set({ selectedCameraId }),
   setStatus: (status) => set({ status }),
+  setAuth: (auth) => set({ auth }),
+  setSignIn: (signIn) => set({ signIn }),
+  setUpload: (upload) => set({ upload }),
 }))

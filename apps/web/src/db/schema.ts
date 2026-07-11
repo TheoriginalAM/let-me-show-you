@@ -56,7 +56,45 @@ export const videoViews = pgTable(
   (table) => [index('video_views_video_id_idx').on(table.videoId)],
 )
 
+/** Long-lived bearer tokens for the desktop app — stored hashed, never plaintext. */
+export const apiTokens = pgTable(
+  'api_tokens',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull().unique(),
+    name: text('name').notNull().default('Desktop'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true, mode: 'string' }),
+  },
+  (table) => [index('api_tokens_user_id_idx').on(table.userId)],
+)
+
+/** Transient device-authorization codes (OAuth device-grant style). */
+export const deviceCodes = pgTable(
+  'device_codes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    deviceCode: text('device_code').notNull().unique(),
+    userCode: text('user_code').notNull().unique(),
+    // Set once a signed-in user approves the code in the browser.
+    userId: text('user_id').references(() => user.id, { onDelete: 'cascade' }),
+    approved: boolean('approved').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'string' }).notNull(),
+  },
+  (table) => [index('device_codes_user_code_idx').on(table.userCode)],
+)
+
 export type VideoRow = typeof videos.$inferSelect
 export type NewVideoRow = typeof videos.$inferInsert
 export type VideoViewRow = typeof videoViews.$inferSelect
 export type NewVideoViewRow = typeof videoViews.$inferInsert
+export type ApiTokenRow = typeof apiTokens.$inferSelect
+export type DeviceCodeRow = typeof deviceCodes.$inferSelect

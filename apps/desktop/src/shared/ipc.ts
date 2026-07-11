@@ -25,10 +25,22 @@ export const IPC = {
   getRecordingStatus: 'get-recording-status',
   hideControlWindow: 'hide-control-window',
   quitApp: 'quit-app',
+  // auth (device flow) + upload
+  signIn: 'sign-in',
+  cancelSignIn: 'cancel-sign-in',
+  signOut: 'sign-out',
+  getAuthState: 'get-auth-state',
+  startUpload: 'start-upload',
+  retryUpload: 'retry-upload',
+  getUploadStatus: 'get-upload-status',
+  openExternalUrl: 'open-external-url',
   // main -> renderer (events)
   recordingStatus: 'recording-status',
   requestStop: 'request-stop',
   webcamCamera: 'webcam-camera',
+  authState: 'auth-state',
+  signInStatus: 'sign-in-status',
+  uploadStatus: 'upload-status',
 } as const
 
 export type SourceType = 'screen' | 'window'
@@ -93,6 +105,40 @@ export interface RecordingStatus {
   error: RecordingError | null
 }
 
+/** Whether the desktop app holds a valid API token for the web backend. */
+export interface AuthState {
+  signedIn: boolean
+}
+
+export type SignInPhase = 'idle' | 'starting' | 'waiting' | 'success' | 'error'
+
+/** Progress of the device-authorization sign-in flow. */
+export interface SignInStatus {
+  phase: SignInPhase
+  /** Short code the user confirms in the browser (shown while waiting). */
+  userCode: string | null
+  verificationUri: string | null
+  message: string | null
+}
+
+export type UploadPhase = 'idle' | 'creating' | 'uploading' | 'done' | 'error'
+
+/** Progress of an upload-and-share of a finished recording. */
+export interface UploadStatus {
+  phase: UploadPhase
+  /** Upload progress in [0, 1] while `phase === 'uploading'`. */
+  progress: number
+  /** Present when `phase === 'done'` (also copied to the clipboard). */
+  shareUrl: string | null
+  /** Present when `phase === 'error'`. */
+  message: string | null
+}
+
+export interface StartUploadPayload {
+  filePath: string
+  title: string
+}
+
 /** The API the preload script exposes on `window.recorder`. */
 export interface RecorderApi {
   listSources: () => Promise<CaptureSource[]>
@@ -125,5 +171,23 @@ export interface RecorderApi {
   onRequestStop: (cb: () => void) => () => void
   /** (webcam window) subscribe to camera-id changes; returns an unsubscribe fn. */
   onWebcamCamera: (cb: (cameraId: string | null) => void) => () => void
+
+  // ---- Auth (device flow) ----
+  /** Start the device sign-in flow (opens the browser + polls). */
+  signIn: () => Promise<void>
+  cancelSignIn: () => Promise<void>
+  signOut: () => Promise<void>
+  getAuthState: () => Promise<AuthState>
+  onAuthState: (cb: (state: AuthState) => void) => () => void
+  onSignInStatus: (cb: (status: SignInStatus) => void) => () => void
+
+  // ---- Upload & share ----
+  startUpload: (payload: StartUploadPayload) => Promise<void>
+  retryUpload: () => Promise<void>
+  getUploadStatus: () => Promise<UploadStatus>
+  onUploadStatus: (cb: (status: UploadStatus) => void) => () => void
+  /** Open an http(s) URL in the default browser (e.g. the share link). */
+  openExternalUrl: (url: string) => Promise<void>
+
   platform: string
 }

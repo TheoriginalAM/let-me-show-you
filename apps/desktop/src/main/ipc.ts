@@ -2,10 +2,13 @@ import { isAbsolute, join, relative, resolve } from 'path'
 import { app, desktopCapturer, ipcMain, shell, systemPreferences } from 'electron'
 import {
   IPC,
+  type AuthState,
   type CaptureSource,
   type MediaPermissions,
   type PermissionState,
   type PermissionTarget,
+  type StartUploadPayload,
+  type UploadStatus,
 } from '../shared/ipc'
 import type { RecordingSession } from './recording-session'
 
@@ -16,6 +19,22 @@ export interface IpcContext {
   getWebcamCamera: () => string | null
   hideControlWindow: () => void
   quit: () => void
+  // auth + upload
+  signIn: () => Promise<void>
+  cancelSignIn: () => void
+  signOut: () => void
+  getAuthState: () => AuthState
+  startUpload: (payload: StartUploadPayload) => Promise<void>
+  retryUpload: () => Promise<void>
+  getUploadStatus: () => UploadStatus
+}
+
+/** Confine an uploadable path to the app's own recordings directory. */
+function isRecordingPath(filePath: unknown): filePath is string {
+  if (typeof filePath !== 'string' || filePath.length === 0) return false
+  const root = resolve(join(app.getPath('videos'), 'LetMeShowYou'))
+  const rel = relative(root, resolve(filePath))
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
 }
 
 // Ids from the most recent list-sources call; used to validate the sourceId
@@ -135,4 +154,31 @@ export function registerIpcHandlers(ctx: IpcContext): void {
   ipcMain.handle(IPC.getWebcamCamera, () => ctx.getWebcamCamera())
   ipcMain.handle(IPC.hideControlWindow, () => ctx.hideControlWindow())
   ipcMain.handle(IPC.quitApp, () => ctx.quit())
+
+  // ---- Auth (device flow) ----
+  ipcMain.handle(IPC.signIn, () => ctx.signIn())
+  ipcMain.handle(IPC.cancelSignIn, () => ctx.cancelSignIn())
+  ipcMain.handle(IPC.signOut, () => ctx.signOut())
+  ipcMain.handle(IPC.getAuthState, () => ctx.getAuthState())
+
+  // ---- Upload & share ----
+  ipcMain.handle(IPC.startUpload, (_event, payload: unknown) => {
+    if (!payload || typeof payload !== 'object') throw new Error('Invalid upload payload')
+    const { filePath, title } = payload as Record<string, unknown>
+    if (!isRecordingPath(filePath)) throw new Error('Refusing to upload a file outside recordings')
+    const cleanTitle = typeof title === 'string' ? title.trim().slice(0, 200) : ''
+    return ctx.startUpload({ filePath, title: cleanTitle })
+  })
+  ipcMain.handle(IPC.retryUpload, () => ctx.retryUpload())
+  ipcMain.handle(IPC.getUploadStatus, () => ctx.getUploadStatus())
+
+  ipcMain.handle(IPC.openExternalUrl, (_event, url: unknown) => {
+    if (typeof url !== 'string') throw new Error('Invalid url')
+    try {
+      const { protocol } = new URL(url)
+      if (protocol === 'https:' || protocol === 'http:') void shell.openExternal(url)
+    } catch {
+      // ignore malformed url
+    }
+  })
 }

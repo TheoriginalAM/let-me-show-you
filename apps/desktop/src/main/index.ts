@@ -8,10 +8,13 @@ import {
   type WebPreferences,
 } from 'electron'
 import { APP_NAME } from '@lmsy/shared'
-import { IPC } from '../shared/ipc'
+import { IPC, type SignInStatus, type StartUploadPayload, type UploadStatus } from '../shared/ipc'
 import { RecordingSession } from './recording-session'
 import { registerIpcHandlers } from './ipc'
 import { createTray } from './tray'
+import { clearToken, hasToken } from './token-store'
+import { cancelSignIn, runSignIn } from './device-auth'
+import { runUpload } from './uploader'
 
 const isDev = !app.isPackaged
 const devServerUrl = process.env.ELECTRON_RENDERER_URL
@@ -164,6 +167,42 @@ function requestStop(): void {
   }
 }
 
+// ---- Auth + upload state (broadcast to the control window) ----
+let uploadStatus: UploadStatus = { phase: 'idle', progress: 0, shareUrl: null, message: null }
+let lastUploadPayload: StartUploadPayload | null = null
+
+function sendToControl(channel: string, payload?: unknown): void {
+  if (controlWindow && !controlWindow.isDestroyed()) {
+    controlWindow.webContents.send(channel, payload)
+  }
+}
+
+function broadcastAuthState(): void {
+  sendToControl(IPC.authState, { signedIn: hasToken() })
+}
+
+async function signIn(): Promise<void> {
+  await runSignIn((status: SignInStatus) => sendToControl(IPC.signInStatus, status))
+  broadcastAuthState()
+}
+
+function signOut(): void {
+  clearToken()
+  broadcastAuthState()
+}
+
+async function startUpload(payload: StartUploadPayload): Promise<void> {
+  lastUploadPayload = payload
+  await runUpload(payload, (status: UploadStatus) => {
+    uploadStatus = status
+    sendToControl(IPC.uploadStatus, status)
+  })
+}
+
+async function retryUpload(): Promise<void> {
+  if (lastUploadPayload) await startUpload(lastUploadPayload)
+}
+
 app.whenReady().then(() => {
   // Allow the renderers to use camera/microphone (getUserMedia). The OS still
   // gates access separately on macOS via the system permission prompts.
@@ -194,12 +233,26 @@ app.whenReady().then(() => {
     getWebcamCamera: () => currentCameraId,
     hideControlWindow: () => controlWindow?.hide(),
     quit,
+    signIn,
+    cancelSignIn,
+    signOut,
+    getAuthState: () => ({ signedIn: hasToken() }),
+    startUpload,
+    retryUpload,
+    getUploadStatus: () => uploadStatus,
   })
 
   // Mirror recording status to the control panel renderer.
   recordingSession.onChange((status) => {
-    if (controlWindow && !controlWindow.isDestroyed()) {
-      controlWindow.webContents.send(IPC.recordingStatus, status)
+    sendToControl(IPC.recordingStatus, status)
+    // A new recording (or dismissal) clears any prior upload result.
+    if (
+      (status.state === 'recording' || status.state === 'idle') &&
+      uploadStatus.phase !== 'idle'
+    ) {
+      uploadStatus = { phase: 'idle', progress: 0, shareUrl: null, message: null }
+      lastUploadPayload = null
+      sendToControl(IPC.uploadStatus, uploadStatus)
     }
   })
 

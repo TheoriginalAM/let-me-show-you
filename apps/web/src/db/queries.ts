@@ -84,3 +84,58 @@ export async function getVideoBySlug(slug: string): Promise<PublicVideo | null> 
     .limit(1)
   return rows[0] ?? null
 }
+
+/**
+ * Create an `uploading` video row for the authenticated owner, retrying on the
+ * (astronomically rare) share-slug collision with a fresh slug.
+ */
+export async function createVideoForUpload(
+  ownerId: string,
+  title: string,
+  makeSlug: () => string,
+): Promise<Video> {
+  let lastError: unknown
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const rows = await db
+        .insert(videos)
+        .values({ ownerId, title, shareSlug: makeSlug(), status: 'uploading' })
+        .returning(ownerVideoColumns)
+      return rows[0]!
+    } catch (error) {
+      // 23505 = unique_violation (slug clash) → retry; anything else is fatal.
+      if ((error as { code?: string })?.code !== '23505') throw error
+      lastError = error
+    }
+  }
+  throw lastError
+}
+
+/** Delete an owner's video (used to roll back a failed upload creation). */
+export async function deleteOwnedVideo(ownerId: string, videoId: string): Promise<void> {
+  await db.delete(videos).where(and(eq(videos.id, videoId), eq(videos.ownerId, ownerId)))
+}
+
+/**
+ * WEBHOOK-ONLY status updates, keyed by videoId taken from a signature-verified
+ * Mux `passthrough`. These are intentionally NOT owner-scoped — never call them
+ * from user-facing routes.
+ */
+export async function markVideoProcessing(videoId: string, muxAssetId: string): Promise<void> {
+  await db.update(videos).set({ status: 'processing', muxAssetId }).where(eq(videos.id, videoId))
+}
+
+export async function markVideoReady(
+  videoId: string,
+  muxPlaybackId: string,
+  durationSeconds: number | null,
+): Promise<void> {
+  await db
+    .update(videos)
+    .set({ status: 'ready', muxPlaybackId, durationSeconds })
+    .where(eq(videos.id, videoId))
+}
+
+export async function markVideoErrored(videoId: string): Promise<void> {
+  await db.update(videos).set({ status: 'errored' }).where(eq(videos.id, videoId))
+}

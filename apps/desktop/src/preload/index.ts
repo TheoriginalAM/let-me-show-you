@@ -1,9 +1,12 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import {
   IPC,
+  type AuthState,
   type RecorderApi,
   type RecordingStatus,
+  type SignInStatus,
   type StartRecordingPayload,
+  type UploadStatus,
 } from '../shared/ipc'
 
 /**
@@ -43,6 +46,34 @@ const api: RecorderApi = {
     ipcRenderer.on(IPC.webcamCamera, listener)
     return () => ipcRenderer.removeListener(IPC.webcamCamera, listener)
   },
+
+  // Auth (device flow)
+  signIn: () => ipcRenderer.invoke(IPC.signIn),
+  cancelSignIn: () => ipcRenderer.invoke(IPC.cancelSignIn),
+  signOut: () => ipcRenderer.invoke(IPC.signOut),
+  getAuthState: () => ipcRenderer.invoke(IPC.getAuthState),
+  onAuthState: (cb) => {
+    const listener = (_event: IpcRendererEvent, state: AuthState): void => cb(state)
+    ipcRenderer.on(IPC.authState, listener)
+    return () => ipcRenderer.removeListener(IPC.authState, listener)
+  },
+  onSignInStatus: (cb) => {
+    const listener = (_event: IpcRendererEvent, status: SignInStatus): void => cb(status)
+    ipcRenderer.on(IPC.signInStatus, listener)
+    return () => ipcRenderer.removeListener(IPC.signInStatus, listener)
+  },
+
+  // Upload & share
+  startUpload: (payload) => ipcRenderer.invoke(IPC.startUpload, payload),
+  retryUpload: () => ipcRenderer.invoke(IPC.retryUpload),
+  getUploadStatus: () => ipcRenderer.invoke(IPC.getUploadStatus),
+  onUploadStatus: (cb) => {
+    const listener = (_event: IpcRendererEvent, status: UploadStatus): void => cb(status)
+    ipcRenderer.on(IPC.uploadStatus, listener)
+    return () => ipcRenderer.removeListener(IPC.uploadStatus, listener)
+  },
+  openExternalUrl: (url) => ipcRenderer.invoke(IPC.openExternalUrl, url),
+
   platform: process.platform,
 }
 

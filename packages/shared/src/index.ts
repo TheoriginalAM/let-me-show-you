@@ -99,3 +99,50 @@ export function formatDuration(totalSeconds: number | null): string {
   const seconds = Math.floor(totalSeconds % 60)
   return `${minutes}:${seconds.toString().padStart(2, '0')}`
 }
+
+// ---------------------------------------------------------------------------
+// HTTP API contract between apps/web and apps/desktop.
+// ---------------------------------------------------------------------------
+
+/** Body for `POST /api/videos/create-upload`. */
+export interface CreateUploadRequest {
+  title?: string
+}
+
+/** Response from `POST /api/videos/create-upload`. */
+export interface CreateUploadResponse {
+  videoId: string
+  /** Mux direct-upload URL to PUT the file to. */
+  uploadUrl: string
+  /** Public share URL (`https://<domain>/s/<slug>`). */
+  shareUrl: string
+}
+
+/** Response from `POST /api/auth/device/start`. */
+export interface DeviceStartResponse {
+  /** Secret the desktop polls with (never shown to the user). */
+  deviceCode: string
+  /** Short human code the user confirms in the browser. */
+  userCode: string
+  /** Page where the user approves (`https://<domain>/device`). */
+  verificationUri: string
+  /** Same page with the code prefilled. */
+  verificationUriComplete: string
+  /** Seconds the desktop should wait between polls. */
+  intervalSeconds: number
+  /** Seconds until the device code expires. */
+  expiresInSeconds: number
+}
+
+/** Body for `POST /api/auth/device/approve` (browser, session-authed). */
+export interface DeviceApproveRequest {
+  userCode: string
+}
+
+/** Response from `POST /api/auth/device/poll`. */
+export type DevicePollResponse = { status: 'pending' } | { status: 'approved'; token: string }
+
+/** Standard JSON error body. */
+export interface ApiErrorResponse {
+  error: string
+}
