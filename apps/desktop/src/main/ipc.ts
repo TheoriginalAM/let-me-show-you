@@ -1,4 +1,5 @@
-import { desktopCapturer, ipcMain, shell, systemPreferences } from 'electron'
+import { isAbsolute, join, relative, resolve } from 'path'
+import { app, desktopCapturer, ipcMain, shell, systemPreferences } from 'electron'
 import {
   IPC,
   type CaptureSource,
@@ -6,10 +7,10 @@ import {
   type PermissionState,
   type PermissionTarget,
 } from '../shared/ipc'
-import type { Recorder } from './recorder'
+import type { RecordingSession } from './recording-session'
 
 export interface IpcContext {
-  recorder: Recorder
+  session: RecordingSession
   showWebcam: (cameraId: string) => void
   hideWebcam: () => void
   getWebcamCamera: () => string | null
@@ -28,8 +29,6 @@ const PRIVACY_URLS: Record<PermissionTarget, string> = {
 }
 
 function permissionFor(target: PermissionTarget): PermissionState {
-  // getMediaAccessStatus is only meaningful on macOS/Windows; elsewhere the OS
-  // does not gate these, so treat as granted.
   if (process.platform !== 'darwin' && process.platform !== 'win32') return 'granted'
   try {
     return systemPreferences.getMediaAccessStatus(target)
@@ -42,11 +41,17 @@ function isPermissionTarget(value: unknown): value is PermissionTarget {
   return value === 'screen' || value === 'microphone' || value === 'camera'
 }
 
-/** Device ids from enumerateDevices are opaque strings; bound them defensively. */
-function sanitizeDeviceId(value: unknown): string | null {
-  if (typeof value !== 'string') return null
-  if (value.length === 0 || value.length > 512) return null
-  return value
+/** Only allow revealing files that are true descendants of the app's dirs. */
+function isRevealablePath(filePath: unknown): filePath is string {
+  if (typeof filePath !== 'string' || filePath.length === 0) return false
+  const resolved = resolve(filePath)
+  const allowedRoots = [join(app.getPath('videos'), 'LetMeShowYou'), app.getPath('temp')]
+  return allowedRoots.some((root) => {
+    // path.relative rejects `..` traversal and sibling dirs that merely share a
+    // name prefix (e.g. `<root>-exfil`), unlike a bare startsWith.
+    const rel = relative(resolve(root), resolved)
+    return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
+  })
 }
 
 export function registerIpcHandlers(ctx: IpcContext): void {
@@ -75,58 +80,59 @@ export function registerIpcHandlers(ctx: IpcContext): void {
   }))
 
   ipcMain.handle(IPC.openPrivacySettings, async (_event, target: unknown) => {
-    if (!isPermissionTarget(target)) {
-      throw new Error('Invalid privacy-settings target')
-    }
+    if (!isPermissionTarget(target)) throw new Error('Invalid privacy-settings target')
     await shell.openExternal(PRIVACY_URLS[target])
   })
 
+  // ---- Recording lifecycle ----
   ipcMain.handle(IPC.startRecording, (_event, payload: unknown) => {
     if (!payload || typeof payload !== 'object') {
       throw new Error('Invalid start-recording payload')
     }
-    const { sourceId, micId, cameraId } = payload as Record<string, unknown>
+    const { sourceId } = payload as Record<string, unknown>
     if (typeof sourceId !== 'string' || !knownSourceIds.has(sourceId)) {
       throw new Error('Unknown or missing sourceId')
     }
-    const validated = {
-      sourceId,
-      micId: sanitizeDeviceId(micId),
-      cameraId: sanitizeDeviceId(cameraId),
+    ctx.session.begin()
+  })
+
+  ipcMain.handle(IPC.writeChunk, async (_event, chunk: unknown) => {
+    // Bounded (~64MB) to reject anything absurd; a 1s chunk at 8Mbps is ~1MB.
+    if (!(chunk instanceof Uint8Array) || chunk.byteLength > 64 * 1024 * 1024) {
+      throw new Error('Invalid recording chunk')
     }
-    // STUB: real capture is intentionally not implemented yet.
-    console.log('[main] start-recording (stub):', validated)
-    ctx.recorder.start()
+    // Awaited so main's write backpressure throttles the renderer.
+    await ctx.session.writeChunk(chunk)
   })
 
-  ipcMain.handle(IPC.stopRecording, () => {
-    console.log('[main] stop-recording (stub)')
-    ctx.recorder.stop()
+  ipcMain.handle(IPC.pauseRecording, () => ctx.session.pause())
+  ipcMain.handle(IPC.resumeRecording, () => ctx.session.resume())
+  ipcMain.handle(IPC.finishRecording, () => ctx.session.finish())
+
+  ipcMain.handle(IPC.abortRecording, (_event, message: unknown) => {
+    const text = typeof message === 'string' && message.length <= 500 ? message : 'Recording failed'
+    return ctx.session.abort(text)
   })
 
-  ipcMain.handle(IPC.pauseRecording, () => {
-    ctx.recorder.pause()
+  ipcMain.handle(IPC.dismissResult, () => ctx.session.dismiss())
+  ipcMain.handle(IPC.getRecordingStatus, () => ctx.session.getStatus())
+
+  ipcMain.handle(IPC.revealInFinder, (_event, filePath: unknown) => {
+    if (!isRevealablePath(filePath)) throw new Error('Refusing to reveal path outside app folders')
+    shell.showItemInFolder(resolve(filePath))
   })
 
-  ipcMain.handle(IPC.resumeRecording, () => {
-    ctx.recorder.resume()
-  })
-
+  // ---- Webcam + window ----
   ipcMain.handle(IPC.toggleWebcam, (_event, cameraId: unknown) => {
-    const id = sanitizeDeviceId(cameraId)
+    const id =
+      typeof cameraId === 'string' && cameraId.length > 0 && cameraId.length <= 512
+        ? cameraId
+        : null
     if (id) ctx.showWebcam(id)
     else ctx.hideWebcam()
   })
 
   ipcMain.handle(IPC.getWebcamCamera, () => ctx.getWebcamCamera())
-
-  ipcMain.handle(IPC.getRecordingStatus, () => ctx.recorder.getStatus())
-
-  ipcMain.handle(IPC.hideControlWindow, () => {
-    ctx.hideControlWindow()
-  })
-
-  ipcMain.handle(IPC.quitApp, () => {
-    ctx.quit()
-  })
+  ipcMain.handle(IPC.hideControlWindow, () => ctx.hideControlWindow())
+  ipcMain.handle(IPC.quitApp, () => ctx.quit())
 }

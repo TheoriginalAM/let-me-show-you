@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { capture } from '../capture'
 import { useRecorderStore } from '../store'
 
 function formatElapsed(ms: number): string {
@@ -37,21 +38,15 @@ export function RecordingBar() {
 
       <div className="rec-actions">
         {paused ? (
-          <button
-            className="btn-secondary no-drag"
-            onClick={() => void window.recorder.resumeRecording()}
-          >
+          <button className="btn-secondary no-drag" onClick={() => capture.resume()}>
             Resume
           </button>
         ) : (
-          <button
-            className="btn-secondary no-drag"
-            onClick={() => void window.recorder.pauseRecording()}
-          >
+          <button className="btn-secondary no-drag" onClick={() => capture.pause()}>
             Pause
           </button>
         )}
-        <button className="btn-stop no-drag" onClick={() => void window.recorder.stopRecording()}>
+        <button className="btn-stop no-drag" onClick={() => capture.stop()}>
           Stop
         </button>
       </div>

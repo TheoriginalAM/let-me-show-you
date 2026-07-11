@@ -11,6 +11,10 @@ files:
   - out/**
   - package.json
 
+# The ffmpeg binary must stay executable on disk, so unpack it from the asar.
+asarUnpack:
+  - '**/node_modules/ffmpeg-static/**'
+
 # Code signing is intentionally NOT configured yet.
 # `identity: null` skips macOS signing so unsigned local builds succeed.
 mac:

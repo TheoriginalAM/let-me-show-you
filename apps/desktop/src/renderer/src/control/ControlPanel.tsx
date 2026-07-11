@@ -1,10 +1,14 @@
 import { useCallback, useEffect } from 'react'
+import { capture } from '../capture'
 import { useRecorderStore, type DeviceOption } from '../store'
 import { PermissionGate } from './PermissionGate'
 import { PermissionNotice } from './PermissionNotice'
 import { SourcePicker } from './SourcePicker'
 import { DeviceSelects } from './DeviceSelects'
 import { RecordingBar } from './RecordingBar'
+import { ProcessingScreen } from './ProcessingScreen'
+import { ReadyScreen } from './ReadyScreen'
+import { ErrorScreen } from './ErrorScreen'
 
 async function enumerate(): Promise<{ mics: DeviceOption[]; cameras: DeviceOption[] }> {
   const devices = await navigator.mediaDevices.enumerateDevices()
@@ -59,18 +63,36 @@ export function ControlPanel() {
   useEffect(() => {
     void refreshPermissions()
     void refreshDevices()
-    // Sync current recording state on mount (robust to renderer reloads mid-record).
-    void window.recorder.getRecordingStatus().then((next) => {
-      useRecorderStore.getState().setStatus(next)
-    })
+
     const onDeviceChange = (): void => void refreshDevices()
     navigator.mediaDevices.addEventListener('devicechange', onDeviceChange)
-    const unsubscribe = window.recorder.onRecordingStatus((next) =>
-      useRecorderStore.getState().setStatus(next),
-    )
+
+    // Subscribe BEFORE fetching the snapshot so a live push always wins.
+    let gotLivePush = false
+    const unsubscribe = window.recorder.onRecordingStatus((next) => {
+      gotLivePush = true
+      useRecorderStore.getState().setStatus(next)
+      // If main ended the session on its own (e.g. a disk write error), release
+      // the still-live capture in this renderer so the mic/screen aren't leaked.
+      if (next.state === 'error') capture.forceRelease()
+    })
+    // The tray "Stop Recording" asks the renderer to stop the live MediaRecorder.
+    const unsubscribeStop = window.recorder.onRequestStop(() => capture.stop())
+
+    // Sync current recording state on mount (robust to renderer reloads).
+    void window.recorder.getRecordingStatus().then((snapshot) => {
+      if (!gotLivePush) useRecorderStore.getState().setStatus(snapshot)
+      // Main thinks we're recording but this renderer has no live recorder (a
+      // reload orphaned it) — end the session so the UI/temp file can recover.
+      if ((snapshot.state === 'recording' || snapshot.state === 'paused') && !capture.isLive) {
+        void window.recorder.abortRecording('Recording interrupted (the recorder was reloaded).')
+      }
+    })
+
     return () => {
       navigator.mediaDevices.removeEventListener('devicechange', onDeviceChange)
       unsubscribe()
+      unsubscribeStop()
     }
   }, [refreshPermissions, refreshDevices])
 
@@ -98,16 +120,14 @@ export function ControlPanel() {
   function startRecording(): void {
     const store = useRecorderStore.getState()
     if (!store.selectedSourceId) return
-    void window.recorder
-      .startRecording({
-        sourceId: store.selectedSourceId,
-        micId: store.selectedMicId,
-        cameraId: store.selectedCameraId,
-      })
-      .catch((error) => console.error('[renderer] startRecording failed:', error))
+    void capture.start({
+      sourceId: store.selectedSourceId,
+      micId: store.selectedMicId,
+      cameraId: store.selectedCameraId,
+    })
   }
 
-  const recording = status.state !== 'idle'
+  const { state } = status
 
   return (
     <div className="panel">
@@ -124,8 +144,14 @@ export function ControlPanel() {
       </header>
 
       <main className="panel-body">
-        {recording ? (
+        {state === 'recording' || state === 'paused' ? (
           <RecordingBar />
+        ) : state === 'processing' ? (
+          <ProcessingScreen />
+        ) : state === 'ready' ? (
+          <ReadyScreen />
+        ) : state === 'error' ? (
+          <ErrorScreen />
         ) : !permissions ? (
           <div className="picker-empty">Checking permissions…</div>
         ) : !screenGranted ? (

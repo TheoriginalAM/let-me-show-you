@@ -5,10 +5,12 @@ packages:
 # pnpm 10+ blocks dependency build (postinstall) scripts by default. pnpm 11
 # (pinned via `packageManager`) reads this per-package `allowBuilds` map to
 # decide which are allowed to run:
-#   - electron: postinstall downloads the Electron binary
-#   - esbuild:  postinstall fetches the platform binary (used by Vite)
-#   - sharp:    optional native image lib pulled in by Next.js
+#   - electron:      postinstall downloads the Electron binary
+#   - esbuild:       postinstall fetches the platform binary (used by Vite)
+#   - sharp:         optional native image lib pulled in by Next.js
+#   - ffmpeg-static: postinstall downloads the ffmpeg binary (desktop transcode)
 allowBuilds:
   electron: true
   esbuild: true
   sharp: true
+  ffmpeg-static: true

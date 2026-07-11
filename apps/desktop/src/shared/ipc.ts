@@ -13,9 +13,13 @@ export const IPC = {
   getPermissions: 'get-permissions',
   openPrivacySettings: 'open-privacy-settings',
   startRecording: 'start-recording',
-  stopRecording: 'stop-recording',
+  writeChunk: 'write-chunk',
   pauseRecording: 'pause-recording',
   resumeRecording: 'resume-recording',
+  finishRecording: 'finish-recording',
+  abortRecording: 'abort-recording',
+  dismissResult: 'dismiss-result',
+  revealInFinder: 'reveal-in-finder',
   toggleWebcam: 'toggle-webcam',
   getWebcamCamera: 'get-webcam-camera',
   getRecordingStatus: 'get-recording-status',
@@ -23,6 +27,7 @@ export const IPC = {
   quitApp: 'quit-app',
   // main -> renderer (events)
   recordingStatus: 'recording-status',
+  requestStop: 'request-stop',
   webcamCamera: 'webcam-camera',
 } as const
 
@@ -52,7 +57,27 @@ export type PermissionTarget = 'screen' | 'microphone' | 'camera'
 
 export type MediaPermissions = Record<PermissionTarget, PermissionState>
 
-export type RecordingState = 'idle' | 'recording' | 'paused'
+/**
+ * The full session lifecycle:
+ *   idle → recording ⇄ paused → processing → ready
+ *                                          ↘ error
+ */
+export type RecordingState = 'idle' | 'recording' | 'paused' | 'processing' | 'ready' | 'error'
+
+/** The finished MP4, shown on the "Recording ready" screen. */
+export interface RecordingResult {
+  filePath: string
+  fileName: string
+  /** JPEG data URL of a frame grabbed ~1s in, or null if it couldn't be made. */
+  thumbnailDataUrl: string | null
+  durationSeconds: number
+}
+
+/** A failed recording. The webm is preserved for recovery when possible. */
+export interface RecordingError {
+  message: string
+  recoveredWebmPath: string | null
+}
 
 export interface RecordingStatus {
   state: RecordingState
@@ -60,6 +85,12 @@ export interface RecordingStatus {
   startedAt: number | null
   /** Elapsed ms accumulated across previous running segments (before pauses). */
   accumulatedMs: number
+  /** Transcode progress in [0, 1] while `state === 'processing'`. */
+  progress: number
+  /** Present only when `state === 'ready'`. */
+  result: RecordingResult | null
+  /** Present only when `state === 'error'`. */
+  error: RecordingError | null
 }
 
 /** The API the preload script exposes on `window.recorder`. */
@@ -67,10 +98,20 @@ export interface RecorderApi {
   listSources: () => Promise<CaptureSource[]>
   getPermissions: () => Promise<MediaPermissions>
   openPrivacySettings: (target: PermissionTarget) => Promise<void>
+  /** Begin a session: opens the temp .webm file (call after acquiring streams). */
   startRecording: (payload: StartRecordingPayload) => Promise<void>
-  stopRecording: () => Promise<void>
+  /** Stream a MediaRecorder chunk to the main-process temp file. */
+  writeChunk: (chunk: Uint8Array) => Promise<void>
   pauseRecording: () => Promise<void>
   resumeRecording: () => Promise<void>
+  /** Finalize: close the temp file and transcode to MP4. */
+  finishRecording: () => Promise<void>
+  /** Abort with an error (disk/capture failure); preserves the webm if it has data. */
+  abortRecording: (message: string) => Promise<void>
+  /** Dismiss the ready/error screen and return to idle. */
+  dismissResult: () => Promise<void>
+  /** Reveal a file in Finder/Explorer. */
+  revealInFinder: (filePath: string) => Promise<void>
   toggleWebcam: (cameraId: string | null) => Promise<void>
   /** (webcam window) current selected camera id, resolved without a race. */
   getWebcamCamera: () => Promise<string | null>
@@ -80,6 +121,8 @@ export interface RecorderApi {
   quit: () => Promise<void>
   /** Subscribe to recording-status changes; returns an unsubscribe fn. */
   onRecordingStatus: (cb: (status: RecordingStatus) => void) => () => void
+  /** Main asks the renderer to stop the MediaRecorder (e.g. from the tray). */
+  onRequestStop: (cb: () => void) => () => void
   /** (webcam window) subscribe to camera-id changes; returns an unsubscribe fn. */
   onWebcamCamera: (cb: (cameraId: string | null) => void) => () => void
   platform: string

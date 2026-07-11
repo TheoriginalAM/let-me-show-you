@@ -1,8 +1,9 @@
 import { Menu, nativeImage, Tray, type NativeImage } from 'electron'
-import type { Recorder } from './recorder'
+import type { RecordingSession } from './recording-session'
 
 export interface TrayContext {
-  recorder: Recorder
+  session: RecordingSession
+  requestStop: () => void
   showControlWindow: () => void
   quit: () => void
 }
@@ -37,15 +38,14 @@ export function createTray(ctx: TrayContext): Tray {
   tray.setToolTip('Let Me Show You')
 
   const rebuildMenu = (): void => {
-    const active = ctx.recorder.isActive()
+    const active = ctx.session.isActive()
     tray.setContextMenu(
       Menu.buildFromTemplate([
         {
-          // Stopping is always safe; starting must go through the control panel
-          // so a source is selected and permissions are checked (the renderer
-          // gates it) — the tray must not begin a phantom, source-less session.
+          // Stopping asks the renderer (which owns the MediaRecorder) to stop;
+          // starting surfaces the panel so a source is picked and validated.
           label: active ? 'Stop Recording' : 'Start Recording',
-          click: () => (active ? ctx.recorder.stop() : ctx.showControlWindow()),
+          click: () => (active ? ctx.requestStop() : ctx.showControlWindow()),
         },
         { type: 'separator' },
         { label: 'Show Recorder', click: () => ctx.showControlWindow() },
@@ -56,7 +56,7 @@ export function createTray(ctx: TrayContext): Tray {
   }
 
   rebuildMenu()
-  ctx.recorder.onChange(rebuildMenu)
+  ctx.session.onChange(rebuildMenu)
   tray.on('click', () => ctx.showControlWindow())
 
   return tray

@@ -9,7 +9,7 @@ import {
 } from 'electron'
 import { APP_NAME } from '@lmsy/shared'
 import { IPC } from '../shared/ipc'
-import { createRecorder } from './recorder'
+import { RecordingSession } from './recording-session'
 import { registerIpcHandlers } from './ipc'
 import { createTray } from './tray'
 
@@ -31,7 +31,7 @@ let webcamWindow: BrowserWindow | null = null
 let currentCameraId: string | null = null
 let isQuitting = false
 
-const recorder = createRecorder()
+const recordingSession = new RecordingSession()
 
 function loadRenderer(win: BrowserWindow, hash?: string): void {
   if (isDev && devServerUrl) {
@@ -155,6 +155,15 @@ function quit(): void {
   app.quit()
 }
 
+// Ask the renderer (which owns the MediaRecorder) to stop, and surface the panel
+// so the user sees the processing/ready screen.
+function requestStop(): void {
+  if (controlWindow && !controlWindow.isDestroyed()) {
+    controlWindow.webContents.send(IPC.requestStop)
+    controlWindow.show()
+  }
+}
+
 app.whenReady().then(() => {
   // Allow the renderers to use camera/microphone (getUserMedia). The OS still
   // gates access separately on macOS via the system permission prompts.
@@ -179,7 +188,7 @@ app.whenReady().then(() => {
   }
 
   registerIpcHandlers({
-    recorder,
+    session: recordingSession,
     showWebcam,
     hideWebcam,
     getWebcamCamera: () => currentCameraId,
@@ -188,7 +197,7 @@ app.whenReady().then(() => {
   })
 
   // Mirror recording status to the control panel renderer.
-  recorder.onChange((status) => {
+  recordingSession.onChange((status) => {
     if (controlWindow && !controlWindow.isDestroyed()) {
       controlWindow.webContents.send(IPC.recordingStatus, status)
     }
@@ -202,7 +211,7 @@ app.whenReady().then(() => {
     })
   }
 
-  createTray({ recorder, showControlWindow, quit })
+  createTray({ session: recordingSession, requestStop, showControlWindow, quit })
   controlWindow = createControlWindow()
 
   app.on('activate', () => {
@@ -212,6 +221,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   isQuitting = true
+  recordingSession.dispose() // kill any in-flight ffmpeg transcode
 })
 
 app.on('window-all-closed', () => {

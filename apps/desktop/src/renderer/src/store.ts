@@ -6,7 +6,14 @@ export interface DeviceOption {
   label: string
 }
 
-const idleStatus: RecordingStatus = { state: 'idle', startedAt: null, accumulatedMs: 0 }
+const idleStatus: RecordingStatus = {
+  state: 'idle',
+  startedAt: null,
+  accumulatedMs: 0,
+  progress: 0,
+  result: null,
+  error: null,
+}
 
 interface RecorderStore {
   permissions: MediaPermissions | null

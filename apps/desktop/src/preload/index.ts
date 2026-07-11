@@ -16,9 +16,13 @@ const api: RecorderApi = {
   openPrivacySettings: (target) => ipcRenderer.invoke(IPC.openPrivacySettings, target),
   startRecording: (payload: StartRecordingPayload) =>
     ipcRenderer.invoke(IPC.startRecording, payload),
-  stopRecording: () => ipcRenderer.invoke(IPC.stopRecording),
+  writeChunk: (chunk) => ipcRenderer.invoke(IPC.writeChunk, chunk),
   pauseRecording: () => ipcRenderer.invoke(IPC.pauseRecording),
   resumeRecording: () => ipcRenderer.invoke(IPC.resumeRecording),
+  finishRecording: () => ipcRenderer.invoke(IPC.finishRecording),
+  abortRecording: (message) => ipcRenderer.invoke(IPC.abortRecording, message),
+  dismissResult: () => ipcRenderer.invoke(IPC.dismissResult),
+  revealInFinder: (filePath) => ipcRenderer.invoke(IPC.revealInFinder, filePath),
   toggleWebcam: (cameraId) => ipcRenderer.invoke(IPC.toggleWebcam, cameraId),
   getWebcamCamera: () => ipcRenderer.invoke(IPC.getWebcamCamera),
   getRecordingStatus: () => ipcRenderer.invoke(IPC.getRecordingStatus),
@@ -28,6 +32,11 @@ const api: RecorderApi = {
     const listener = (_event: IpcRendererEvent, status: RecordingStatus): void => cb(status)
     ipcRenderer.on(IPC.recordingStatus, listener)
     return () => ipcRenderer.removeListener(IPC.recordingStatus, listener)
+  },
+  onRequestStop: (cb) => {
+    const listener = (): void => cb()
+    ipcRenderer.on(IPC.requestStop, listener)
+    return () => ipcRenderer.removeListener(IPC.requestStop, listener)
   },
   onWebcamCamera: (cb) => {
     const listener = (_event: IpcRendererEvent, cameraId: string | null): void => cb(cameraId)
