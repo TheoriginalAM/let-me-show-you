@@ -15,6 +15,13 @@ import { createTray } from './tray'
 import { clearToken, hasToken } from './token-store'
 import { cancelSignIn, runSignIn } from './device-auth'
 import { runUpload } from './uploader'
+import { getUpdateStatus, initAutoUpdates } from './updater'
+import { initSentryMain } from './sentry'
+
+// Crash reporting first (env-gated + off in dev), so it can capture early errors.
+initSentryMain()
+// Ensure the product name is used everywhere (dev menu, About panel, userData).
+app.setName(APP_NAME)
 
 const isDev = !app.isPackaged
 const devServerUrl = process.env.ELECTRON_RENDERER_URL
@@ -89,6 +96,8 @@ function createControlWindow(): BrowserWindow {
   })
   win.webContents.on('did-finish-load', () => {
     console.log(`[main] ${APP_NAME} control panel loaded`)
+    // Re-sync update status so a renderer reload still sees a pending update.
+    win.webContents.send(IPC.updateStatus, getUpdateStatus())
   })
   loadRenderer(win)
   return win
@@ -266,6 +275,15 @@ app.whenReady().then(() => {
 
   createTray({ session: recordingSession, requestStop, showControlWindow, quit })
   controlWindow = createControlWindow()
+
+  app.setAboutPanelOptions({
+    applicationName: APP_NAME,
+    applicationVersion: app.getVersion(),
+    copyright: 'Copyright © 2026 Let Me Show You',
+  })
+
+  // Background auto-updates (no-op in dev): check on launch + every 4 hours.
+  initAutoUpdates(() => controlWindow)
 
   app.on('activate', () => {
     showControlWindow()

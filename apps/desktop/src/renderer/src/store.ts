@@ -5,6 +5,7 @@ import type {
   MediaPermissions,
   RecordingStatus,
   SignInStatus,
+  UpdateStatus,
   UploadStatus,
 } from '@shared/ipc'
 
@@ -29,6 +30,7 @@ const idleSignIn: SignInStatus = {
   verificationUri: null,
   message: null,
 }
+const idleUpdate: UpdateStatus = { phase: 'idle', version: null }
 
 interface RecorderStore {
   permissions: MediaPermissions | null
@@ -43,6 +45,9 @@ interface RecorderStore {
   auth: AuthState
   signIn: SignInStatus
   upload: UploadStatus
+  update: UpdateStatus
+  /** null until the first-run flag has been read from main. */
+  onboardingComplete: boolean | null
 
   setPermissions: (permissions: MediaPermissions) => void
   setSources: (sources: CaptureSource[]) => void
@@ -55,6 +60,8 @@ interface RecorderStore {
   setAuth: (auth: AuthState) => void
   setSignIn: (signIn: SignInStatus) => void
   setUpload: (upload: UploadStatus) => void
+  setUpdate: (update: UpdateStatus) => void
+  setOnboardingComplete: (value: boolean) => void
 }
 
 export const useRecorderStore = create<RecorderStore>((set) => ({
@@ -70,6 +77,8 @@ export const useRecorderStore = create<RecorderStore>((set) => ({
   auth: { signedIn: false },
   signIn: idleSignIn,
   upload: idleUpload,
+  update: idleUpdate,
+  onboardingComplete: null,
 
   setPermissions: (permissions) => set({ permissions }),
   setSources: (sources) =>
@@ -100,4 +109,6 @@ export const useRecorderStore = create<RecorderStore>((set) => ({
   setAuth: (auth) => set({ auth }),
   setSignIn: (signIn) => set({ signIn }),
   setUpload: (upload) => set({ upload }),
+  setUpdate: (update) => set({ update }),
+  setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),
 }))

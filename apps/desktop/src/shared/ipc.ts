@@ -34,6 +34,10 @@ export const IPC = {
   retryUpload: 'retry-upload',
   getUploadStatus: 'get-upload-status',
   openExternalUrl: 'open-external-url',
+  // onboarding + auto-update
+  getOnboardingComplete: 'get-onboarding-complete',
+  completeOnboarding: 'complete-onboarding',
+  restartToUpdate: 'restart-to-update',
   // main -> renderer (events)
   recordingStatus: 'recording-status',
   requestStop: 'request-stop',
@@ -41,6 +45,7 @@ export const IPC = {
   authState: 'auth-state',
   signInStatus: 'sign-in-status',
   uploadStatus: 'upload-status',
+  updateStatus: 'update-status',
 } as const
 
 export type SourceType = 'screen' | 'window'
@@ -139,6 +144,15 @@ export interface StartUploadPayload {
   title: string
 }
 
+export type UpdatePhase = 'idle' | 'downloading' | 'ready'
+
+/** Auto-update progress. The renderer only surfaces a toast when `phase === 'ready'`. */
+export interface UpdateStatus {
+  phase: UpdatePhase
+  /** The version that is ready to install (present when `phase === 'ready'`). */
+  version: string | null
+}
+
 /** The API the preload script exposes on `window.recorder`. */
 export interface RecorderApi {
   listSources: () => Promise<CaptureSource[]>
@@ -188,6 +202,18 @@ export interface RecorderApi {
   onUploadStatus: (cb: (status: UploadStatus) => void) => () => void
   /** Open an http(s) URL in the default browser (e.g. the share link). */
   openExternalUrl: (url: string) => Promise<void>
+
+  // ---- First-run onboarding ----
+  /** Whether the user has finished (or skipped) the first-run onboarding. */
+  getOnboardingComplete: () => Promise<boolean>
+  /** Mark onboarding as done so it isn't shown again. */
+  completeOnboarding: () => Promise<void>
+
+  // ---- Auto-update ----
+  /** Quit and install a downloaded update (from the "Update ready" toast). */
+  restartToUpdate: () => Promise<void>
+  /** Subscribe to auto-update status; returns an unsubscribe fn. */
+  onUpdateStatus: (cb: (status: UpdateStatus) => void) => () => void
 
   platform: string
 }

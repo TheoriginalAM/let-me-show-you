@@ -9,6 +9,13 @@ const bundledWorkspaceDeps = ['@lmsy/shared']
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin({ exclude: bundledWorkspaceDeps })],
+    // Bake the Sentry DSN into the main bundle at build time (empty when unset,
+    // so Sentry stays off). Read at build — not runtime — so a distributed app
+    // reports crashes without the end user setting any env var.
+    define: {
+      'process.env.SENTRY_DSN': JSON.stringify(process.env.SENTRY_DSN ?? ''),
+      'process.env.SENTRY_ENVIRONMENT': JSON.stringify(process.env.SENTRY_ENVIRONMENT ?? ''),
+    },
     build: {
       rollupOptions: {
         input: { index: resolve(__dirname, 'src/main/index.ts') },

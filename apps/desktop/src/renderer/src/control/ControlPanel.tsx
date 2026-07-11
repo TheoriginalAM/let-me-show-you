@@ -10,6 +10,8 @@ import { ProcessingScreen } from './ProcessingScreen'
 import { ReadyScreen } from './ReadyScreen'
 import { ErrorScreen } from './ErrorScreen'
 import { Settings } from './Settings'
+import { Onboarding } from './Onboarding'
+import { UpdateToast } from './UpdateToast'
 
 async function enumerate(): Promise<{ mics: DeviceOption[]; cameras: DeviceOption[] }> {
   const devices = await navigator.mediaDevices.enumerateDevices()
@@ -36,6 +38,7 @@ export function ControlPanel() {
   const status = useRecorderStore((s) => s.status)
   const selectedSourceId = useRecorderStore((s) => s.selectedSourceId)
   const selectedCameraId = useRecorderStore((s) => s.selectedCameraId)
+  const onboardingComplete = useRecorderStore((s) => s.onboardingComplete)
   const [showSettings, setShowSettings] = useState(false)
 
   const refreshPermissions = useCallback(async () => {
@@ -92,8 +95,14 @@ export function ControlPanel() {
     const unsubscribeUpload = window.recorder.onUploadStatus((s) =>
       useRecorderStore.getState().setUpload(s),
     )
+    const unsubscribeUpdate = window.recorder.onUpdateStatus((s) =>
+      useRecorderStore.getState().setUpdate(s),
+    )
     void window.recorder.getAuthState().then(store.setAuth)
     void window.recorder.getUploadStatus().then(store.setUpload)
+    void window.recorder
+      .getOnboardingComplete()
+      .then((done) => useRecorderStore.getState().setOnboardingComplete(done))
 
     // Sync current recording state on mount (robust to renderer reloads).
     void window.recorder.getRecordingStatus().then((snapshot) => {
@@ -112,6 +121,7 @@ export function ControlPanel() {
       unsubscribeAuth()
       unsubscribeSignIn()
       unsubscribeUpload()
+      unsubscribeUpdate()
     }
   }, [refreshPermissions, refreshDevices])
 
@@ -154,13 +164,15 @@ export function ControlPanel() {
         <span className="title-dot" />
         <span className="title-text">Let Me Show You</span>
         <div className="titlebar-actions">
-          <button
-            className={`win-icon no-drag ${showSettings ? 'active' : ''}`}
-            title="Settings"
-            onClick={() => setShowSettings((value) => !value)}
-          >
-            ⚙
-          </button>
+          {onboardingComplete === true && (
+            <button
+              className={`win-icon no-drag ${showSettings ? 'active' : ''}`}
+              title="Settings"
+              onClick={() => setShowSettings((value) => !value)}
+            >
+              ⚙
+            </button>
+          )}
           <button
             className="win-close no-drag"
             title="Hide to tray"
@@ -172,7 +184,11 @@ export function ControlPanel() {
       </header>
 
       <main className="panel-body">
-        {showSettings ? (
+        {onboardingComplete === null ? (
+          <div className="picker-empty">Loading…</div>
+        ) : onboardingComplete === false ? (
+          <Onboarding onRecheck={recheck} />
+        ) : showSettings ? (
           <Settings onClose={() => setShowSettings(false)} />
         ) : state === 'recording' || state === 'paused' ? (
           <RecordingBar />
@@ -201,6 +217,7 @@ export function ControlPanel() {
           </>
         )}
       </main>
+      <UpdateToast />
     </div>
   )
 }

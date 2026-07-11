@@ -6,6 +6,7 @@ import {
   type RecordingStatus,
   type SignInStatus,
   type StartRecordingPayload,
+  type UpdateStatus,
   type UploadStatus,
 } from '../shared/ipc'
 
@@ -73,6 +74,18 @@ const api: RecorderApi = {
     return () => ipcRenderer.removeListener(IPC.uploadStatus, listener)
   },
   openExternalUrl: (url) => ipcRenderer.invoke(IPC.openExternalUrl, url),
+
+  // Onboarding
+  getOnboardingComplete: () => ipcRenderer.invoke(IPC.getOnboardingComplete),
+  completeOnboarding: () => ipcRenderer.invoke(IPC.completeOnboarding),
+
+  // Auto-update
+  restartToUpdate: () => ipcRenderer.invoke(IPC.restartToUpdate),
+  onUpdateStatus: (cb) => {
+    const listener = (_event: IpcRendererEvent, status: UpdateStatus): void => cb(status)
+    ipcRenderer.on(IPC.updateStatus, listener)
+    return () => ipcRenderer.removeListener(IPC.updateStatus, listener)
+  },
 
   platform: process.platform,
 }

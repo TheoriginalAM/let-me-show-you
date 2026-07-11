@@ -11,6 +11,8 @@ import {
   type UploadStatus,
 } from '../shared/ipc'
 import type { RecordingSession } from './recording-session'
+import { getOnboardingComplete, setOnboardingComplete } from './settings-store'
+import { restartToUpdate } from './updater'
 
 export interface IpcContext {
   session: RecordingSession
@@ -181,4 +183,11 @@ export function registerIpcHandlers(ctx: IpcContext): void {
       // ignore malformed url
     }
   })
+
+  // ---- Onboarding ----
+  ipcMain.handle(IPC.getOnboardingComplete, () => getOnboardingComplete())
+  ipcMain.handle(IPC.completeOnboarding, () => setOnboardingComplete(true))
+
+  // ---- Auto-update ----
+  ipcMain.handle(IPC.restartToUpdate, () => restartToUpdate())
 }

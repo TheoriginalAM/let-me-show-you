@@ -15,17 +15,45 @@ files:
 asarUnpack:
   - '**/node_modules/ffmpeg-static/**'
 
-# Code signing is intentionally NOT configured yet.
-# `identity: null` skips macOS signing so unsigned local builds succeed.
+# Auto-update source + release target. electron-updater reads latest-mac.yml /
+# latest.yml from the GitHub Releases of this repo.
+# NOTE: owner/repo must match your actual GitHub repository.
+publish:
+  - provider: github
+    owner: TheoriginalAM
+    repo: let-me-show-you
+    # Publish a real (non-draft) release so /releases/latest and electron-updater see it.
+    releaseType: release
+
+# afterPack fixes the per-arch ffmpeg binary (ffmpeg-static ships one arch);
+# afterSign notarizes the signed mac app when Apple creds are present (env-gated).
+afterPack: build/fix-ffmpeg.cjs
+afterSign: build/notarize.cjs
+
 mac:
-  identity: null
   category: public.app-category.productivity
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  # Notarization is done by the afterSign hook, not electron-builder's built-in.
+  notarize: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  extendInfo:
+    NSCameraUsageDescription: Let Me Show You uses your camera to add an optional webcam bubble to your recordings.
+    NSMicrophoneUsageDescription: Let Me Show You uses your microphone to record voiceover alongside your screen.
+    NSScreenCaptureUsageDescription: Let Me Show You records your screen so you can share it as a video.
   target:
+    # dmg for manual download; zip is what electron-updater applies on macOS.
     - target: dmg
       arch:
         - arm64
         - x64
+    - target: zip
+      arch:
+        - arm64
+        - x64
 
+# Windows: NSIS installer, intentionally unsigned for now.
 win:
   target:
     - target: nsis

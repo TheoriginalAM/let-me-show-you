@@ -1,0 +1,65 @@
+name: Release
+
+# Build, (mac) sign + notarize, and publish the desktop app to a GitHub Release
+# whenever a v* tag is pushed. electron-builder uploads the dmg/exe plus the
+# latest-mac.yml / latest.yml manifests that electron-updater reads.
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    strategy:
+      fail-fast: false
+      # Serialize so the two jobs don't race to create the same GitHub Release.
+      max-parallel: 1
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+          - os: windows-latest
+            platform: win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.1.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Compile (electron-vite)
+        run: pnpm --filter @lmsy/desktop run compile
+        env:
+          # Baked into the main bundle by the vite define; enables Sentry in
+          # released builds (no-op if the secret is unset).
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          SENTRY_ENVIRONMENT: production
+
+      - name: Build, publish & (mac) notarize
+        working-directory: apps/desktop
+        # bash on all runners (incl. Windows) so the tag→version expansion works.
+        shell: bash
+        # Drive the artifact/manifest version from the v* tag, not package.json.
+        run: pnpm exec electron-builder --${{ matrix.platform }} --publish always -c.extraMetadata.version="${GITHUB_REF_NAME#v}"
+        env:
+          # Publishing to GitHub Releases.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # macOS code signing (Developer ID .p12 as base64) — mac job only.
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          # macOS notarization (used by build/notarize.cjs) — mac job only.
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}

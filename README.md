@@ -94,12 +94,54 @@ pnpm build:desktop # electron-vite build && electron-builder
 Running `build:desktop` without target flags packages for the **current** OS.
 Use `pnpm --filter @lmsy/desktop build:unpack` for a fast, unpacked `--dir` build.
 
-App icons are not included yet — electron-builder uses the default Electron icon
-until you add `icon.icns` / `icon.ico` under `apps/desktop/build/` (the configured
-`buildResources` directory).
+App icons live in `apps/desktop/build/` (`icon.png` + `icon.icns`); electron-builder
+generates the Windows `.ico` from the PNG.
 
-> **Code signing is not configured yet.** macOS builds are produced unsigned
-> (`mac.identity: null`). Add signing certificates before distributing.
+macOS builds enable the **hardened runtime** with camera/microphone entitlements
+([`build/entitlements.mac.plist`](apps/desktop/build/entitlements.mac.plist)) and
+Info.plist usage strings. A **local** `pnpm build:desktop` with no signing certificate
+produces an unsigned (ad-hoc) dmg that runs on your own machine — pass
+`CSC_IDENTITY_AUTO_DISCOVERY=false` to force-skip signing. Signing + notarization only
+run in CI (see below).
+
+## Releasing the desktop app
+
+Auto-updates use [electron-updater](https://www.electron.build/auto-update) against
+**GitHub Releases** (the app checks on launch and every 4 hours, then shows a subtle
+"Update ready — restart" toast). Point `publish.owner` / `publish.repo` in
+[`apps/desktop/electron-builder.yml`](apps/desktop/electron-builder.yml) — and the
+`GITHUB_REPO` env read by the web `/download` page — at your GitHub repository.
+
+To cut a release, bump `version` in `apps/desktop/package.json`, then push a matching
+`v*` tag:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+The [`release`](.github/workflows/release.yml) workflow builds the macOS dmg
+(`arm64` + `x64`) and Windows exe, notarizes the mac build, and publishes everything —
+plus the `latest-mac.yml` / `latest.yml` update manifests electron-updater reads — to
+the GitHub Release.
+
+### Required GitHub Actions secrets
+
+| Secret                        | Used for                                                                                         |
+| ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| `GITHUB_TOKEN`                | Provided automatically; publishes the release (workflow grants `contents: write`).               |
+| `CSC_LINK`                    | Base64 of the Apple **Developer ID Application** certificate (`.p12`) — `base64 -i cert.p12`.     |
+| `CSC_KEY_PASSWORD`            | Password for that `.p12`.                                                                         |
+| `APPLE_ID`                    | Apple ID email used for notarization.                                                             |
+| `APPLE_APP_SPECIFIC_PASSWORD` | An [app-specific password](https://support.apple.com/en-us/102654) for that Apple ID.            |
+| `APPLE_TEAM_ID`               | Your 10-character Apple Developer Team ID.                                                        |
+
+Windows is built **unsigned** for now (no signing secrets needed).
+
+### Desktop error reporting (Sentry)
+
+Set `SENTRY_DSN` (and optionally `SENTRY_ENVIRONMENT`) **at build time** — it is baked
+into the main-process bundle and enables Sentry in both the main and renderer
+processes. Sentry is off in development and whenever the DSN is unset.
 
 ## Tooling
 
