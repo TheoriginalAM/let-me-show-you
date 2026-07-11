@@ -12,8 +12,8 @@ const { execFileSync } = require('child_process')
 const { existsSync, rmSync } = require('fs')
 const path = require('path')
 
-const MAX_ATTEMPTS = 3
-const PER_ATTEMPT_TIMEOUT = '20m' // notarytool self-terminates cleanly at this bound
+const MAX_ATTEMPTS = 3 // retries are for fast submission/network errors, not slow processing
+const PER_ATTEMPT_TIMEOUT = '90m' // Apple's notary can sit "In Progress" for 20–70+ min when backlogged
 const BACKOFF_SECONDS = 30
 
 const delay = (seconds) => new Promise((resolve) => setTimeout(resolve, seconds * 1000))
@@ -73,6 +73,15 @@ exports.default = async function notarizing(context) {
         // app-specific password) in it. Only the exit status is safe to log.
         const status = err && typeof err.status === 'number' ? err.status : 'unknown'
         console.warn(`[notarize] Attempt ${attempt} did not complete (exit ${status}).`)
+        // Exit 124 = notarytool's own --timeout fired: the submission WAS accepted
+        // and is still processing after PER_ATTEMPT_TIMEOUT. Re-submitting only
+        // restarts Apple's clock, so fail with guidance rather than burn another
+        // long wait — the fix is to re-run once Apple's backlog clears.
+        if (status === 124) {
+          throw new Error(
+            `[notarize] Apple's notary did not finish within ${PER_ATTEMPT_TIMEOUT} (service is backlogged). Re-run the release later.`,
+          )
+        }
         if (attempt >= MAX_ATTEMPTS) {
           throw new Error(`[notarize] Notarization failed after ${MAX_ATTEMPTS} attempts.`)
         }
