@@ -17,6 +17,9 @@ export const user = pgTable("user", {
   banned: boolean("banned").default(false),
   banReason: text("ban_reason"),
   banExpires: timestamp("ban_expires"),
+  // Invite-gating: new signups start unapproved and can't use the app until an
+  // admin approves them. Existing users are grandfathered to true in the migration.
+  approved: boolean("approved").default(false).notNull(),
 });
 
 export const session = pgTable(

@@ -6,10 +6,10 @@ import { formatDuration, type VideoStatus } from '@lmsy/shared'
 import { renameVideoAction, setVisibilityAction } from '@/app/dashboard/actions'
 
 const STATUS_STYLES: Record<VideoStatus, string> = {
-  ready: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300',
-  processing: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
-  uploading: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
-  errored: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
+  ready: 'bg-green-500/15 text-green-300 ring-1 ring-inset ring-green-500/25',
+  processing: 'bg-amber-500/15 text-amber-300 ring-1 ring-inset ring-amber-500/25',
+  uploading: 'bg-blue-500/15 text-blue-300 ring-1 ring-inset ring-blue-500/25',
+  errored: 'bg-red-500/15 text-red-300 ring-1 ring-inset ring-red-500/25',
 }
 
 export type VideoCardProps = {
@@ -111,7 +111,7 @@ export function VideoCard(props: VideoCardProps) {
 
   const thumbClickable = isPublic
   const Thumb = (
-    <div className="relative aspect-video w-full overflow-hidden rounded-t-xl bg-neutral-100 dark:bg-neutral-900">
+    <div className="relative aspect-video w-full overflow-hidden rounded-t-xl bg-[linear-gradient(135deg,#14121f,#0c0b14)]">
       {props.thumbnailUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
@@ -121,7 +121,7 @@ export function VideoCard(props: VideoCardProps) {
           className="h-full w-full object-cover"
         />
       ) : (
-        <div className="flex h-full w-full items-center justify-center text-sm text-neutral-400">
+        <div className="flex h-full w-full items-center justify-center text-sm text-faint">
           No preview yet
         </div>
       )}
@@ -139,7 +139,7 @@ export function VideoCard(props: VideoCardProps) {
   )
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950">
+    <div className="glass glass-hover flex flex-col overflow-hidden rounded-xl">
       {thumbClickable ? (
         <a href={props.shareUrl} target="_blank" rel="noopener noreferrer" className="block">
           {Thumb}
@@ -166,35 +166,31 @@ export function VideoCard(props: VideoCardProps) {
               }
             }}
             onBlur={commitRename}
-            className="w-full rounded-md border border-neutral-300 px-2 py-1 text-sm font-medium dark:border-neutral-700 dark:bg-neutral-900"
+            className="w-full rounded-lg border border-line bg-white/[0.03] px-2 py-1 text-sm font-medium text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
           />
         ) : (
-          <h3 className="truncate text-sm font-semibold" title={title}>
+          <h3 className="truncate text-sm font-semibold text-ink" title={title}>
             {title}
           </h3>
         )}
 
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-neutral-500">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-faint">
           <span>{props.viewCount.toLocaleString()} views</span>
           <span aria-hidden>·</span>
           <span>{props.createdLabel}</span>
           <span aria-hidden>·</span>
-          <span
-            className={
-              isPublic ? 'text-neutral-500' : 'font-medium text-neutral-700 dark:text-neutral-300'
-            }
-          >
+          <span className={isPublic ? 'text-faint' : 'font-medium text-accent-ink'}>
             {isPublic ? 'Public' : 'Private'}
           </span>
         </div>
 
-        {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className="text-xs text-red-300">{error}</p>}
 
         <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
           <button
             onClick={copyLink}
             disabled={busy}
-            className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
+            className="btn-ghost px-2 py-1 text-xs disabled:opacity-50"
           >
             {copied ? 'Copied!' : 'Copy link'}
           </button>
@@ -204,14 +200,14 @@ export function VideoCard(props: VideoCardProps) {
               setEditing(true)
             }}
             disabled={busy || editing}
-            className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
+            className="btn-ghost px-2 py-1 text-xs disabled:opacity-50"
           >
             Rename
           </button>
           <button
             onClick={toggleVisibility}
             disabled={busy}
-            className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
+            className="btn-ghost px-2 py-1 text-xs disabled:opacity-50"
           >
             {isPublic ? 'Make private' : 'Make public'}
           </button>
@@ -221,14 +217,14 @@ export function VideoCard(props: VideoCardProps) {
               <button
                 onClick={confirmDelete}
                 disabled={deleting}
-                className="rounded-md bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-500 disabled:opacity-50"
+                className="rounded-lg bg-red-500 px-2 py-1 text-xs font-medium text-white shadow-[0_10px_24px_-12px_rgba(239,68,68,0.8)] transition hover:bg-red-400 disabled:opacity-50"
               >
                 {deleting ? 'Deleting…' : 'Confirm'}
               </button>
               <button
                 onClick={() => setConfirmingDelete(false)}
                 disabled={deleting}
-                className="rounded-md border border-neutral-300 px-2 py-1 text-xs font-medium hover:bg-neutral-50 disabled:opacity-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
+                className="btn-ghost px-2 py-1 text-xs disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -237,7 +233,7 @@ export function VideoCard(props: VideoCardProps) {
             <button
               onClick={() => setConfirmingDelete(true)}
               disabled={busy}
-              className="ml-auto rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+              className="ml-auto rounded-lg border border-red-500/25 bg-red-500/10 px-2 py-1 text-xs font-medium text-red-300 transition hover:bg-red-500/20 hover:border-red-500/40 disabled:opacity-50"
             >
               Delete
             </button>

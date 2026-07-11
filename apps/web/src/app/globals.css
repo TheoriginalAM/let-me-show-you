@@ -1,5 +1,209 @@
 @import 'tailwindcss';
 
+/* ------------------------------------------------------------------ *
+ * Let Me Show You — "dark & premium" design system
+ * Deep near-black canvas, luminous violet accents, glass surfaces,
+ * film grain. Dark-first (no light mode).
+ * ------------------------------------------------------------------ */
+@theme {
+  --color-canvas: #08080c;
+  --color-canvas-2: #0d0d15;
+  --color-ink: #f6f6fb;
+  --color-muted: #9c9cb4;
+  --color-faint: #6a6a80;
+  --color-line: rgba(255, 255, 255, 0.09);
+  --color-line-strong: rgba(255, 255, 255, 0.16);
+  --color-accent: #8b8bf6;
+  --color-accent-strong: #6d6df5;
+  --color-accent-ink: #c9c9ff;
+
+  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+
+  --radius: 0.9rem;
+}
+
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
+}
+
+* {
+  border-color: var(--color-line);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-feature-settings: 'ss01', 'cv01';
+  text-rendering: optimizeLegibility;
+}
+
+/* Layered ambient glow behind everything (fixed so it never scrolls away). */
+.atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: -10;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(60rem 40rem at 50% -12%, rgba(120, 110, 255, 0.28), transparent 60%),
+    radial-gradient(45rem 40rem at 100% 0%, rgba(90, 80, 220, 0.12), transparent 55%),
+    radial-gradient(50rem 40rem at 0% 30%, rgba(60, 90, 200, 0.1), transparent 55%);
+}
+.atmosphere::before {
+  /* faint dot grid for texture/depth */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(70% 55% at 50% 0%, black, transparent 75%);
+}
+
+/* Film-grain overlay for that premium, non-flat feel. */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.045;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Glass surface — translucent, hairline border, blur, top highlight. */
+.glass {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(12, 12, 20, 0.55);
+  border: 1px solid var(--color-line);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+.glass-hover {
+  transition:
+    border-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.glass-hover:hover {
+  border-color: var(--color-line-strong);
+  transform: translateY(-2px);
+  box-shadow: 0 20px 60px -25px rgba(110, 100, 245, 0.4);
+}
+
+/* Primary luminous button. */
+.btn-primary {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.7rem;
+  background: linear-gradient(180deg, #8281ff, var(--color-accent-strong));
+  color: #fff;
+  font-weight: 600;
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.25) inset,
+    0 12px 30px -12px rgba(109, 109, 245, 0.75);
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.2s ease,
+    filter 0.2s ease;
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+  box-shadow:
+    0 1px 0 0 rgba(255, 255, 255, 0.3) inset,
+    0 16px 40px -12px rgba(109, 109, 245, 0.9);
+}
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.7rem;
+  border: 1px solid var(--color-line);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--color-ink);
+  font-weight: 500;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease;
+}
+.btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--color-line-strong);
+}
+
+/* Small caps eyebrow label. */
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-accent-ink);
+}
+
+/* Gradient text for accent words. */
+.text-gradient {
+  background: linear-gradient(180deg, #ffffff 30%, #b8b8ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Staggered entrance for hero elements. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.rise {
+  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* Slow drift for the ambient glow so it feels alive. */
+@keyframes drift {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(2%, 1.5%, 0);
+  }
+}
+
+::selection {
+  background: rgba(130, 129, 255, 0.35);
+  color: #fff;
+}
+
+/* Thin custom scrollbar. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
+  background-clip: content-box;
 }

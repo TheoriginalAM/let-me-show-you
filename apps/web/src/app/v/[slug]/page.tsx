@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic'
 // Dedupe the slug lookup across generateMetadata + the page render (one request).
 const loadVideo = cache((slug: string) => getVideoBySlug(slug))
 
-const ACCENT = '#4f46e5' // indigo-600 — brand accent
+const ACCENT = '#8b8bf6' // luminous violet — brand accent
 
 /** Mux static MP4 rendition (enabled via mp4_support: 'capped-1080p'). */
 function muxMp4Url(playbackId: string): string {
@@ -97,35 +97,43 @@ export default async function SharePage({ params }: PageProps) {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
       <div className="flex items-center justify-between">
-        <Link href="/" className="text-sm font-semibold tracking-tight">
+        <Link
+          href="/"
+          className="flex items-center gap-2 text-sm font-semibold tracking-tight text-ink"
+        >
+          <span className="grid h-6 w-6 place-items-center rounded-md bg-gradient-to-b from-[#8281ff] to-accent-strong text-[10px] text-white shadow-[0_6px_16px_-6px_rgba(109,109,245,0.9)]">
+            ▶
+          </span>
           {APP_NAME}
         </Link>
-        <Link
-          href="/signup"
-          className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-500"
-        >
+        <Link href="/signup" className="btn-primary px-3.5 py-1.5 text-sm">
           Get started
         </Link>
       </div>
 
       {isReady && video.muxPlaybackId ? (
-        <ShareView
-          slug={slug}
-          playbackId={video.muxPlaybackId}
-          title={video.title}
-          poster={poster}
-          accentColor={ACCENT}
-        />
+        <div className="rise relative" style={{ animationDelay: '80ms' }}>
+          <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-[radial-gradient(60%_60%_at_50%_20%,rgba(120,110,255,0.3),transparent_70%)] blur-2xl" />
+          <div className="glass overflow-hidden rounded-2xl p-2 shadow-[0_40px_120px_-40px_rgba(80,70,220,0.7)]">
+            <ShareView
+              slug={slug}
+              playbackId={video.muxPlaybackId}
+              title={video.title}
+              poster={poster}
+              accentColor={ACCENT}
+            />
+          </div>
+        </div>
       ) : (
         <ProcessingState slug={slug} title={video.title} />
       )}
 
-      <div className="flex flex-col gap-2">
-        <h1 className="text-xl font-bold tracking-tight sm:text-2xl">{video.title}</h1>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-500">
-          <span className="font-medium text-neutral-700 dark:text-neutral-300">
-            {video.ownerName}
-          </span>
+      <div className="rise flex flex-col gap-2" style={{ animationDelay: '150ms' }}>
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+          {video.title}
+        </h1>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-faint">
+          <span className="font-medium text-muted">{video.ownerName}</span>
           <span aria-hidden>·</span>
           <span>{formatRelativeDate(video.createdAt)}</span>
           {isReady && (
@@ -143,9 +151,9 @@ export default async function SharePage({ params }: PageProps) {
         </div>
       </div>
 
-      <footer className="mt-auto border-t border-neutral-200 pt-6 text-sm text-neutral-500 dark:border-neutral-800">
+      <footer className="mt-auto border-t border-line pt-6 text-sm text-faint">
         Recorded with {APP_NAME}.{' '}
-        <Link href="/" className="font-medium text-indigo-600 hover:underline dark:text-indigo-400">
+        <Link href="/" className="font-medium text-accent transition hover:text-accent-ink">
           Make your own →
         </Link>
       </footer>

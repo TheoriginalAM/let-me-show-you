@@ -1,8 +1,7 @@
-import { headers } from 'next/headers'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { buildShareUrl, formatRelativeDate, muxThumbnailUrl } from '@lmsy/shared'
-import { auth } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/current-user'
 import { listVideosByOwnerWithViews } from '@/db/queries'
 import { SignOutButton } from '@/components/sign-out-button'
 import { VideoCard } from '@/components/video-card'
@@ -11,33 +10,36 @@ import { VideoCard } from '@/components/video-card'
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
-  const session = await auth.api.getSession({ headers: await headers() })
+  // Middleware gates /dashboard on the cookie; this validates the session and
+  // enforces the invite gate.
+  const user = await getCurrentUser()
+  if (!user) redirect('/login')
+  if (!user.approved) redirect('/pending')
 
-  // Middleware gates /dashboard on the cookie; this validates the session for
-  // real and gives us the trusted user id.
-  if (!session) {
-    redirect('/login')
-  }
-
-  const videos = await listVideosByOwnerWithViews(session.user.id)
+  const videos = await listVideosByOwnerWithViews(user.id)
   const now = Date.now()
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6">
-      <header className="flex flex-wrap items-center justify-between gap-4">
+      <header className="rise flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Your recordings</h1>
-          <p className="mt-1 text-sm text-neutral-500">
-            Signed in as {session.user.name || session.user.email}
-          </p>
+          <h1 className="font-display text-3xl font-semibold tracking-tight">Your recordings</h1>
+          <p className="mt-1 text-sm text-muted">Signed in as {user.name}</p>
         </div>
-        <SignOutButton />
+        <div className="flex items-center gap-2">
+          {user.role === 'admin' && (
+            <Link href="/admin" className="btn-ghost px-3 py-1.5 text-sm">
+              Admin
+            </Link>
+          )}
+          <SignOutButton />
+        </div>
       </header>
 
       {videos.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-neutral-300 p-12 text-center dark:border-neutral-700">
-          <h2 className="text-lg font-semibold">No recordings yet</h2>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-neutral-500">
+        <div className="glass rise rounded-2xl border-dashed p-12 text-center">
+          <h2 className="font-display text-lg font-semibold tracking-tight">No recordings yet</h2>
+          <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
             Record your screen from the desktop app and it will appear here, ready to share.
           </p>
         </div>
@@ -69,8 +71,8 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      <footer className="mt-auto pt-6 text-sm text-neutral-500">
-        <Link href="/" className="hover:underline">
+      <footer className="mt-auto border-t border-line pt-6 text-sm text-faint">
+        <Link href="/" className="transition hover:text-ink">
           ← Back to {`letmeshowyou.com.au`}
         </Link>
       </footer>

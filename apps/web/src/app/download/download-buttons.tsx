@@ -42,28 +42,19 @@ export function DownloadButtons({ assets }: { assets: DownloadAssets }) {
 
   const ordered = os === 'windows' ? [...win, ...mac] : [...mac, ...win]
   if (ordered.length === 0) {
-    return (
-      <p className="text-sm text-neutral-500">The latest release doesn’t have installers yet.</p>
-    )
+    return <p className="text-sm text-faint">The latest release doesn’t have installers yet.</p>
   }
 
   const [primary, ...rest] = ordered
   return (
     <div className="flex w-full flex-col items-center gap-3">
-      <a
-        href={primary.href}
-        className="w-full max-w-xs rounded-lg bg-indigo-600 px-5 py-3 text-center text-sm font-medium text-white hover:bg-indigo-500"
-      >
+      <a href={primary.href} className="btn-primary w-full max-w-xs px-5 py-3 text-center text-sm">
         {primary.label}
       </a>
       {rest.length > 0 && (
         <div className="flex flex-wrap justify-center gap-3">
           {rest.map((option) => (
-            <a
-              key={option.key}
-              href={option.href}
-              className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
-            >
+            <a key={option.key} href={option.href} className="btn-ghost px-4 py-2 text-sm">
               {option.label}
             </a>
           ))}

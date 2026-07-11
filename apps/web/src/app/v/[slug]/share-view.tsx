@@ -8,9 +8,7 @@ import { recordShareView } from './actions'
 // client-side only and show a poster-shaped skeleton while it hydrates.
 const MuxPlayer = dynamic(() => import('@mux/mux-player-react'), {
   ssr: false,
-  loading: () => (
-    <div className="aspect-video w-full animate-pulse rounded-xl bg-neutral-200 dark:bg-neutral-800" />
-  ),
+  loading: () => <div className="aspect-video w-full animate-pulse rounded-xl bg-white/[0.04]" />,
 })
 
 export function ShareView({

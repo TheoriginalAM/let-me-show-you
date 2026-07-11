@@ -5,85 +5,161 @@ const features = [
   {
     title: 'Record with your voice',
     body: 'Capture your screen and narrate as you go. Explain the thing instead of typing three paragraphs about it.',
+    icon: (
+      <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0M12 19v3" />
+    ),
   },
   {
     title: 'Share with one link',
-    body: 'Every recording gets a clean public link that plays instantly in the browser — no sign-up for the person watching.',
+    body: 'Every recording becomes a clean public link that plays instantly in the browser — no sign-up for the person watching.',
+    icon: (
+      <path d="M9 15l6-6M10.5 6.5l1-1a4 4 0 0 1 5.657 5.657l-1 1M13.5 17.5l-1 1a4 4 0 0 1-5.657-5.657l1-1" />
+    ),
   },
   {
     title: 'See what lands',
     body: 'Know when your clients actually watched. View counts on every recording, right in your dashboard.',
+    icon: <path d="M3 3v18h18M8 14l3-4 3 3 4-6" />,
   },
 ]
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-5">
-        <span className="text-sm font-semibold tracking-tight">{APP_NAME}</span>
-        <nav className="flex items-center gap-4 text-sm">
-          <Link href="/login" className="font-medium hover:underline">
-            Sign in
-          </Link>
-          <Link
-            href="/signup"
-            className="rounded-lg bg-indigo-600 px-3 py-1.5 font-medium text-white hover:bg-indigo-500"
-          >
-            Get started
-          </Link>
-        </nav>
-      </header>
-
-      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col px-6">
-        <section className="flex flex-col items-start gap-6 py-16 sm:py-24">
-          <span className="inline-flex items-center rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-            {APP_DOMAIN}
+    <div className="relative flex min-h-screen flex-col">
+      {/* ---------- Nav ---------- */}
+      <header className="sticky top-0 z-40">
+        <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4">
+          <span className="flex items-center gap-2 text-sm font-semibold tracking-tight">
+            <span className="grid h-6 w-6 place-items-center rounded-md bg-gradient-to-b from-[#8281ff] to-accent-strong text-[10px] text-white shadow-[0_6px_16px_-6px_rgba(109,109,245,0.9)]">
+              ▶
+            </span>
+            {APP_NAME}
           </span>
-          <h1 className="max-w-3xl text-5xl font-bold tracking-tight sm:text-7xl">
-            Show, don’t tell.
-          </h1>
-          <p className="max-w-xl text-lg text-neutral-600 dark:text-neutral-400">
-            Record your screen with voiceover and send it to clients as a single link. Walk them
-            through the work instead of writing another long email.
-          </p>
-          <div className="flex flex-wrap items-center gap-3 pt-2">
-            <Link
-              href="/download"
-              className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-indigo-500"
-            >
-              Download the app
-            </Link>
-            <Link
-              href="/login"
-              className="rounded-lg border border-neutral-300 px-5 py-2.5 text-sm font-medium hover:bg-neutral-50 dark:border-neutral-700 dark:hover:bg-neutral-900"
-            >
+          <nav className="flex items-center gap-2 text-sm">
+            <Link href="/login" className="btn-ghost px-3 py-1.5">
               Sign in
             </Link>
+            <Link href="/signup" className="btn-primary px-3.5 py-1.5">
+              Get started
+            </Link>
+          </nav>
+        </div>
+      </header>
+
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6">
+        {/* ---------- Hero ---------- */}
+        <section className="grid items-center gap-12 py-16 sm:py-24 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="flex flex-col items-start gap-6">
+            <span className="eyebrow rise" style={{ animationDelay: '40ms' }}>
+              <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_2px_rgba(139,139,246,0.9)]" />
+              {APP_DOMAIN}
+            </span>
+            <h1
+              className="rise font-display text-6xl font-semibold leading-[0.95] tracking-tight sm:text-7xl"
+              style={{ animationDelay: '90ms' }}
+            >
+              <span className="text-gradient">Show,</span>
+              <br />
+              don’t tell.
+            </h1>
+            <p
+              className="rise max-w-md text-lg leading-relaxed text-muted"
+              style={{ animationDelay: '150ms' }}
+            >
+              Record your screen with voiceover and send it to clients as a single link. Walk them
+              through the work instead of writing another long email.
+            </p>
+            <div
+              className="rise flex flex-wrap items-center gap-3 pt-1"
+              style={{ animationDelay: '210ms' }}
+            >
+              <Link href="/download" className="btn-primary px-5 py-3 text-sm">
+                Download the app
+              </Link>
+              <Link href="/login" className="btn-ghost px-5 py-3 text-sm">
+                Sign in
+              </Link>
+            </div>
+          </div>
+
+          {/* Floating product mock */}
+          <div className="rise relative" style={{ animationDelay: '280ms' }}>
+            <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-[radial-gradient(60%_60%_at_50%_20%,rgba(120,110,255,0.35),transparent_70%)] blur-2xl" />
+            <div className="glass overflow-hidden rounded-2xl p-2 shadow-[0_40px_120px_-40px_rgba(80,70,220,0.7)]">
+              <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-xl bg-[linear-gradient(135deg,#14121f,#0c0b14)]">
+                <div className="absolute inset-0 bg-[radial-gradient(40%_60%_at_50%_45%,rgba(130,120,255,0.22),transparent_70%)]" />
+                <button className="relative grid h-16 w-16 place-items-center rounded-full bg-white/10 backdrop-blur ring-1 ring-white/20 transition hover:scale-105">
+                  <svg viewBox="0 0 24 24" className="ml-1 h-6 w-6 fill-white">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </button>
+                <span className="absolute bottom-3 right-3 rounded bg-black/60 px-1.5 py-0.5 text-xs font-medium tabular-nums text-white">
+                  2:14
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 px-3 py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">Q3 dashboard walkthrough</p>
+                  <p className="text-xs text-faint">Sam Rivera · 2 hours ago · 34 views</p>
+                </div>
+                <span className="shrink-0 rounded-md bg-accent-strong/20 px-2 py-1 text-xs font-medium text-accent-ink ring-1 ring-inset ring-accent/30">
+                  Link copied
+                </span>
+              </div>
+            </div>
           </div>
         </section>
 
-        <section className="grid gap-6 pb-20 sm:grid-cols-3">
+        {/* ---------- Features ---------- */}
+        <section className="grid gap-4 pb-16 sm:grid-cols-3">
           {features.map((feature) => (
-            <div
-              key={feature.title}
-              className="rounded-2xl border border-neutral-200 p-6 dark:border-neutral-800"
-            >
+            <div key={feature.title} className="glass glass-hover rounded-2xl p-6">
+              <span className="mb-4 grid h-10 w-10 place-items-center rounded-xl bg-white/5 ring-1 ring-white/10">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="h-5 w-5 text-accent"
+                >
+                  {feature.icon}
+                </svg>
+              </span>
               <h2 className="font-semibold">{feature.title}</h2>
-              <p className="mt-2 text-sm text-neutral-600 dark:text-neutral-400">{feature.body}</p>
+              <p className="mt-2 text-sm leading-relaxed text-muted">{feature.body}</p>
             </div>
           ))}
         </section>
+
+        {/* ---------- CTA band ---------- */}
+        <section className="relative mb-20 overflow-hidden rounded-3xl border border-line px-8 py-14 text-center">
+          <div className="absolute inset-0 -z-10 bg-[radial-gradient(60%_120%_at_50%_0%,rgba(120,110,255,0.25),transparent_70%)]" />
+          <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+            Stop typing. Start showing.
+          </h2>
+          <p className="mx-auto mt-3 max-w-md text-muted">
+            Record your first walkthrough in the next five minutes.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <Link href="/download" className="btn-primary px-5 py-3 text-sm">
+              Download the app
+            </Link>
+            <Link href="/signup" className="btn-ghost px-5 py-3 text-sm">
+              Create account
+            </Link>
+          </div>
+        </section>
       </main>
 
-      <footer className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-2 border-t border-neutral-200 px-6 py-6 text-sm text-neutral-500 dark:border-neutral-800">
-        <span>
-          © {2026} {APP_NAME}
-        </span>
-        <div className="flex gap-4">
-          <Link href="/login" className="hover:underline">
+      <footer className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-2 border-t border-line px-6 py-6 text-sm text-faint">
+        <span>© 2026 {APP_NAME}</span>
+        <div className="flex gap-5">
+          <Link href="/login" className="transition hover:text-ink">
             Sign in
           </Link>
-          <Link href="/download" className="hover:underline">
+          <Link href="/download" className="transition hover:text-ink">
             Download
           </Link>
         </div>

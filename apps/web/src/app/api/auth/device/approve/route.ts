@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getAuthedUserId } from '@/lib/api-auth'
 import { approveDeviceCode } from '@/db/tokens'
+import { isUserApproved } from '@/db/users'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -10,6 +11,9 @@ export async function POST(request: Request) {
   const userId = await getAuthedUserId(request)
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+  if (!(await isUserApproved(userId))) {
+    return NextResponse.json({ error: 'Your account is pending approval.' }, { status: 403 })
   }
 
   const body = (await request.json().catch(() => ({}))) as { userCode?: unknown }

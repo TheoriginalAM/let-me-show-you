@@ -23,11 +23,11 @@ export function ProcessingState({ slug, title }: { slug: string; title: string }
   }, [slug, router])
 
   return (
-    <div className="flex aspect-video w-full flex-col items-center justify-center gap-4 rounded-xl border border-neutral-200 bg-neutral-50 text-center dark:border-neutral-800 dark:bg-neutral-900">
-      <div className="h-10 w-10 animate-spin rounded-full border-2 border-neutral-300 border-t-indigo-600 dark:border-neutral-700 dark:border-t-indigo-400" />
+    <div className="glass flex aspect-video w-full flex-col items-center justify-center gap-4 rounded-2xl text-center">
+      <div className="h-10 w-10 animate-spin rounded-full border-2 border-line-strong border-t-accent" />
       <div className="px-6">
-        <p className="font-medium">Still processing…</p>
-        <p className="mt-1 text-sm text-neutral-500">
+        <p className="font-medium text-ink">Still processing…</p>
+        <p className="mt-1 text-sm text-muted">
           “{title}” is being prepared. This page will update automatically.
         </p>
       </div>
