@@ -32,9 +32,12 @@ export async function getLatestRelease(): Promise<DownloadAssets | null> {
   if (process.env.GITHUB_TOKEN) headers.Authorization = `Bearer ${process.env.GITHUB_TOKEN}`
 
   try {
+    // Fetch live: the Next Data Cache (persisted across Railway builds) otherwise
+    // pins a stale release long after a new one ships. This page is low-traffic,
+    // so GitHub's unauthenticated rate limit is not a concern.
     const res = await fetch(`https://api.github.com/repos/${REPO}/releases/latest`, {
       headers,
-      next: { revalidate: 3600 },
+      cache: 'no-store',
     })
     if (!res.ok) return null
     const release = (await res.json()) as GhRelease

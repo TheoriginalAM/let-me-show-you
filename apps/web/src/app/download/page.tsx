@@ -9,6 +9,9 @@ export const metadata: Metadata = {
   description: `Download the ${APP_NAME} desktop recorder for macOS and Windows.`,
 }
 
+// Always reflect the current latest release (getLatestRelease fetches live).
+export const dynamic = 'force-dynamic'
+
 export default async function DownloadPage() {
   const release = await getLatestRelease()
 
