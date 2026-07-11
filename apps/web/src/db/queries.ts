@@ -1,12 +1,20 @@
 import 'server-only'
 
-import { and, count, desc, eq, gt, inArray, isNull } from 'drizzle-orm'
+import { and, count, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 import type { PublicVideo, Video } from '@lmsy/shared'
 import { db } from './index'
 import { user, videos, videoViews } from './schema'
 
-/** A video plus its total view count (dashboard rows). */
-export type VideoWithViews = Video & { viewCount: number }
+/** A video plus its total view count and whether it has a share password (dashboard rows). */
+export type VideoWithViews = Video & { viewCount: number; hasPassword: boolean }
+
+/**
+ * A share-link video that MAY be password-protected. Includes the server-only
+ * `passwordHash` so the caller (a server component / server action) can gate
+ * access — it must never be forwarded to the client. Use this instead of
+ * {@link getVideoBySlug} when the page itself renders the password gate.
+ */
+export type ShareableVideo = PublicVideo & { passwordHash: string | null }
 
 /**
  * Data-access layer for videos.
@@ -95,6 +103,39 @@ export async function getVideoBySlug(slug: string): Promise<PublicVideo | null> 
 }
 
 /**
+ * Share-link lookup that INCLUDES password-protected videos and returns the
+ * server-only `passwordHash`. The caller must verify the password (or a valid
+ * unlock token) before revealing the playback id, and must never forward
+ * `passwordHash` to the client. Same visibility rules as {@link getVideoBySlug}
+ * otherwise (public + viewable status).
+ */
+export async function getShareableVideoBySlug(slug: string): Promise<ShareableVideo | null> {
+  const rows = await db
+    .select({
+      id: videos.id,
+      title: videos.title,
+      status: videos.status,
+      muxPlaybackId: videos.muxPlaybackId,
+      durationSeconds: videos.durationSeconds,
+      shareSlug: videos.shareSlug,
+      ownerName: user.name,
+      createdAt: videos.createdAt,
+      passwordHash: videos.passwordHash,
+    })
+    .from(videos)
+    .innerJoin(user, eq(videos.ownerId, user.id))
+    .where(
+      and(
+        eq(videos.shareSlug, slug),
+        inArray(videos.status, ['ready', 'processing', 'uploading']),
+        eq(videos.isPublic, true),
+      ),
+    )
+    .limit(1)
+  return rows[0] ?? null
+}
+
+/**
  * Total public view count for a video, keyed by id. Not owner-scoped: callers
  * must have already resolved the id from a public slug (i.e. the video is
  * public). Used by the public share page.
@@ -132,13 +173,38 @@ export async function recordVideoView(videoId: string, ipHash: string): Promise<
 /** All of an owner's videos with their view counts, newest first (dashboard). */
 export async function listVideosByOwnerWithViews(ownerId: string): Promise<VideoWithViews[]> {
   const rows = await db
-    .select({ ...ownerVideoColumns, viewCount: count(videoViews.id) })
+    .select({
+      ...ownerVideoColumns,
+      viewCount: count(videoViews.id),
+      hasPassword: sql<boolean>`${videos.passwordHash} is not null`,
+    })
     .from(videos)
     .leftJoin(videoViews, eq(videoViews.videoId, videos.id))
     .where(eq(videos.ownerId, ownerId))
     .groupBy(videos.id)
     .orderBy(desc(videos.createdAt))
-  return rows.map((row) => ({ ...row, viewCount: Number(row.viewCount) }))
+  return rows.map((row) => ({
+    ...row,
+    viewCount: Number(row.viewCount),
+    hasPassword: Boolean(row.hasPassword),
+  }))
+}
+
+/**
+ * Set or clear a video's share password (pass a pre-hashed value, or `null` to
+ * remove protection). Owner-scoped. Returns whether a row was updated.
+ */
+export async function setOwnedVideoPassword(
+  ownerId: string,
+  videoId: string,
+  passwordHash: string | null,
+): Promise<boolean> {
+  const rows = await db
+    .update(videos)
+    .set({ passwordHash })
+    .where(and(eq(videos.id, videoId), eq(videos.ownerId, ownerId)))
+    .returning({ id: videos.id })
+  return rows.length > 0
 }
 
 /** Rename a video the caller owns. Returns whether a row was updated. */

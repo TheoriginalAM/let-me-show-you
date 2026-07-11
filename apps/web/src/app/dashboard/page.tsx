@@ -54,6 +54,7 @@ export default async function DashboardPage() {
               shareUrl={buildShareUrl(video.shareSlug)}
               status={video.status}
               isPublic={video.isPublic}
+              isProtected={video.hasPassword}
               durationSeconds={video.durationSeconds}
               viewCount={video.viewCount}
               createdLabel={formatRelativeDate(video.createdAt, now)}

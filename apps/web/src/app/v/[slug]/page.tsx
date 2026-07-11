@@ -1,5 +1,6 @@
 import { cache } from 'react'
 import type { Metadata } from 'next'
+import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
@@ -9,7 +10,9 @@ import {
   formatRelativeDate,
   muxThumbnailUrl,
 } from '@lmsy/shared'
-import { getPublicVideoViewCount, getVideoBySlug } from '@/db/queries'
+import { getPublicVideoViewCount, getShareableVideoBySlug } from '@/db/queries'
+import { unlockCookieName, verifyUnlockToken } from '@/lib/share-password'
+import { PasswordGate } from './password-gate'
 import { ProcessingState } from './processing-state'
 import { ShareView } from './share-view'
 
@@ -17,7 +20,13 @@ import { ShareView } from './share-view'
 export const dynamic = 'force-dynamic'
 
 // Dedupe the slug lookup across generateMetadata + the page render (one request).
-const loadVideo = cache((slug: string) => getVideoBySlug(slug))
+const loadVideo = cache((slug: string) => getShareableVideoBySlug(slug))
+
+/** Whether the current request has proven the password for a protected video. */
+async function hasUnlocked(videoId: string, passwordHash: string): Promise<boolean> {
+  const token = (await cookies()).get(unlockCookieName(videoId))?.value
+  return Boolean(token && verifyUnlockToken(token, videoId, passwordHash))
+}
 
 const ACCENT = '#8b8bf6' // luminous violet — brand accent
 
@@ -37,6 +46,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const video = await loadVideo(slug)
   if (!video) {
     return { title: 'Video not found', robots: { index: false } }
+  }
+
+  // A protected recording must not leak its title, byline, or thumbnail into
+  // social unfurls or search results. Advertise nothing but the lock.
+  if (video.passwordHash) {
+    return {
+      title: 'Password-protected recording',
+      description: `A private recording shared on ${APP_NAME}.`,
+      robots: { index: false },
+    }
   }
 
   const url = buildShareUrl(slug)
@@ -88,8 +107,12 @@ export default async function SharePage({ params }: PageProps) {
   const video = await loadVideo(slug)
   if (!video) notFound()
 
+  // Password-protected: show only the lock screen until the viewer proves the
+  // password (verified server-side; the cookie never carries the password).
+  const locked = video.passwordHash ? !(await hasUnlocked(video.id, video.passwordHash)) : false
+
   const isReady = video.status === 'ready' && Boolean(video.muxPlaybackId)
-  const viewCount = isReady ? await getPublicVideoViewCount(video.id) : 0
+  const viewCount = !locked && isReady ? await getPublicVideoViewCount(video.id) : 0
   const poster = video.muxPlaybackId
     ? muxThumbnailUrl(video.muxPlaybackId, { width: 1280, fitMode: 'preserve' })
     : ''
@@ -111,45 +134,51 @@ export default async function SharePage({ params }: PageProps) {
         </Link>
       </div>
 
-      {isReady && video.muxPlaybackId ? (
-        <div className="rise relative" style={{ animationDelay: '80ms' }}>
-          <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-[radial-gradient(60%_60%_at_50%_20%,rgba(120,110,255,0.3),transparent_70%)] blur-2xl" />
-          <div className="glass overflow-hidden rounded-2xl p-2 shadow-[0_40px_120px_-40px_rgba(80,70,220,0.7)]">
-            <ShareView
-              slug={slug}
-              playbackId={video.muxPlaybackId}
-              title={video.title}
-              poster={poster}
-              accentColor={ACCENT}
-            />
-          </div>
-        </div>
+      {locked ? (
+        <PasswordGate slug={slug} />
       ) : (
-        <ProcessingState slug={slug} title={video.title} />
-      )}
+        <>
+          {isReady && video.muxPlaybackId ? (
+            <div className="rise relative" style={{ animationDelay: '80ms' }}>
+              <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-[radial-gradient(60%_60%_at_50%_20%,rgba(120,110,255,0.3),transparent_70%)] blur-2xl" />
+              <div className="glass overflow-hidden rounded-2xl p-2 shadow-[0_40px_120px_-40px_rgba(80,70,220,0.7)]">
+                <ShareView
+                  slug={slug}
+                  playbackId={video.muxPlaybackId}
+                  title={video.title}
+                  poster={poster}
+                  accentColor={ACCENT}
+                />
+              </div>
+            </div>
+          ) : (
+            <ProcessingState slug={slug} title={video.title} />
+          )}
 
-      <div className="rise flex flex-col gap-2" style={{ animationDelay: '150ms' }}>
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-          {video.title}
-        </h1>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-faint">
-          <span className="font-medium text-muted">{video.ownerName}</span>
-          <span aria-hidden>·</span>
-          <span>{formatRelativeDate(video.createdAt)}</span>
-          {isReady && (
-            <>
+          <div className="rise flex flex-col gap-2" style={{ animationDelay: '150ms' }}>
+            <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
+              {video.title}
+            </h1>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-faint">
+              <span className="font-medium text-muted">{video.ownerName}</span>
               <span aria-hidden>·</span>
-              <span>{viewLabel(viewCount)}</span>
-              {video.durationSeconds != null && (
+              <span>{formatRelativeDate(video.createdAt)}</span>
+              {isReady && (
                 <>
                   <span aria-hidden>·</span>
-                  <span>{formatDuration(video.durationSeconds)}</span>
+                  <span>{viewLabel(viewCount)}</span>
+                  {video.durationSeconds != null && (
+                    <>
+                      <span aria-hidden>·</span>
+                      <span>{formatDuration(video.durationSeconds)}</span>
+                    </>
+                  )}
                 </>
               )}
-            </>
-          )}
-        </div>
-      </div>
+            </div>
+          </div>
+        </>
+      )}
 
       <footer className="mt-auto border-t border-line pt-6 text-sm text-faint">
         Recorded with {APP_NAME}.{' '}

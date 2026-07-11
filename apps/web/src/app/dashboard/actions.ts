@@ -3,9 +3,13 @@
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
-import { renameOwnedVideo, setOwnedVideoVisibility } from '@/db/queries'
+import { renameOwnedVideo, setOwnedVideoPassword, setOwnedVideoVisibility } from '@/db/queries'
+import { hashSharePassword } from '@/lib/share-password'
 
 type ActionResult = { ok: boolean; error?: string }
+
+/** Minimum share-password length. Short enough to be memorable, long enough to matter. */
+const MIN_PASSWORD_LENGTH = 4
 
 async function requireUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
@@ -30,6 +34,27 @@ export async function setVisibilityAction(
 ): Promise<ActionResult> {
   const userId = await requireUserId()
   const ok = await setOwnedVideoVisibility(userId, videoId, isPublic)
+  revalidatePath('/dashboard')
+  return { ok, error: ok ? undefined : 'Video not found' }
+}
+
+/**
+ * Set (or, with `password: null`, clear) the share password on a video the
+ * caller owns. The password is hashed server-side before it ever touches the DB.
+ */
+export async function setVideoPasswordAction(
+  videoId: string,
+  password: string | null,
+): Promise<ActionResult> {
+  const userId = await requireUserId()
+  let hash: string | null = null
+  if (password !== null) {
+    if (password.length < MIN_PASSWORD_LENGTH) {
+      return { ok: false, error: `Use at least ${MIN_PASSWORD_LENGTH} characters` }
+    }
+    hash = hashSharePassword(password)
+  }
+  const ok = await setOwnedVideoPassword(userId, videoId, hash)
   revalidatePath('/dashboard')
   return { ok, error: ok ? undefined : 'Video not found' }
 }
