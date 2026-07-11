@@ -48,7 +48,12 @@ export default function Home() {
 
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6">
         {/* ---------- Hero ---------- */}
-        <section className="grid items-center gap-12 py-16 sm:py-24 lg:grid-cols-[1.05fr_0.95fr]">
+        <section className="relative grid items-center gap-12 py-16 sm:py-24 lg:grid-cols-[1.05fr_0.95fr]">
+          {/* Photographic aurora backdrop, weighted right and faded out behind the headline. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -inset-x-6 -top-10 bottom-0 -z-10 bg-[url('/brand/hero-atmosphere.jpg')] bg-cover bg-[center_right] opacity-60 [mask-image:linear-gradient(to_right,transparent,black_48%,black)]"
+          />
           <div className="flex flex-col items-start gap-6">
             <span className="eyebrow rise" style={{ animationDelay: '40ms' }}>
               <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_2px_rgba(139,139,246,0.9)]" />
@@ -135,6 +140,10 @@ export default function Home() {
 
         {/* ---------- CTA band ---------- */}
         <section className="relative mb-20 overflow-hidden rounded-3xl border border-line px-8 py-14 text-center">
+          <div
+            aria-hidden
+            className="absolute inset-0 -z-20 bg-[url('/brand/cta-contours.jpg')] bg-cover bg-center opacity-40 [mask-image:radial-gradient(80%_120%_at_50%_100%,black,transparent_75%)]"
+          />
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(60%_120%_at_50%_0%,rgba(120,110,255,0.25),transparent_70%)]" />
           <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
             Stop typing. Start showing.

@@ -31,11 +31,13 @@ export const metadata: Metadata = {
     title: `${APP_NAME} — Show, don’t tell`,
     description,
     url: '/',
+    images: [{ url: '/brand/og.jpg', width: 1200, height: 630, alt: APP_NAME }],
   },
   twitter: {
     card: 'summary_large_image',
     title: `${APP_NAME} — Show, don’t tell`,
     description,
+    images: ['/brand/og.jpg'],
   },
 }
 
