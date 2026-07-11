@@ -1,9 +1,11 @@
 import { headers } from 'next/headers'
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { buildShareUrl, formatDuration } from '@lmsy/shared'
+import { buildShareUrl, formatRelativeDate, muxThumbnailUrl } from '@lmsy/shared'
 import { auth } from '@/lib/auth'
-import { listVideosByOwner } from '@/db/queries'
+import { listVideosByOwnerWithViews } from '@/db/queries'
 import { SignOutButton } from '@/components/sign-out-button'
+import { VideoCard } from '@/components/video-card'
 
 // The session lookup reads request headers, so this route is always dynamic.
 export const dynamic = 'force-dynamic'
@@ -11,19 +13,20 @@ export const dynamic = 'force-dynamic'
 export default async function DashboardPage() {
   const session = await auth.api.getSession({ headers: await headers() })
 
-  // Middleware already gates /dashboard on the cookie; this validates the
-  // session for real and gives us the trusted user id.
+  // Middleware gates /dashboard on the cookie; this validates the session for
+  // real and gives us the trusted user id.
   if (!session) {
     redirect('/login')
   }
 
-  const videos = await listVideosByOwner(session.user.id)
+  const videos = await listVideosByOwnerWithViews(session.user.id)
+  const now = Date.now()
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-3xl flex-col gap-8 px-6 py-12">
-      <header className="flex items-center justify-between">
+    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6">
+      <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold">Your recordings</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Your recordings</h1>
           <p className="mt-1 text-sm text-neutral-500">
             Signed in as {session.user.name || session.user.email}
           </p>
@@ -35,33 +38,42 @@ export default async function DashboardPage() {
         <div className="rounded-2xl border border-dashed border-neutral-300 p-12 text-center dark:border-neutral-700">
           <h2 className="text-lg font-semibold">No recordings yet</h2>
           <p className="mx-auto mt-2 max-w-sm text-sm text-neutral-500">
-            Record your screen from the desktop app and it will appear here.
+            Record your screen from the desktop app and it will appear here, ready to share.
           </p>
         </div>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {videos.map((video) => (
-            <li
+            <VideoCard
               key={video.id}
-              className="flex items-center justify-between rounded-xl border border-neutral-200 px-4 py-3 dark:border-neutral-800"
-            >
-              <div>
-                <p className="font-medium">{video.title}</p>
-                <p className="text-xs text-neutral-500">
-                  {video.status} · {formatDuration(video.durationSeconds)} ·{' '}
-                  {video.isPublic ? 'public' : 'private'}
-                </p>
-              </div>
-              <a
-                href={buildShareUrl(video.shareSlug)}
-                className="font-mono text-xs text-indigo-600 hover:underline dark:text-indigo-400"
-              >
-                /s/{video.shareSlug}
-              </a>
-            </li>
+              id={video.id}
+              title={video.title}
+              slug={video.shareSlug}
+              shareUrl={buildShareUrl(video.shareSlug)}
+              status={video.status}
+              isPublic={video.isPublic}
+              durationSeconds={video.durationSeconds}
+              viewCount={video.viewCount}
+              createdLabel={formatRelativeDate(video.createdAt, now)}
+              thumbnailUrl={
+                video.muxPlaybackId
+                  ? muxThumbnailUrl(video.muxPlaybackId, {
+                      width: 640,
+                      height: 360,
+                      fitMode: 'smartcrop',
+                    })
+                  : null
+              }
+            />
           ))}
-        </ul>
+        </div>
       )}
+
+      <footer className="mt-auto pt-6 text-sm text-neutral-500">
+        <Link href="/" className="hover:underline">
+          ← Back to {`letmeshowyou.com.au`}
+        </Link>
+      </footer>
     </main>
   )
 }

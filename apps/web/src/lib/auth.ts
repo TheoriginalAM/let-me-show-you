@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth'
 import { drizzleAdapter } from 'better-auth/adapters/drizzle'
-import { magicLink } from 'better-auth/plugins'
+import { admin, magicLink } from 'better-auth/plugins'
 import { nextCookies } from 'better-auth/next-js'
 // Relative imports (not the `@/` alias) so the Better Auth CLI loader can
 // resolve this module graph when generating the schema.
@@ -37,6 +37,9 @@ export const auth = betterAuth({
         console.log(`\n[magic-link] to: ${email}\n[magic-link] url: ${url}\n`)
       },
     }),
+    // Adds `role`/ban fields + admin APIs (list/set-role/ban/impersonate).
+    // Bootstrap the first admin by setting their `user.role` to 'admin'.
+    admin(),
     // nextCookies() must be the last plugin so it can attach Set-Cookie headers.
     nextCookies(),
   ],

@@ -46,7 +46,8 @@ export interface Video {
 
 /**
  * The public-safe view of a {@link Video}, returned for share links. Excludes
- * the owner id and any private/upload-only fields.
+ * the owner id and any private/upload-only fields, but includes the owner's
+ * display name and creation date, which are shown on the public share page.
  */
 export interface PublicVideo {
   id: string
@@ -55,6 +56,10 @@ export interface PublicVideo {
   muxPlaybackId: string | null
   durationSeconds: number | null
   shareSlug: string
+  /** Owner's display name (public byline on the share page). */
+  ownerName: string
+  /** ISO creation date, shown as a relative time on the share page. */
+  createdAt: string
 }
 
 /** A single view event against a {@link Video} (basic analytics). */
@@ -78,9 +83,65 @@ export interface ShareLink {
   createdAt: string
 }
 
-/** Build the public URL for a share-link slug. */
+/** The path segment public share links live under (`/v/<slug>`). */
+export const SHARE_PATH = 'v'
+
+/** Build the public URL for a share-link slug (`https://<domain>/v/<slug>`). */
 export function buildShareUrl(slug: string): string {
-  return `https://${APP_DOMAIN}/s/${slug}`
+  return `https://${APP_DOMAIN}/${SHARE_PATH}/${slug}`
+}
+
+/**
+ * Build a Mux image URL for a playback id. Works for any public playback id and
+ * needs no auth. Defaults to a webp thumbnail; pass `time`/`width`/`height` to
+ * pick a frame and size. Used for posters and dashboard/OpenGraph images.
+ */
+export function muxThumbnailUrl(
+  playbackId: string,
+  opts: {
+    time?: number
+    width?: number
+    height?: number
+    fitMode?: 'preserve' | 'crop' | 'smartcrop' | 'pad'
+    /** Image format. Default `webp`; use `jpg` for social cards (LinkedIn etc. don't render webp). */
+    format?: 'webp' | 'jpg' | 'png'
+  } = {},
+): string {
+  // Built by hand (no URLSearchParams) so this stays lib-agnostic for the
+  // desktop bundle; all values are numbers or a fixed enum, so no encoding.
+  const params: string[] = []
+  if (opts.time != null) params.push(`time=${opts.time}`)
+  if (opts.width) params.push(`width=${opts.width}`)
+  if (opts.height) params.push(`height=${opts.height}`)
+  if (opts.fitMode) params.push(`fit_mode=${opts.fitMode}`)
+  const qs = params.length ? `?${params.join('&')}` : ''
+  return `https://image.mux.com/${playbackId}/thumbnail.${opts.format ?? 'webp'}${qs}`
+}
+
+/** Human-readable relative time (e.g. `just now`, `3 hours ago`, `2 days ago`). */
+export function formatRelativeDate(iso: string, now: number = Date.now()): string {
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return ''
+  const seconds = Math.round((now - then) / 1000)
+  if (seconds < 45) return 'just now'
+  const units: [number, string][] = [
+    [60, 'second'],
+    [60, 'minute'],
+    [24, 'hour'],
+    [7, 'day'],
+    [4.348, 'week'],
+    [12, 'month'],
+    [Number.POSITIVE_INFINITY, 'year'],
+  ]
+  let value = seconds
+  let unit = 'second'
+  for (let i = 0; i < units.length; i++) {
+    unit = units[i][1]
+    if (value < units[i][0]) break
+    value = value / units[i][0]
+  }
+  const rounded = Math.floor(value)
+  return `${rounded} ${unit}${rounded === 1 ? '' : 's'} ago`
 }
 
 /** Human-readable rendering of a byte count (e.g. `12.4 MB`). */
@@ -114,7 +175,7 @@ export interface CreateUploadResponse {
   videoId: string
   /** Mux direct-upload URL to PUT the file to. */
   uploadUrl: string
-  /** Public share URL (`https://<domain>/s/<slug>`). */
+  /** Public share URL (`https://<domain>/v/<slug>`). */
   shareUrl: string
 }
 

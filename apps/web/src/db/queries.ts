@@ -1,9 +1,12 @@
 import 'server-only'
 
-import { and, count, desc, eq, isNull } from 'drizzle-orm'
+import { and, count, desc, eq, gt, inArray, isNull } from 'drizzle-orm'
 import type { PublicVideo, Video } from '@lmsy/shared'
 import { db } from './index'
-import { videos, videoViews } from './schema'
+import { user, videos, videoViews } from './schema'
+
+/** A video plus its total view count (dashboard rows). */
+export type VideoWithViews = Video & { viewCount: number }
 
 /**
  * Data-access layer for videos.
@@ -58,8 +61,11 @@ export async function getOwnedVideoViewCount(ownerId: string, videoId: string): 
 }
 
 /**
- * Public share-link lookup. Returns a video ONLY when it is `ready`, public, and
- * NOT password-protected, and never exposes the owner id or any secret column.
+ * Public share-link lookup. Returns a video when it is public, NOT
+ * password-protected, and in a viewable state (`ready`, or still
+ * `processing`/`uploading` so the share page can show a "still processing"
+ * state). Never exposes the owner id or any secret column; the owner's display
+ * name and creation date ARE included as they are shown publicly on the page.
  * Password-protected shares must go through a dedicated password-verified path.
  */
 export async function getVideoBySlug(slug: string): Promise<PublicVideo | null> {
@@ -71,18 +77,108 @@ export async function getVideoBySlug(slug: string): Promise<PublicVideo | null> 
       muxPlaybackId: videos.muxPlaybackId,
       durationSeconds: videos.durationSeconds,
       shareSlug: videos.shareSlug,
+      ownerName: user.name,
+      createdAt: videos.createdAt,
     })
     .from(videos)
+    .innerJoin(user, eq(videos.ownerId, user.id))
     .where(
       and(
         eq(videos.shareSlug, slug),
-        eq(videos.status, 'ready'),
+        inArray(videos.status, ['ready', 'processing', 'uploading']),
         eq(videos.isPublic, true),
         isNull(videos.passwordHash),
       ),
     )
     .limit(1)
   return rows[0] ?? null
+}
+
+/**
+ * Total public view count for a video, keyed by id. Not owner-scoped: callers
+ * must have already resolved the id from a public slug (i.e. the video is
+ * public). Used by the public share page.
+ */
+export async function getPublicVideoViewCount(videoId: string): Promise<number> {
+  const rows = await db
+    .select({ value: count() })
+    .from(videoViews)
+    .where(eq(videoViews.videoId, videoId))
+  return Number(rows[0]?.value ?? 0)
+}
+
+/**
+ * Record a view, debounced to at most one per IP hash per hour. Returns whether
+ * a new row was inserted. `ipHash` must already be salted+hashed by the caller.
+ */
+export async function recordVideoView(videoId: string, ipHash: string): Promise<boolean> {
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+  const recent = await db
+    .select({ id: videoViews.id })
+    .from(videoViews)
+    .where(
+      and(
+        eq(videoViews.videoId, videoId),
+        eq(videoViews.viewerIpHash, ipHash),
+        gt(videoViews.viewedAt, oneHourAgo),
+      ),
+    )
+    .limit(1)
+  if (recent.length > 0) return false
+  await db.insert(videoViews).values({ videoId, viewerIpHash: ipHash })
+  return true
+}
+
+/** All of an owner's videos with their view counts, newest first (dashboard). */
+export async function listVideosByOwnerWithViews(ownerId: string): Promise<VideoWithViews[]> {
+  const rows = await db
+    .select({ ...ownerVideoColumns, viewCount: count(videoViews.id) })
+    .from(videos)
+    .leftJoin(videoViews, eq(videoViews.videoId, videos.id))
+    .where(eq(videos.ownerId, ownerId))
+    .groupBy(videos.id)
+    .orderBy(desc(videos.createdAt))
+  return rows.map((row) => ({ ...row, viewCount: Number(row.viewCount) }))
+}
+
+/** Rename a video the caller owns. Returns whether a row was updated. */
+export async function renameOwnedVideo(
+  ownerId: string,
+  videoId: string,
+  title: string,
+): Promise<boolean> {
+  const rows = await db
+    .update(videos)
+    .set({ title })
+    .where(and(eq(videos.id, videoId), eq(videos.ownerId, ownerId)))
+    .returning({ id: videos.id })
+  return rows.length > 0
+}
+
+/** Toggle a video's public/private flag. Returns whether a row was updated. */
+export async function setOwnedVideoVisibility(
+  ownerId: string,
+  videoId: string,
+  isPublic: boolean,
+): Promise<boolean> {
+  const rows = await db
+    .update(videos)
+    .set({ isPublic })
+    .where(and(eq(videos.id, videoId), eq(videos.ownerId, ownerId)))
+    .returning({ id: videos.id })
+  return rows.length > 0
+}
+
+/** Slugs + timestamps of all public, ready videos — for the sitemap. */
+export async function listPublicVideoSlugs(
+  limit = 5000,
+): Promise<{ slug: string; createdAt: string }[]> {
+  return db
+    .select({ slug: videos.shareSlug, createdAt: videos.createdAt })
+    .from(videos)
+    .where(and(eq(videos.status, 'ready'), eq(videos.isPublic, true), isNull(videos.passwordHash)))
+    .orderBy(desc(videos.createdAt))
+    .limit(limit)
 }
 
 /**
