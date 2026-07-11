@@ -1,86 +1,457 @@
 :root {
+  color-scheme: dark;
   --bg: #0b0b12;
-  --card: #14141f;
-  --border: #262637;
+  --surface: #16161f;
+  --surface-2: #1e1e2a;
+  --border: #2a2a3a;
   --fg: #f4f4f8;
   --muted: #9a9ab0;
-  --accent: #8b8bff;
+  --accent: #6d6dff;
+  --accent-hover: #8080ff;
+  --danger: #ff4d5e;
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  height: 100%;
+  font-family: var(--font);
+  color: var(--fg);
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+body {
   background: var(--bg);
+}
+
+/* The webcam bubble window is transparent — no opaque page background. */
+:root[data-view='webcam'] body {
+  background: transparent;
+}
+
+#root {
+  height: 100%;
+}
+
+/* Interactive elements must stay clickable inside drag regions. */
+button,
+select,
+input,
+a,
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/* ---------- Control panel ---------- */
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.titlebar {
+  -webkit-app-region: drag;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.title-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+.title-text {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.win-close {
+  margin-left: auto;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.win-close:hover {
+  background: var(--surface-2);
   color: var(--fg);
 }
 
-.app {
+.panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 100vh;
-  padding: 2rem;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.card {
-  width: 100%;
-  max-width: 30rem;
-  padding: 2.5rem;
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 1rem;
+.picker-empty {
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+  padding: 24px 0;
 }
 
-.eyebrow {
-  margin: 0 0 0.75rem;
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
-  color: var(--accent);
+/* ---------- Source picker ---------- */
+.sources {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-h1 {
-  margin: 0;
-  font-size: 2.25rem;
-  letter-spacing: -0.02em;
-}
-
-.tagline {
-  margin: 0.5rem 0 2rem;
+.group-title {
+  margin: 0 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--muted);
 }
 
-.meta {
+.source-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1rem;
-  margin: 0;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
 }
 
-.meta dt {
-  font-size: 0.7rem;
+.source-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+.source-card:hover {
+  background: var(--surface-2);
+}
+.source-card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.source-thumb {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #000;
+  pointer-events: none;
+}
+
+.source-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.source-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.source-name-text {
+  font-size: 11px;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Device selects ---------- */
+.devices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.field-label {
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--muted);
 }
 
-.meta dd {
-  margin: 0.25rem 0 0;
-  font-weight: 600;
-  text-transform: capitalize;
+.field select {
+  appearance: none;
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.field select:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
-.share {
-  margin: 1.75rem 0 0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.85rem;
-  color: var(--accent);
+/* ---------- Mic/camera permission notice ---------- */
+.perm-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: #2a2110;
+  border: 1px solid #5a4416;
+  border-radius: 8px;
+}
+.perm-notice-text {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #fbbf24;
+}
+.perm-notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.perm-notice-actions .btn-ghost {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  color: #fbbf24;
+}
+.perm-notice-actions .btn-ghost:hover {
+  color: #fff;
+}
+
+/* ---------- Buttons ---------- */
+.btn-record {
+  padding: 12px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-record:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.btn-record:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-ghost {
+  padding: 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn-ghost:hover {
+  color: var(--fg);
+}
+
+.btn-secondary {
+  flex: 1;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.btn-secondary:hover {
+  border-color: var(--accent);
+}
+
+.btn-stop {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-stop:hover {
+  filter: brightness(1.08);
+}
+
+/* ---------- Permission gate ---------- */
+.gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 12px 4px;
+}
+.gate-icon {
+  font-size: 36px;
+}
+.gate-title {
+  margin: 0;
+  font-size: 16px;
+}
+.gate-body {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+.perm-list {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.perm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.badge-granted {
+  background: #10331f;
+  color: #4ade80;
+}
+.badge-denied,
+.badge-restricted {
+  background: #3a1620;
+  color: var(--danger);
+}
+.badge-not-determined {
+  background: #33260f;
+  color: #fbbf24;
+}
+
+/* ---------- Recording bar ---------- */
+.recording {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 8px;
+}
+.rec-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.rec-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--danger);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.rec-dot.paused {
+  background: #fbbf24;
+  animation: none;
+}
+.rec-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.rec-timer {
+  font-size: 40px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.rec-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+/* ---------- Webcam bubble ---------- */
+.bubble {
+  -webkit-app-region: drag;
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #000;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  border: 3px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bubble-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1); /* mirror, like a selfie preview */
+}
+.bubble-error {
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  padding: 0 16px;
 }

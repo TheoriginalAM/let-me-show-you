@@ -1,11 +1,10 @@
-export {}
+import type { RecorderApi } from '@shared/ipc'
 
 declare global {
   interface Window {
-    /** API bridge exposed by the preload script (see src/preload/index.ts). */
-    lmsy: {
-      ping: () => Promise<string>
-      platform: string
-    }
+    /** The bridge exposed by the preload script (see src/preload/index.ts). */
+    recorder: RecorderApi
   }
 }
+
+export {}
