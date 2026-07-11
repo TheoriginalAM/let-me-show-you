@@ -69,6 +69,9 @@ jobs:
 
       - name: Build, publish & (mac) notarize
         working-directory: apps/desktop
+        # Backstop against a pathological hang (the notarize hook already self-bounds
+        # each notary attempt to 20m and retries, so this should never trip normally).
+        timeout-minutes: 90
         # bash on all runners (incl. Windows) so the tag→version expansion works.
         shell: bash
         # Drive the artifact/manifest version from the v* tag, not package.json.
