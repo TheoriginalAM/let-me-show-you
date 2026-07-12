@@ -175,6 +175,7 @@ export function ControlPanel() {
       void capture.start({
         mode: 'camera',
         sourceId: null,
+        displayId: null,
         micId: s.selectedMicId,
         cameraId: camId,
         areaRect: null,
@@ -192,6 +193,7 @@ export function ControlPanel() {
       void capture.start({
         mode: 'area',
         sourceId: screen.id,
+        displayId: String(s.areaRect.displayId),
         micId: s.selectedMicId,
         cameraId: s.selectedCameraId,
         areaRect: s.areaRect,
@@ -203,6 +205,7 @@ export function ControlPanel() {
     void capture.start({
       mode: s.mode,
       sourceId: s.selectedSourceId,
+      displayId: s.sources.find((x) => x.id === s.selectedSourceId)?.displayId ?? null,
       micId: s.selectedMicId,
       cameraId: s.selectedCameraId,
       areaRect: null,

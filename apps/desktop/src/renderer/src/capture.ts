@@ -1,4 +1,4 @@
-import type { AreaRect, StartRecordingPayload } from '@shared/ipc'
+import type { AreaRect, StartRecordingPayload, WebcamShape } from '@shared/ipc'
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -22,6 +22,8 @@ class CaptureController {
   private sourceStream: MediaStream | null = null
   private cropRaf: number | null = null
   private cropVideo: HTMLVideoElement | null = null
+  private webcamCompositeStream: MediaStream | null = null
+  private webcamVideoEl: HTMLVideoElement | null = null
   private cropPaused = false
   private writeChain: Promise<unknown> = Promise.resolve()
   private starting = false
@@ -68,10 +70,32 @@ class CaptureController {
               },
             },
           } as unknown as MediaStreamConstraints)
-          videoStream =
-            payload.mode === 'area' && payload.areaRect
-              ? this.cropToArea(desktop, payload.areaRect)
-              : desktop
+          // window/area can overlay the webcam by compositing it onto a canvas:
+          // window capture excludes the floating bubble, and area already draws to
+          // a canvas to crop. Screen mode leaves the on-screen bubble as-is.
+          const overlayCameraId =
+            payload.mode === 'window' || payload.mode === 'area' ? payload.cameraId : null
+          if (payload.mode === 'area' || overlayCameraId) {
+            let webcam: { stream: MediaStream; shape: WebcamShape } | null = null
+            if (overlayCameraId) {
+              try {
+                const camStream = await navigator.mediaDevices.getUserMedia({
+                  video: { deviceId: { exact: overlayCameraId }, width: 640, height: 640 },
+                  audio: false,
+                })
+                const cfg = await window.recorder.getWebcamConfig().catch(() => null)
+                webcam = { stream: camStream, shape: cfg?.shape ?? 'circle' }
+              } catch {
+                webcam = null // overlay is best-effort
+              }
+            }
+            videoStream = this.buildComposite(desktop, {
+              crop: payload.mode === 'area' ? payload.areaRect : null,
+              webcam,
+            })
+          } else {
+            videoStream = desktop
+          }
         }
       } catch (error) {
         this.releaseStream()
@@ -255,17 +279,33 @@ class CaptureController {
   }
 
   /**
-   * Draw a cropped region of a desktop stream onto a canvas and record THAT.
-   * Maps the DIP selection rect to captured-video pixels (the capture may be
-   * downscaled from native). The raw desktop stream is retained for cleanup.
+   * Composite the desktop feed onto a canvas and record THAT: optionally cropped
+   * to an area (DIP rect mapped to captured-video pixels, which may be downscaled
+   * from native) and/or with the webcam drawn into the bottom-right corner
+   * (window capture can't include the separate floating bubble). Raw streams are
+   * retained for cleanup.
    */
-  private cropToArea(desktop: MediaStream, rect: AreaRect): MediaStream {
+  private buildComposite(
+    desktop: MediaStream,
+    opts: { crop: AreaRect | null; webcam: { stream: MediaStream; shape: WebcamShape } | null },
+  ): MediaStream {
     this.sourceStream = desktop
-    const video = document.createElement('video')
-    video.srcObject = desktop
-    video.muted = true
-    void video.play().catch(() => undefined)
-    this.cropVideo = video
+    const srcVideo = document.createElement('video')
+    srcVideo.srcObject = desktop
+    srcVideo.muted = true
+    void srcVideo.play().catch(() => undefined)
+    this.cropVideo = srcVideo
+
+    let camVideo: HTMLVideoElement | null = null
+    if (opts.webcam) {
+      this.webcamCompositeStream = opts.webcam.stream
+      camVideo = document.createElement('video')
+      camVideo.srcObject = opts.webcam.stream
+      camVideo.muted = true
+      void camVideo.play().catch(() => undefined)
+      this.webcamVideoEl = camVideo
+    }
+    const camShape: WebcamShape = opts.webcam?.shape ?? 'circle'
 
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
@@ -276,15 +316,22 @@ class CaptureController {
     let sized = false
 
     const setup = (): boolean => {
-      const vw = video.videoWidth
-      const vh = video.videoHeight
+      const vw = srcVideo.videoWidth
+      const vh = srcVideo.videoHeight
       if (!vw || !vh) return false
-      const scaleX = vw / rect.displayWidth
-      const scaleY = vh / rect.displayHeight
-      sx = Math.round(rect.x * scaleX)
-      sy = Math.round(rect.y * scaleY)
-      sw = Math.max(2, Math.round(rect.width * scaleX))
-      sh = Math.max(2, Math.round(rect.height * scaleY))
+      if (opts.crop) {
+        const scaleX = vw / opts.crop.displayWidth
+        const scaleY = vh / opts.crop.displayHeight
+        sx = Math.round(opts.crop.x * scaleX)
+        sy = Math.round(opts.crop.y * scaleY)
+        sw = Math.max(2, Math.round(opts.crop.width * scaleX))
+        sh = Math.max(2, Math.round(opts.crop.height * scaleY))
+      } else {
+        sx = 0
+        sy = 0
+        sw = vw
+        sh = vh
+      }
       sw -= sw % 2 // even dims keep the downstream H.264 encoder happy
       sh -= sh % 2
       canvas.width = sw
@@ -299,7 +346,37 @@ class CaptureController {
         return
       }
       // Skip the decode+draw while paused (no output is being recorded anyway).
-      if (!this.cropPaused && ctx) ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh)
+      if (!this.cropPaused && ctx) {
+        ctx.drawImage(srcVideo, sx, sy, sw, sh, 0, 0, sw, sh)
+        if (camVideo && camVideo.videoWidth) {
+          const size = Math.round(Math.min(sw, sh) * 0.26)
+          const margin = Math.round(size * 0.16)
+          const dx = sw - size - margin
+          const dy = sh - size - margin
+          const cw = camVideo.videoWidth
+          const ch = camVideo.videoHeight
+          const side = Math.min(cw, ch)
+          const cxs = (cw - side) / 2
+          const cys = (ch - side) / 2
+          const radius =
+            camShape === 'circle' ? size / 2 : camShape === 'rounded' ? size * 0.24 : size * 0.08
+          ctx.save()
+          ctx.beginPath()
+          ctx.roundRect(dx, dy, size, size, radius)
+          ctx.clip()
+          ctx.translate(dx + size, dy)
+          ctx.scale(-1, 1) // mirror, selfie-style (matches the bubble)
+          ctx.drawImage(camVideo, cxs, cys, side, side, 0, 0, size, size)
+          ctx.restore()
+          ctx.save()
+          ctx.beginPath()
+          ctx.roundRect(dx, dy, size, size, radius)
+          ctx.lineWidth = Math.max(2, Math.round(size * 0.03))
+          ctx.strokeStyle = 'rgba(255,255,255,0.9)'
+          ctx.stroke()
+          ctx.restore()
+        }
+      }
       this.cropRaf = requestAnimationFrame(draw)
     }
     this.cropPaused = false
@@ -315,6 +392,14 @@ class CaptureController {
     if (this.cropVideo) {
       this.cropVideo.srcObject = null
       this.cropVideo = null
+    }
+    if (this.webcamVideoEl) {
+      this.webcamVideoEl.srcObject = null
+      this.webcamVideoEl = null
+    }
+    if (this.webcamCompositeStream) {
+      for (const track of this.webcamCompositeStream.getTracks()) track.stop()
+      this.webcamCompositeStream = null
     }
     if (this.sourceStream) {
       for (const track of this.sourceStream.getTracks()) track.stop()

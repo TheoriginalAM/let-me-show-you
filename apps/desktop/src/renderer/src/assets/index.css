@@ -29,8 +29,11 @@ body {
   user-select: none;
 }
 
+/* Translucent tint so the macOS window vibrancy (blur) shows through on the
+   control panel. On Windows the opaque window backgroundColor sits behind it, so
+   it reads as the same solid dark. */
 body {
-  background: var(--bg);
+  background: rgba(10, 10, 15, 0.72);
 }
 
 /* The webcam bubble window is transparent — no opaque page background. */
@@ -1176,6 +1179,31 @@ a,
   border-radius: 12px;
   border: 1px solid var(--border);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Recording region indicator ---------- */
+:root[data-view='indicator'] body {
+  background: transparent;
+}
+.rec-indicator {
+  position: fixed;
+  inset: 0;
+  border: 3px solid var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(0, 0, 0, 0.35);
+  animation: rec-pulse 1.6s ease-in-out infinite;
+}
+@keyframes rec-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
 }
 
 /* ---------- First-run onboarding ---------- */

@@ -93,6 +93,8 @@ export interface StartRecordingPayload {
   mode: RecordingMode
   /** desktopCapturer id for screen/window/area; null for camera-only. */
   sourceId: string | null
+  /** Electron display id of the captured screen (screen mode), for the indicator. */
+  displayId: string | null
   micId: string | null
   /** In 'camera' mode: the camera to record. In screen/window: the webcam overlay (or null). */
   cameraId: string | null

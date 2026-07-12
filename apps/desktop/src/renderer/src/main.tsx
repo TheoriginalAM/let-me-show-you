@@ -4,6 +4,7 @@ import * as Sentry from '@sentry/electron/renderer'
 import { ControlPanel } from './control/ControlPanel'
 import { WebcamBubble } from './webcam/WebcamBubble'
 import { AreaOverlay } from './area/AreaOverlay'
+import { RecordingIndicator } from './indicator/RecordingIndicator'
 import './assets/index.css'
 
 // Renderer crash reporting. Events forward to the main-process Sentry client,
@@ -21,6 +22,7 @@ document.documentElement.dataset.view = view
 function Root() {
   if (view === 'webcam') return <WebcamBubble />
   if (view === 'area') return <AreaOverlay />
+  if (view === 'indicator') return <RecordingIndicator />
   return <ControlPanel />
 }
 

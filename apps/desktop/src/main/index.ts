@@ -78,6 +78,7 @@ function hardenWindow(win: BrowserWindow): void {
 }
 
 function createControlWindow(): BrowserWindow {
+  const isMac = process.platform === 'darwin'
   const win = new BrowserWindow({
     width: 380,
     height: 580,
@@ -88,7 +89,10 @@ function createControlWindow(): BrowserWindow {
     frame: false,
     titleBarStyle: 'hidden',
     alwaysOnTop: true,
-    backgroundColor: '#0a0a0f',
+    // macOS: a translucent blur material (Supercut-style). The renderer keeps a
+    // dark tint over it for contrast. Elsewhere: opaque.
+    backgroundColor: isMac ? '#00000000' : '#0a0a0f',
+    ...(isMac ? { vibrancy: 'under-window' as const, visualEffectState: 'active' as const } : {}),
     title: APP_NAME,
     webPreferences: baseWebPreferences,
   })
@@ -125,6 +129,9 @@ function createWebcamWindow(): BrowserWindow {
     skipTaskbar: true,
     alwaysOnTop: true,
     backgroundColor: '#00000000',
+    // The bubble never becomes key (showInactive); without this, a click on the
+    // hover controls is swallowed to "activate" the window instead of firing.
+    acceptFirstMouse: true,
     webPreferences: baseWebPreferences,
   })
   hardenWindow(win)
@@ -318,6 +325,82 @@ async function retryUpload(): Promise<void> {
   if (lastUploadPayload) await startUpload(lastUploadPayload)
 }
 
+// ---- Recording region indicator (a live border, excluded from the capture) ----
+let indicatorWindow: BrowserWindow | null = null
+
+function hideRecordingIndicator(): void {
+  if (indicatorWindow && !indicatorWindow.isDestroyed()) indicatorWindow.close()
+  indicatorWindow = null
+}
+
+function showRecordingIndicator(payload: {
+  mode: string
+  areaRect: AreaRect | null
+  displayId?: string | null
+}): void {
+  syncBubbleForRecording(payload.mode, true)
+  hideRecordingIndicator()
+  // Only screen + area have a fixed on-screen region to outline. Window can move
+  // (hard to track) and camera has nothing on screen.
+  let bounds: { x: number; y: number; width: number; height: number } | null = null
+  if (payload.mode === 'area' && payload.areaRect) {
+    const r = payload.areaRect
+    const d =
+      screen.getAllDisplays().find((x) => x.id === r.displayId) ?? screen.getPrimaryDisplay()
+    bounds = { x: d.bounds.x + r.x, y: d.bounds.y + r.y, width: r.width, height: r.height }
+  } else if (payload.mode === 'screen') {
+    // Frame the display actually being recorded, not just wherever the cursor is.
+    const byId =
+      payload.displayId != null
+        ? screen.getAllDisplays().find((x) => String(x.id) === payload.displayId)
+        : undefined
+    bounds = { ...(byId ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint())).bounds }
+  }
+  if (!bounds) return
+
+  const win = new BrowserWindow({
+    ...bounds,
+    frame: false,
+    transparent: true,
+    hasShadow: false,
+    resizable: false,
+    movable: false,
+    focusable: false,
+    skipTaskbar: true,
+    alwaysOnTop: true,
+    fullscreenable: false,
+    backgroundColor: '#00000000',
+    webPreferences: baseWebPreferences,
+  })
+  hardenWindow(win)
+  win.setIgnoreMouseEvents(true) // click-through
+  win.setContentProtection(true) // visible to the user, excluded from the recording
+  win.setAlwaysOnTop(true, 'screen-saver')
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
+  loadRenderer(win, 'indicator')
+  win.showInactive()
+  win.on('closed', () => {
+    if (indicatorWindow === win) indicatorWindow = null
+  })
+  indicatorWindow = win
+}
+
+/**
+ * Window/area recordings composite the webcam into the frame, so hide the
+ * floating bubble while they run — otherwise a full-screen area capture bakes the
+ * live bubble in AND the composite draws it again (double webcam). Screen mode is
+ * left alone (its bubble is the recorded webcam). Restored when recording ends.
+ */
+function syncBubbleForRecording(mode: string, recording: boolean): void {
+  if (!webcamWindow || webcamWindow.isDestroyed() || !currentCameraId) return
+  const composited = mode === 'window' || mode === 'area'
+  if (recording && composited) {
+    webcamWindow.hide()
+  } else if (!recording && !webcamWindow.isVisible()) {
+    webcamWindow.showInactive()
+  }
+}
+
 app.whenReady().then(() => {
   // Allow the renderers to use camera/microphone (getUserMedia). The OS still
   // gates access separately on macOS via the system permission prompts.
@@ -349,6 +432,7 @@ app.whenReady().then(() => {
     resizeWebcam,
     selectArea,
     cancelAreaSelect,
+    showRecordingIndicator,
     hideControlWindow: () => controlWindow?.hide(),
     quit,
     signIn,
@@ -363,6 +447,11 @@ app.whenReady().then(() => {
   // Mirror recording status to the control panel renderer.
   recordingSession.onChange((status) => {
     sendToControl(IPC.recordingStatus, status)
+    // Drop the region border + restore the webcam bubble once recording stops.
+    if (status.state !== 'recording' && status.state !== 'paused') {
+      hideRecordingIndicator()
+      syncBubbleForRecording('', false)
+    }
     // A new recording (or dismissal) clears any prior upload result.
     if (
       (status.state === 'recording' || status.state === 'idle') &&

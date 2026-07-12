@@ -8,6 +8,7 @@ import {
   type MediaPermissions,
   type PermissionState,
   type PermissionTarget,
+  type StartRecordingPayload,
   type StartUploadPayload,
   type UploadStatus,
   type WebcamConfig,
@@ -32,6 +33,7 @@ export interface IpcContext {
   resizeWebcam: (size: WebcamSize) => void
   selectArea: () => Promise<AreaRect | null>
   cancelAreaSelect: () => void
+  showRecordingIndicator: (payload: StartRecordingPayload) => void
   hideControlWindow: () => void
   quit: () => void
   // auth + upload
@@ -168,6 +170,7 @@ export function registerIpcHandlers(ctx: IpcContext): void {
       throw new Error('Unknown or missing sourceId')
     }
     ctx.session.begin()
+    ctx.showRecordingIndicator(payload as StartRecordingPayload)
   })
 
   ipcMain.handle(IPC.writeChunk, async (_event, chunk: unknown) => {
