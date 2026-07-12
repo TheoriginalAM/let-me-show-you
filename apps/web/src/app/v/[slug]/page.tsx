@@ -163,11 +163,6 @@ export default async function SharePage({ params }: PageProps) {
             {APP_NAME}
           </Link>
         )}
-        {!branded && (
-          <Link href="/signup" className="btn-primary px-3.5 py-1.5 text-sm">
-            Get started
-          </Link>
-        )}
       </div>
 
       {locked ? (
@@ -219,7 +214,13 @@ export default async function SharePage({ params }: PageProps) {
             </div>
           </div>
 
-          <Comments slug={slug} initialComments={comments} isOwner={isOwner} accent={accent} />
+          <Comments
+            slug={slug}
+            initialComments={comments}
+            isOwner={isOwner}
+            accent={accent}
+            defaultName={currentUser?.name ?? ''}
+          />
         </>
       )}
 

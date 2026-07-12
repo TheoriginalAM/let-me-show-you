@@ -29,28 +29,33 @@ export function Comments({
   initialComments,
   isOwner,
   accent,
+  defaultName = '',
 }: {
   slug: string
   initialComments: ThreadComment[]
   isOwner: boolean
   accent: string
+  /** Prefilled when the viewer is signed in (their account name). */
+  defaultName?: string
 }) {
   const [comments, setComments] = useState<ThreadComment[]>(initialComments)
-  const [name, setName] = useState('')
+  const [name, setName] = useState(defaultName)
   const [body, setBody] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
   const honeypot = useRef<HTMLInputElement>(null)
 
-  // Remember the commenter's name across visits (feels chat-like on return).
+  // A signed-in viewer's account name wins; otherwise fall back to the name they
+  // last commented with (feels chat-like on return).
   useEffect(() => {
+    if (defaultName) return
     try {
       const saved = localStorage.getItem(NAME_KEY)
       if (saved) setName(saved)
     } catch {
       /* ignore private-mode storage errors */
     }
-  }, [])
+  }, [defaultName])
 
   function submit(e: React.FormEvent): void {
     e.preventDefault()
