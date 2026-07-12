@@ -1,26 +1,32 @@
 import Link from 'next/link'
-import { APP_DOMAIN, APP_NAME } from '@lmsy/shared'
+import { APP_NAME } from '@lmsy/shared'
 
 const features = [
   {
     title: 'Record with your voice',
-    body: 'Capture your screen and narrate as you go. Explain the thing instead of typing three paragraphs about it.',
+    body: 'Capture your screen and narrate as you go. Explain the thing out loud instead of typing three paragraphs about it.',
     icon: (
       <path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Zm7 9a7 7 0 0 1-14 0M12 19v3" />
     ),
   },
   {
     title: 'Share with one link',
-    body: 'Every recording becomes a clean public link that plays instantly in the browser — no sign-up for the person watching.',
+    body: 'Every recording becomes a clean link that plays instantly in any browser. The person watching never signs up or installs a thing.',
     icon: (
       <path d="M9 15l6-6M10.5 6.5l1-1a4 4 0 0 1 5.657 5.657l-1 1M13.5 17.5l-1 1a4 4 0 0 1-5.657-5.657l1-1" />
     ),
   },
   {
-    title: 'See what lands',
-    body: 'Know when your clients actually watched. View counts on every recording, right in your dashboard.',
+    title: 'See what actually lands',
+    body: 'Know the moment a client presses play. View counts on every recording, right in your dashboard.',
     icon: <path d="M3 3v18h18M8 14l3-4 3 3 4-6" />,
   },
+]
+
+const steps = [
+  { n: '01', title: 'Hit record', body: 'Open the app, pick a screen or window, and talk through it like you would in the room.' },
+  { n: '02', title: 'Send the link', body: 'Stop recording and the link is already on your clipboard. Paste it anywhere.' },
+  { n: '03', title: 'They just watch', body: 'It plays instantly in their browser. No account, no download, no friction.' },
 ]
 
 export default function Home() {
@@ -49,7 +55,6 @@ export default function Home() {
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col px-6">
         {/* ---------- Hero ---------- */}
         <section className="relative grid items-center gap-12 py-16 sm:py-24 lg:grid-cols-[1.05fr_0.95fr]">
-          {/* Photographic aurora backdrop, weighted right and faded out behind the headline. */}
           <div
             aria-hidden
             className="pointer-events-none absolute -inset-x-6 -top-10 bottom-0 -z-10 bg-[url('/brand/hero-atmosphere.jpg')] bg-cover bg-[center_right] opacity-60 [mask-image:linear-gradient(to_right,transparent,black_48%,black)]"
@@ -57,7 +62,7 @@ export default function Home() {
           <div className="flex flex-col items-start gap-6">
             <span className="eyebrow rise" style={{ animationDelay: '40ms' }}>
               <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_2px_rgba(139,139,246,0.9)]" />
-              {APP_DOMAIN}
+              Built by the people who use it
             </span>
             <h1
               className="rise font-display text-6xl font-semibold leading-[0.95] tracking-tight sm:text-7xl"
@@ -65,14 +70,15 @@ export default function Home() {
             >
               <span className="text-gradient">Show,</span>
               <br />
-              don’t tell.
+              don&rsquo;t tell.
             </h1>
             <p
               className="rise max-w-md text-lg leading-relaxed text-muted"
               style={{ animationDelay: '150ms' }}
             >
-              Record your screen with voiceover and send it to clients as a single link. Walk them
-              through the work instead of writing another long email.
+              The screen recorder for people who live in client work. Record what you mean, say it
+              out loud, and send a single link. No more three paragraph emails. No more &ldquo;quick
+              call to explain.&rdquo;
             </p>
             <div
               className="rise flex flex-wrap items-center gap-3 pt-1"
@@ -85,6 +91,9 @@ export default function Home() {
                 Sign in
               </Link>
             </div>
+            <p className="rise text-sm text-faint" style={{ animationDelay: '250ms' }}>
+              Free to start. macOS and Windows.
+            </p>
           </div>
 
           {/* Floating product mock */}
@@ -115,6 +124,55 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ---------- Manifesto: built by practitioners ---------- */}
+        <section className="relative mb-16 overflow-hidden rounded-3xl border border-line px-8 py-12 sm:px-12 sm:py-16">
+          <div className="absolute inset-0 -z-10 bg-[radial-gradient(70%_120%_at_15%_0%,rgba(120,110,255,0.16),transparent_65%)]" />
+          <span className="eyebrow">
+            <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_2px_rgba(139,139,246,0.9)]" />
+            Why we built it
+          </span>
+          <h2 className="mt-4 max-w-3xl font-display text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
+            We built this because we needed it.
+          </h2>
+          <div className="mt-5 grid max-w-4xl gap-5 text-lg leading-relaxed text-muted sm:grid-cols-2">
+            <p>
+              We run agencies, we freelance, we ship product. For years we buried updates in emails
+              nobody read and lost whole afternoons to calls that should have been a two minute
+              video.
+            </p>
+            <p>
+              The tools out there felt designed in a boardroom, not on a deadline. So we made the one
+              we actually wanted. Every feature here earned its place because one of us needed it on
+              a real client, in a real week.
+            </p>
+          </div>
+          <p className="mt-6 text-sm font-medium text-accent-ink">
+            From the people who use it, every day.
+          </p>
+        </section>
+
+        {/* ---------- How it works ---------- */}
+        <section className="mb-16">
+          <div className="mb-8 flex flex-col gap-2">
+            <span className="eyebrow">
+              <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_2px_rgba(139,139,246,0.9)]" />
+              How it works
+            </span>
+            <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+              Three steps. About ninety seconds.
+            </h2>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-3">
+            {steps.map((step) => (
+              <div key={step.n} className="glass glass-hover rounded-2xl p-6">
+                <span className="font-display text-2xl font-semibold text-accent-ink">{step.n}</span>
+                <h3 className="mt-3 text-lg font-semibold">{step.title}</h3>
+                <p className="mt-2 leading-relaxed text-muted">{step.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* ---------- Features ---------- */}
         <section className="grid gap-4 pb-16 sm:grid-cols-3">
           {features.map((feature) => (
@@ -132,26 +190,27 @@ export default function Home() {
                   {feature.icon}
                 </svg>
               </span>
-              <h2 className="font-semibold">{feature.title}</h2>
-              <p className="mt-2 text-sm leading-relaxed text-muted">{feature.body}</p>
+              <h2 className="text-lg font-semibold">{feature.title}</h2>
+              <p className="mt-2 leading-relaxed text-muted">{feature.body}</p>
             </div>
           ))}
         </section>
 
         {/* ---------- CTA band ---------- */}
-        <section className="relative mb-20 overflow-hidden rounded-3xl border border-line px-8 py-14 text-center">
+        <section className="relative mb-20 overflow-hidden rounded-3xl border border-line px-8 py-16 text-center">
           <div
             aria-hidden
             className="absolute inset-0 -z-20 bg-[url('/brand/cta-contours.jpg')] bg-cover bg-center opacity-40 [mask-image:radial-gradient(80%_120%_at_50%_100%,black,transparent_75%)]"
           />
           <div className="absolute inset-0 -z-10 bg-[radial-gradient(60%_120%_at_50%_0%,rgba(120,110,255,0.25),transparent_70%)]" />
-          <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+          <h2 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">
             Stop typing. Start showing.
           </h2>
-          <p className="mx-auto mt-3 max-w-md text-muted">
-            Record your first walkthrough in the next five minutes.
+          <p className="mx-auto mt-4 max-w-lg text-lg text-muted">
+            Record your first walkthrough in the next five minutes. Made by people who do this all
+            day, for people who do this all day.
           </p>
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <Link href="/download" className="btn-primary px-5 py-3 text-sm">
               Download the app
             </Link>
