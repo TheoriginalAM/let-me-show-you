@@ -32,6 +32,9 @@ export default async function DashboardPage() {
       <header className="rise flex flex-wrap items-center justify-between gap-4">
         <WorkspaceSwitcher workspaces={workspaces} activeId={active?.id ?? null} />
         <div className="flex items-center gap-2">
+          <Link href="/dashboard/settings" className="btn-ghost px-3 py-1.5 text-sm">
+            Settings
+          </Link>
           {user.role === 'admin' && (
             <Link href="/admin" className="btn-ghost px-3 py-1.5 text-sm">
               Admin

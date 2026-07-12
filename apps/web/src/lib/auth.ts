@@ -8,7 +8,7 @@ import { db } from '../db'
 import * as schema from '../db/schema'
 import { ensureUserHasWorkspace } from '../db/workspaces'
 import { sendEmail } from './email'
-import { magicLinkEmail } from './email-templates'
+import { magicLinkEmail, resetPasswordEmail } from './email-templates'
 import { notifyAdminsOfSignup } from './notifications'
 
 // Pin the origin explicitly. Without this, Better Auth would derive the base URL
@@ -28,6 +28,14 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    // Password reset by emailed link (works even when the user is locked out).
+    sendResetPassword: async ({ user, url }) => {
+      const { subject, html, text } = resetPasswordEmail(url)
+      const ok = await sendEmail({ to: user.email, subject, html, text })
+      if (!ok && process.env.NODE_ENV !== 'production') {
+        console.log(`\n[reset-password] to: ${user.email}\n[reset-password] url: ${url}\n`)
+      }
+    },
   },
   // Email the admins when a new (pending) user is created. Best-effort — never
   // block or fail signup on a delivery hiccup.

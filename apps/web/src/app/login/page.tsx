@@ -105,6 +105,12 @@ function LoginForm() {
             >
               Email me a magic link
             </button>
+            <Link
+              href="/forgot-password"
+              className="mt-1 text-center text-xs text-faint transition-colors hover:text-muted"
+            >
+              Forgot your password?
+            </Link>
           </form>
         )}
 

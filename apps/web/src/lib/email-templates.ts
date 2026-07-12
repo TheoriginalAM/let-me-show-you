@@ -119,6 +119,20 @@ export function newCommentEmail(opts: {
   }
 }
 
+export function resetPasswordEmail(url: string) {
+  return {
+    subject: `Reset your ${APP_NAME} password`,
+    html: layout({
+      preview: `Reset your ${APP_NAME} password.`,
+      heading: 'Reset your password',
+      body: 'Tap the button below to choose a new password. If you did not request this, you can ignore this email and your password stays the same.',
+      cta: { label: 'Reset password', url },
+      footNote: 'For your security, this link expires shortly.',
+    }),
+    text: `Reset your ${APP_NAME} password:\n\n${url}\n\nIf you did not request this, you can ignore this email.`,
+  }
+}
+
 export function workspaceInviteEmail(opts: {
   workspaceName: string
   inviterName: string
