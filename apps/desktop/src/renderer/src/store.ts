@@ -122,7 +122,15 @@ export const useRecorderStore = create<RecorderStore>((set) => ({
   selectMic: (selectedMicId) => set({ selectedMicId }),
   selectCamera: (selectedCameraId) => set({ selectedCameraId }),
   selectCameraModeDevice: (cameraModeDeviceId) => set({ cameraModeDeviceId }),
-  setStatus: (status) => set({ status }),
+  setStatus: (status) =>
+    set((state) => {
+      const wasRecording = state.status.state === 'recording' || state.status.state === 'paused'
+      const nowRecording = status.state === 'recording' || status.state === 'paused'
+      // When a recording ends, revert the webcam overlay to off so it doesn't
+      // silently carry into the next recording. The effect keyed on
+      // selectedCameraId hides the bubble.
+      return wasRecording && !nowRecording ? { status, selectedCameraId: null } : { status }
+    }),
   setAuth: (auth) => set({ auth }),
   setSignIn: (signIn) => set({ signIn }),
   setUpload: (upload) => set({ upload }),
