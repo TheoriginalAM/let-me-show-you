@@ -10,6 +10,7 @@ export function ReadyScreen() {
   const auth = useRecorderStore((s) => s.auth)
   const upload = useRecorderStore((s) => s.upload)
   const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
   const [withPassword, setWithPassword] = useState(false)
   const [password, setPassword] = useState('')
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
@@ -42,6 +43,7 @@ export function ReadyScreen() {
     void window.recorder.startUpload({
       filePath: result.filePath,
       title: title.trim() || defaultTitle,
+      description: description.trim() || null,
       password: withPassword && password ? password : null,
       workspaceId,
     })
@@ -94,6 +96,18 @@ export function ReadyScreen() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 autoFocus
+              />
+            </div>
+            <div>
+              <label className="ufield-label">Description (optional)</label>
+              <textarea
+                className="uinput no-drag"
+                placeholder="Shown under the video on its share page"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={2}
+                maxLength={2000}
+                style={{ resize: 'vertical' }}
               />
             </div>
             {workspaces.length > 1 && (

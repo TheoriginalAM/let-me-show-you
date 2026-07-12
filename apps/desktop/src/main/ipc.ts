@@ -224,9 +224,14 @@ export function registerIpcHandlers(ctx: IpcContext): void {
   // ---- Upload & share ----
   ipcMain.handle(IPC.startUpload, (_event, payload: unknown) => {
     if (!payload || typeof payload !== 'object') throw new Error('Invalid upload payload')
-    const { filePath, title, password, workspaceId } = payload as Record<string, unknown>
+    const { filePath, title, description, password, workspaceId } = payload as Record<
+      string,
+      unknown
+    >
     if (!isRecordingPath(filePath)) throw new Error('Refusing to upload a file outside recordings')
     const cleanTitle = typeof title === 'string' ? title.trim().slice(0, 200) : ''
+    const cleanDescription =
+      typeof description === 'string' && description.trim() ? description.slice(0, 2000) : null
     // Preserve the optional share password (server enforces the min length); an
     // empty/absent value means "no protection". Dropping it here was silently
     // un-protecting recordings even when the user set a password.
@@ -235,6 +240,7 @@ export function registerIpcHandlers(ctx: IpcContext): void {
     return ctx.startUpload({
       filePath,
       title: cleanTitle,
+      description: cleanDescription,
       password: cleanPassword,
       workspaceId: cleanWorkspaceId,
     })

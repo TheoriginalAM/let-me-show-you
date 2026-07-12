@@ -83,6 +83,7 @@ export async function runUpload(payload: StartUploadPayload, emit: Emit): Promis
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         title: payload.title,
+        description: payload.description ?? null,
         password: payload.password ?? null,
         workspaceId: payload.workspaceId ?? null,
       }),

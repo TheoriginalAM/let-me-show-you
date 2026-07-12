@@ -185,6 +185,8 @@ export interface UploadStatus {
 export interface StartUploadPayload {
   filePath: string
   title: string
+  /** Optional description shown under the video on its share page. */
+  description?: string | null
   /** Optional share password. When set, the recording is password-protected. */
   password?: string | null
   /** Workspace to upload into (null = the account's active workspace). */
