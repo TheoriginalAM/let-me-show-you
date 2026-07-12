@@ -98,7 +98,10 @@ export function WorkspaceSwitcher({
             tabIndex={-1}
             onClick={() => setOpen(false)}
           />
-          <div className="absolute left-0 top-full z-20 mt-2 w-80 overflow-hidden rounded-2xl border border-line-strong bg-[#14141e] p-2 shadow-[0_40px_100px_-30px_rgba(0,0,0,0.9)]">
+          <div
+            className="absolute left-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-white/15 p-2 shadow-[0_30px_80px_-15px_rgba(0,0,0,0.95)]"
+            style={{ backgroundColor: '#1c1c28' }}
+          >
             <p className="px-3 pb-1.5 pt-2 text-xs font-semibold uppercase tracking-wider text-faint">
               Your workspaces
             </p>
