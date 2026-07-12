@@ -19,7 +19,12 @@ import { createTray } from './tray'
 import { clearToken, hasToken } from './token-store'
 import { cancelSignIn, runSignIn } from './device-auth'
 import { runUpload } from './uploader'
-import { getUpdateStatus, initAutoUpdates } from './updater'
+import {
+  checkForUpdatesManual,
+  getUpdateStatus,
+  initAutoUpdates,
+  restartToUpdate,
+} from './updater'
 import { initSentryMain } from './sentry'
 
 // Crash reporting first (env-gated + off in dev), so it can capture early errors.
@@ -471,7 +476,15 @@ app.whenReady().then(() => {
     })
   }
 
-  createTray({ session: recordingSession, requestStop, showControlWindow, quit })
+  const tray = createTray({
+    session: recordingSession,
+    requestStop,
+    showControlWindow,
+    quit,
+    checkForUpdates: () => void checkForUpdatesManual(),
+    getUpdateStatus,
+    restartToUpdate,
+  })
   controlWindow = createControlWindow()
 
   app.setAboutPanelOptions({
@@ -481,7 +494,9 @@ app.whenReady().then(() => {
   })
 
   // Background auto-updates (no-op in dev): check on launch + every 4 hours.
-  initAutoUpdates(() => controlWindow)
+  // The status-change callback lets the tray swap in "Restart to Update" once a
+  // download finishes.
+  initAutoUpdates(() => controlWindow, () => tray.refresh())
 
   app.on('activate', () => {
     showControlWindow()

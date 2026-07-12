@@ -1,11 +1,21 @@
 import { Menu, nativeImage, Tray, type NativeImage } from 'electron'
 import type { RecordingSession } from './recording-session'
+import type { UpdateStatus } from '../shared/ipc'
 
 export interface TrayContext {
   session: RecordingSession
   requestStop: () => void
   showControlWindow: () => void
   quit: () => void
+  checkForUpdates: () => void
+  getUpdateStatus: () => UpdateStatus
+  restartToUpdate: () => void
+}
+
+export interface TrayHandle {
+  tray: Tray
+  /** Rebuild the menu (e.g. after the update status changes). */
+  refresh: () => void
 }
 
 /**
@@ -33,12 +43,14 @@ function createTrayIcon(): NativeImage {
   return image
 }
 
-export function createTray(ctx: TrayContext): Tray {
+export function createTray(ctx: TrayContext): TrayHandle {
   const tray = new Tray(createTrayIcon())
   tray.setToolTip('Let Me Show You')
 
   const rebuildMenu = (): void => {
     const active = ctx.session.isActive()
+    const updateReady = ctx.getUpdateStatus().phase === 'ready'
+    const updateVersion = ctx.getUpdateStatus().version
     tray.setContextMenu(
       Menu.buildFromTemplate([
         {
@@ -50,6 +62,17 @@ export function createTray(ctx: TrayContext): Tray {
         { type: 'separator' },
         { label: 'Show Recorder', click: () => ctx.showControlWindow() },
         { type: 'separator' },
+        // When a download is waiting, offer a one-click restart-to-install; the
+        // tray app rarely fully quits, so autoInstallOnAppQuit alone never fires.
+        ...(updateReady
+          ? [
+              {
+                label: `Restart to Update${updateVersion ? ` (v${updateVersion})` : ''}`,
+                click: () => ctx.restartToUpdate(),
+              },
+            ]
+          : [{ label: 'Check for Updates…', click: () => ctx.checkForUpdates() }]),
+        { type: 'separator' },
         { label: 'Quit', click: () => ctx.quit() },
       ]),
     )
@@ -59,5 +82,5 @@ export function createTray(ctx: TrayContext): Tray {
   ctx.session.onChange(rebuildMenu)
   tray.on('click', () => ctx.showControlWindow())
 
-  return tray
+  return { tray, refresh: rebuildMenu }
 }
