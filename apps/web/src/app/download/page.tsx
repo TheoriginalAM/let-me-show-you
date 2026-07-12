@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import { APP_NAME } from '@lmsy/shared'
+import { getCurrentUser } from '@/lib/current-user'
 import { getLatestRelease, releasesUrl } from '@/lib/github-releases'
 import { DownloadButtons } from './download-buttons'
 
@@ -9,10 +11,15 @@ export const metadata: Metadata = {
   description: `Download the ${APP_NAME} desktop recorder for macOS and Windows.`,
 }
 
-// Always reflect the current latest release (getLatestRelease fetches live).
+// Always reflect the current latest release (getLatestRelease fetches live) and
+// read the session per request.
 export const dynamic = 'force-dynamic'
 
 export default async function DownloadPage() {
+  // Downloads are gated behind an account, so every install maps to a real user.
+  const user = await getCurrentUser()
+  if (!user) redirect('/signup?redirect=/download')
+
   const release = await getLatestRelease()
 
   return (
@@ -29,6 +36,13 @@ export default async function DownloadPage() {
           Record your screen with voiceover on your desktop and share it with a single link. For
           macOS and Windows.
         </p>
+
+        {!user.approved && (
+          <p className="mx-auto mt-6 max-w-sm rounded-lg bg-amber-500/10 px-3 py-2.5 text-sm text-amber-200 ring-1 ring-inset ring-amber-500/25">
+            Your account is pending approval. You can install the app now and sign in to it once
+            you&rsquo;re approved.
+          </p>
+        )}
 
         {release ? (
           <>

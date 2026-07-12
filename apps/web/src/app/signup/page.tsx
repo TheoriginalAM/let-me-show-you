@@ -1,12 +1,22 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { authClient } from '@/lib/auth-client'
 
-export default function SignupPage() {
+/** Only allow same-origin relative redirects (no open redirect). */
+function safeRedirect(value: string | null): string | null {
+  return value && value.startsWith('/') && !value.startsWith('//') ? value : null
+}
+
+function SignupForm() {
   const router = useRouter()
+  // Where to go after signup: an explicit ?redirect (e.g. from the gated download
+  // page) wins; otherwise land on the invite-gating pending screen.
+  const redirectParam = safeRedirect(useSearchParams().get('redirect'))
+  const redirectTo = redirectParam ?? '/pending'
+  const loginHref = redirectParam ? `/login?redirect=${encodeURIComponent(redirectParam)}` : '/login'
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -24,8 +34,9 @@ export default function SignupPage() {
       setError(error.message ?? 'Sign up failed')
       return
     }
-    // New accounts are invite-gated — land on the pending screen until approved.
-    router.push('/pending')
+    // New accounts are invite-gated; land on the requested page (or the pending
+    // screen). They're signed in either way, so a gated page like /download opens.
+    router.push(redirectTo)
     router.refresh()
   }
 
@@ -36,7 +47,7 @@ export default function SignupPage() {
       return
     }
     setPending(true)
-    const { error } = await authClient.signIn.magicLink({ email, callbackURL: '/dashboard' })
+    const { error } = await authClient.signIn.magicLink({ email, callbackURL: redirectTo })
     setPending(false)
     if (error) {
       setError(error.message ?? 'Could not send magic link')
@@ -117,11 +128,19 @@ export default function SignupPage() {
 
         <p className="mt-6 text-sm text-muted">
           Already have an account?{' '}
-          <Link href="/login" className="text-accent transition-colors hover:text-accent-ink">
+          <Link href={loginHref} className="text-accent transition-colors hover:text-accent-ink">
             Log in
           </Link>
         </p>
       </div>
     </main>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <SignupForm />
+    </Suspense>
   )
 }
