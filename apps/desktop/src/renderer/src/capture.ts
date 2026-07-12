@@ -61,6 +61,10 @@ class CaptureController {
       // TODO: system/desktop audio capture is out of scope for now — mic only.
       let audioStream: MediaStream | null = null
       if (payload.micId) {
+        // Trigger the macOS mic permission prompt first — getUserMedia alone does
+        // not reliably surface it in a packaged app. Denial → we fall back to
+        // video-only below.
+        await window.recorder.requestMediaAccess('microphone').catch(() => false)
         try {
           audioStream = await navigator.mediaDevices.getUserMedia({
             audio: {

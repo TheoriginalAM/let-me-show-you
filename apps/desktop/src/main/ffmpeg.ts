@@ -58,6 +58,11 @@ export function transcodeToMp4(
     '-y',
     '-i',
     input,
+    // libx264 with yuv420p requires even width AND height. Screen/window captures
+    // can be odd-sized (e.g. 1738x1079), which makes the encoder fail to open, so
+    // round each dimension down to the nearest even number.
+    '-vf',
+    'scale=trunc(iw/2)*2:trunc(ih/2)*2',
     '-c:v',
     'libx264',
     '-preset',

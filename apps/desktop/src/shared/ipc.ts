@@ -11,6 +11,7 @@ export const IPC = {
   // renderer -> main (invoke/handle)
   listSources: 'list-sources',
   getPermissions: 'get-permissions',
+  requestMediaAccess: 'request-media-access',
   openPrivacySettings: 'open-privacy-settings',
   startRecording: 'start-recording',
   writeChunk: 'write-chunk',
@@ -157,6 +158,13 @@ export interface UpdateStatus {
 export interface RecorderApi {
   listSources: () => Promise<CaptureSource[]>
   getPermissions: () => Promise<MediaPermissions>
+  /**
+   * Trigger the native macOS camera/microphone permission prompt (a no-op that
+   * resolves `true` off macOS). Only 'microphone' and 'camera' can be requested
+   * programmatically — screen recording must be granted in System Settings.
+   * Returns whether access is granted.
+   */
+  requestMediaAccess: (target: 'microphone' | 'camera') => Promise<boolean>
   openPrivacySettings: (target: PermissionTarget) => Promise<void>
   /** Begin a session: opens the temp .webm file (call after acquiring streams). */
   startRecording: (payload: StartRecordingPayload) => Promise<void>

@@ -100,6 +100,22 @@ export function registerIpcHandlers(ctx: IpcContext): void {
     camera: permissionFor('camera'),
   }))
 
+  // Show the native macOS TCC prompt for mic/camera. Unlike getMediaAccessStatus
+  // (read-only) or getUserMedia (unreliable at triggering the prompt in a
+  // packaged app), this reliably prompts a 'not-determined' user AND registers
+  // the app in System Settings so a later denial can be reversed there.
+  ipcMain.handle(IPC.requestMediaAccess, async (_event, target: unknown): Promise<boolean> => {
+    if (target !== 'microphone' && target !== 'camera') {
+      throw new Error('Invalid media-access target')
+    }
+    if (process.platform !== 'darwin') return true
+    try {
+      return await systemPreferences.askForMediaAccess(target)
+    } catch {
+      return false
+    }
+  })
+
   ipcMain.handle(IPC.openPrivacySettings, async (_event, target: unknown) => {
     if (!isPermissionTarget(target)) throw new Error('Invalid privacy-settings target')
     await shell.openExternal(PRIVACY_URLS[target])

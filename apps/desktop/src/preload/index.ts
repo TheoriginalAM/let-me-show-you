@@ -27,6 +27,7 @@ const api: RecorderApi = {
   abortRecording: (message) => ipcRenderer.invoke(IPC.abortRecording, message),
   dismissResult: () => ipcRenderer.invoke(IPC.dismissResult),
   revealInFinder: (filePath) => ipcRenderer.invoke(IPC.revealInFinder, filePath),
+  requestMediaAccess: (target) => ipcRenderer.invoke(IPC.requestMediaAccess, target),
   toggleWebcam: (cameraId) => ipcRenderer.invoke(IPC.toggleWebcam, cameraId),
   getWebcamCamera: () => ipcRenderer.invoke(IPC.getWebcamCamera),
   getRecordingStatus: () => ipcRenderer.invoke(IPC.getRecordingStatus),

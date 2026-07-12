@@ -96,7 +96,13 @@ export function Onboarding({ onRecheck }: { onRecheck: () => void }) {
           </p>
           <ul className="perm-list">
             {PERMISSION_TARGETS.map((target) => {
-              const granted = permissions?.[target] === 'granted'
+              const state = permissions?.[target]
+              const granted = state === 'granted'
+              // Mic/camera can be prompted natively while still undecided; screen
+              // recording and any hard denial must be handled in System Settings.
+              const canPrompt =
+                target !== 'screen' &&
+                (state === 'not-determined' || state === 'unknown' || state == null)
               return (
                 <li key={target} className="perm-row">
                   <span>
@@ -104,17 +110,24 @@ export function Onboarding({ onRecheck }: { onRecheck: () => void }) {
                     {target === 'screen' ? ' · required' : ''}
                   </span>
                   <span className="perm-row-actions">
-                    <span className={`badge badge-${permissions?.[target] ?? 'unknown'}`}>
+                    <span className={`badge badge-${state ?? 'unknown'}`}>
                       {granted ? 'Allowed' : 'Set up'}
                     </span>
                     {!granted ? (
                       <button
                         className="btn-mini no-drag"
-                        onClick={() =>
-                          void window.recorder.openPrivacySettings(target).catch(console.error)
-                        }
+                        onClick={() => {
+                          if (canPrompt) {
+                            void window.recorder
+                              .requestMediaAccess(target)
+                              .then(onRecheck)
+                              .catch(console.error)
+                          } else {
+                            void window.recorder.openPrivacySettings(target).catch(console.error)
+                          }
+                        }}
                       >
-                        Open
+                        {canPrompt ? 'Allow' : 'Open'}
                       </button>
                     ) : null}
                   </span>
