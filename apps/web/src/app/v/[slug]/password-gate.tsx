@@ -10,7 +10,7 @@ import { unlockShare } from './actions'
  * the password. On success the server sets an unlock cookie and we refresh the
  * route, which re-renders into the player.
  */
-export function PasswordGate({ slug }: { slug: string }) {
+export function PasswordGate({ slug, accent }: { slug: string; accent: string }) {
   const router = useRouter()
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -33,7 +33,10 @@ export function PasswordGate({ slug }: { slug: string }) {
 
   return (
     <div className="rise relative" style={{ animationDelay: '80ms' }}>
-      <div className="absolute -inset-6 -z-10 rounded-[2rem] bg-[radial-gradient(60%_60%_at_50%_20%,rgba(120,110,255,0.28),transparent_70%)] blur-2xl" />
+      <div
+        className="absolute -inset-6 -z-10 rounded-[2rem] blur-2xl"
+        style={{ background: `radial-gradient(60% 60% at 50% 20%, ${accent}47, transparent 70%)` }}
+      />
       <div className="glass flex flex-col items-center gap-5 rounded-2xl px-6 py-14 text-center shadow-[0_40px_120px_-40px_rgba(80,70,220,0.7)]">
         <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/5 ring-1 ring-white/10">
           <svg
@@ -43,7 +46,8 @@ export function PasswordGate({ slug }: { slug: string }) {
             strokeWidth="1.6"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-7 w-7 text-accent"
+            className="h-7 w-7"
+            style={{ color: accent }}
           >
             <rect x="4" y="11" width="16" height="10" rx="2" />
             <path d="M8 11V7a4 4 0 0 1 8 0v4" />
@@ -73,7 +77,8 @@ export function PasswordGate({ slug }: { slug: string }) {
           <button
             type="submit"
             disabled={pending || !password}
-            className="btn-primary px-5 py-2.5 text-sm disabled:opacity-50"
+            className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+            style={{ background: accent }}
           >
             {pending ? 'Unlocking…' : 'Unlock'}
           </button>

@@ -27,6 +27,9 @@ export default async function DashboardPage() {
           <p className="mt-1 text-sm text-muted">Signed in as {user.name}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/dashboard/branding" className="btn-ghost px-3 py-1.5 text-sm">
+            Branding
+          </Link>
           {user.role === 'admin' && (
             <Link href="/admin" className="btn-ghost px-3 py-1.5 text-sm">
               Admin

@@ -20,6 +20,11 @@ export const user = pgTable("user", {
   // Invite-gating: new signups start unapproved and can't use the app until an
   // admin approves them. Existing users are grandfathered to true in the migration.
   approved: boolean("approved").default(false).notNull(),
+  // Branding: personalizes the public share pages (/v/<slug>) with the owner's
+  // logo, name, and accent colour. All nullable — unset falls back to LMSY branding.
+  brandName: text("brand_name"),
+  brandLogo: text("brand_logo"), // data URL (small, resized client-side)
+  brandColor: text("brand_color"), // accent hex, e.g. #8b8bf6
 });
 
 export const session = pgTable(

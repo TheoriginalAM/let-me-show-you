@@ -47,3 +47,30 @@ export async function setUserApproved(userId: string, approved: boolean): Promis
     .returning({ id: user.id })
   return rows.length > 0
 }
+
+/** An owner's branding for their public share pages. All fields optional. */
+export interface Brand {
+  name: string | null
+  logo: string | null
+  color: string | null
+}
+
+/** The signed-in owner's current branding (for the settings page). */
+export async function getUserBrand(userId: string): Promise<Brand> {
+  const rows = await db
+    .select({ name: user.brandName, logo: user.brandLogo, color: user.brandColor })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1)
+  return rows[0] ?? { name: null, logo: null, color: null }
+}
+
+/** Update the owner's branding; pass null on a field to clear it. */
+export async function setUserBrand(userId: string, brand: Brand): Promise<boolean> {
+  const rows = await db
+    .update(user)
+    .set({ brandName: brand.name, brandLogo: brand.logo, brandColor: brand.color })
+    .where(eq(user.id, userId))
+    .returning({ id: user.id })
+  return rows.length > 0
+}

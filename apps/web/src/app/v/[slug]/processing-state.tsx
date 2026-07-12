@@ -9,7 +9,15 @@ import { pollShareStatus } from './actions'
  * and refreshes the route (which re-renders the server component into the player)
  * once Mux reports the asset is ready.
  */
-export function ProcessingState({ slug, title }: { slug: string; title: string }) {
+export function ProcessingState({
+  slug,
+  title,
+  accent = '#8b8bf6',
+}: {
+  slug: string
+  title: string
+  accent?: string
+}) {
   const router = useRouter()
 
   useEffect(() => {
@@ -24,7 +32,10 @@ export function ProcessingState({ slug, title }: { slug: string; title: string }
 
   return (
     <div className="glass flex aspect-video w-full flex-col items-center justify-center gap-4 rounded-2xl text-center">
-      <div className="h-10 w-10 animate-spin rounded-full border-2 border-line-strong border-t-accent" />
+      <div
+        className="h-10 w-10 animate-spin rounded-full border-2 border-line-strong"
+        style={{ borderTopColor: accent }}
+      />
       <div className="px-6">
         <p className="font-medium text-ink">Still processing…</p>
         <p className="mt-1 text-sm text-muted">

@@ -14,7 +14,11 @@ export type VideoWithViews = Video & { viewCount: number; hasPassword: boolean }
  * access — it must never be forwarded to the client. Use this instead of
  * {@link getVideoBySlug} when the page itself renders the password gate.
  */
-export type ShareableVideo = PublicVideo & { passwordHash: string | null }
+export type ShareableVideo = PublicVideo & {
+  passwordHash: string | null
+  /** Owner branding for the public share page (null → LMSY branding). */
+  brand: { name: string | null; logo: string | null; color: string | null }
+}
 
 /**
  * Data-access layer for videos.
@@ -121,6 +125,9 @@ export async function getShareableVideoBySlug(slug: string): Promise<ShareableVi
       ownerName: user.name,
       createdAt: videos.createdAt,
       passwordHash: videos.passwordHash,
+      brandName: user.brandName,
+      brandLogo: user.brandLogo,
+      brandColor: user.brandColor,
     })
     .from(videos)
     .innerJoin(user, eq(videos.ownerId, user.id))
@@ -132,7 +139,10 @@ export async function getShareableVideoBySlug(slug: string): Promise<ShareableVi
       ),
     )
     .limit(1)
-  return rows[0] ?? null
+  const row = rows[0]
+  if (!row) return null
+  const { brandName, brandLogo, brandColor, ...video } = row
+  return { ...video, brand: { name: brandName, logo: brandLogo, color: brandColor } }
 }
 
 /**
