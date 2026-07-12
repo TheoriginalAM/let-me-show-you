@@ -12,8 +12,10 @@ export function WebcamBubble() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [cameraId, setCameraId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [shape, setShape] = useState<WebcamShape>('circle')
-  const [size, setSize] = useState<WebcamSize>('medium')
+  // Optimistic defaults match DEFAULT_WEBCAM (main sizes the window to 'large'),
+  // then getWebcamConfig() below reconciles with any persisted choice.
+  const [shape, setShape] = useState<WebcamShape>('square')
+  const [size, setSize] = useState<WebcamSize>('large')
 
   // Resolve the current camera id without a race, then track changes.
   useEffect(() => {

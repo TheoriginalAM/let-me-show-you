@@ -13,7 +13,7 @@ interface Settings {
   webcamSize?: WebcamSize
 }
 
-const DEFAULT_WEBCAM: WebcamConfig = { shape: 'circle', size: 'medium' }
+const DEFAULT_WEBCAM: WebcamConfig = { shape: 'square', size: 'large' }
 
 function settingsPath(): string {
   return join(app.getPath('userData'), 'settings.json')

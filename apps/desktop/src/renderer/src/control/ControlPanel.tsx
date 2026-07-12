@@ -287,6 +287,9 @@ export function ControlPanel() {
           </div>
         ) : (
           <>
+            <div className="mode-bar">
+              <ModeTabs />
+            </div>
             <div className="source-scroll">
               <Preview />
               {mode === 'camera' ? (
@@ -319,7 +322,6 @@ export function ControlPanel() {
               <PermissionNotice permissions={permissions} />
             </div>
             <div className="panel-footer">
-              <ModeTabs />
               <DeviceSelects mode={mode} />
               <button
                 className="btn-record no-drag"

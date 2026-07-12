@@ -85,8 +85,8 @@ function hardenWindow(win: BrowserWindow): void {
 function createControlWindow(): BrowserWindow {
   const isMac = process.platform === 'darwin'
   const win = new BrowserWindow({
-    width: 380,
-    height: 580,
+    width: 408,
+    height: 668,
     show: false,
     resizable: false,
     maximizable: false,
@@ -169,6 +169,11 @@ function showWebcam(cameraId: string): void {
 function hideWebcam(): void {
   currentCameraId = null
   if (webcamWindow && !webcamWindow.isDestroyed()) {
+    // Clear any recording-time capture exclusion so a reused/hidden bubble is
+    // never left content-protected. Turning the camera off nulls currentCameraId,
+    // which would otherwise make syncBubbleForRecording's end-of-recording reset
+    // early-return and strand the protection ON.
+    webcamWindow.setContentProtection(false)
     // Tell the (still-loaded) renderer to release the camera, then hide.
     webcamWindow.webContents.send(IPC.webcamCamera, null)
     webcamWindow.hide()
@@ -345,18 +350,19 @@ function showRecordingIndicator(payload: {
 }): void {
   syncBubbleForRecording(payload.mode, true)
   hideRecordingIndicator()
-  // Only screen + area have a fixed on-screen region to outline. Window can move
-  // (hard to track) and camera has nothing on screen.
+  // Area outlines the exact region; screen + window outline the whole display
+  // being recorded (a window's live bounds aren't exposed, so we frame its
+  // display as a "recording on this screen" cue). Camera has nothing on screen.
   let bounds: { x: number; y: number; width: number; height: number } | null = null
   if (payload.mode === 'area' && payload.areaRect) {
     const r = payload.areaRect
     const d =
       screen.getAllDisplays().find((x) => x.id === r.displayId) ?? screen.getPrimaryDisplay()
     bounds = { x: d.bounds.x + r.x, y: d.bounds.y + r.y, width: r.width, height: r.height }
-  } else if (payload.mode === 'screen') {
+  } else if (payload.mode === 'screen' || payload.mode === 'window') {
     // Frame the display actually being recorded, not just wherever the cursor is.
     const byId =
-      payload.displayId != null
+      payload.displayId != null && payload.displayId !== ''
         ? screen.getAllDisplays().find((x) => String(x.id) === payload.displayId)
         : undefined
     bounds = { ...(byId ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint())).bounds }
@@ -391,19 +397,18 @@ function showRecordingIndicator(payload: {
 }
 
 /**
- * Window/area recordings composite the webcam into the frame, so hide the
- * floating bubble while they run — otherwise a full-screen area capture bakes the
- * live bubble in AND the composite draws it again (double webcam). Screen mode is
- * left alone (its bubble is the recorded webcam). Restored when recording ends.
+ * Keep the webcam bubble on screen as a live self-view in every mode. Window/area
+ * recordings composite the webcam into the frame separately, so during those we
+ * exclude the floating bubble from screen capture (setContentProtection) instead
+ * of hiding it — the user still sees themselves, but an area's full-screen
+ * capture won't bake the bubble in on top of the composite (double webcam).
+ * Screen mode records the on-screen bubble directly, so it stays capturable.
  */
 function syncBubbleForRecording(mode: string, recording: boolean): void {
   if (!webcamWindow || webcamWindow.isDestroyed() || !currentCameraId) return
   const composited = mode === 'window' || mode === 'area'
-  if (recording && composited) {
-    webcamWindow.hide()
-  } else if (!recording && !webcamWindow.isVisible()) {
-    webcamWindow.showInactive()
-  }
+  webcamWindow.setContentProtection(recording && composited)
+  if (!webcamWindow.isVisible()) webcamWindow.showInactive()
 }
 
 app.whenReady().then(() => {

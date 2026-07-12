@@ -84,7 +84,7 @@ a,
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 13px 14px;
+  padding: 15px 18px 10px;
 }
 
 .title-dot {
@@ -139,24 +139,29 @@ a,
   gap: 14px;
 }
 
+/* Prominent mode selector, pinned below the titlebar (Supercut-style). */
+.mode-bar {
+  padding: 2px 18px 12px;
+}
+
 /* Idle picker: sources scroll here, controls live in the pinned footer. */
 .source-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 4px 14px 12px;
+  padding: 4px 18px 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
 }
 .panel-footer {
-  padding: 12px 14px 15px;
+  padding: 14px 18px 17px;
   border-top: 1px solid var(--border);
   background: rgba(10, 10, 16, 0.55);
   backdrop-filter: blur(12px);
   display: flex;
   flex-direction: column;
-  gap: 11px;
+  gap: 13px;
 }
 
 /* Slim, unobtrusive scrollbars for the scroll regions. */
@@ -200,18 +205,18 @@ a,
 .source-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 10px;
+  gap: 12px;
 }
 
 .source-card {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px;
+  gap: 9px;
+  padding: 9px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 13px;
   cursor: pointer;
   text-align: left;
   transition:
@@ -283,18 +288,18 @@ a,
 /* ---------- Device chips (compact mic + camera row) ---------- */
 .device-row {
   display: flex;
-  gap: 8px;
+  gap: 9px;
 }
 .device-chip {
   flex: 1;
   min-width: 0;
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 8px 10px;
+  gap: 8px;
+  padding: 11px 13px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: 11px;
   transition: border-color 0.12s ease;
 }
 .device-chip:hover {
@@ -376,16 +381,17 @@ a,
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 9px;
-  padding: 13px;
+  gap: 10px;
+  padding: 15px;
   border: none;
-  border-radius: 12px;
+  border-radius: 13px;
   background: linear-gradient(180deg, var(--accent), var(--accent-strong));
   color: #fff;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  box-shadow: 0 10px 30px -10px rgba(109, 109, 245, 0.85);
+  box-shadow: 0 12px 32px -10px rgba(109, 109, 245, 0.9);
   transition:
     filter 0.14s ease,
     transform 0.14s ease,
@@ -984,10 +990,13 @@ a,
   position: relative;
   width: 100%;
   aspect-ratio: 16 / 10;
-  border-radius: 14px;
+  border-radius: 16px;
   overflow: hidden;
   background: linear-gradient(135deg, #16141f, #0c0b14);
   border: 1px solid var(--border);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.04),
+    0 16px 40px -24px rgba(0, 0, 0, 0.8);
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -1020,50 +1029,53 @@ a,
   color: var(--fg);
 }
 
-/* ---------- Mode tabs ---------- */
+/* ---------- Mode tabs (segmented control) ---------- */
 .mode-tabs {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 4px;
-  padding: 3px;
-  background: var(--surface);
+  gap: 5px;
+  padding: 5px;
+  background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 14px;
 }
 .mode-tab {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
-  padding: 7px 4px;
+  gap: 5px;
+  padding: 11px 4px 9px;
   border: none;
-  border-radius: 9px;
+  border-radius: 10px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
   transition:
-    background 0.12s ease,
-    color 0.12s ease;
+    background 0.14s ease,
+    color 0.14s ease,
+    box-shadow 0.14s ease;
 }
-.mode-tab:hover {
+.mode-tab:hover:not(.on) {
   color: var(--fg);
   background: var(--surface-2);
 }
 .mode-tab.on {
-  background: var(--accent-strong);
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
   color: #fff;
+  box-shadow: 0 6px 16px -6px rgba(109, 109, 245, 0.85);
 }
 .mode-tab-ico {
   display: grid;
   place-items: center;
 }
 .mode-tab-ico svg {
-  width: 17px;
-  height: 17px;
+  width: 20px;
+  height: 20px;
 }
 .mode-tab-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 /* ---------- Area + camera pickers ---------- */
