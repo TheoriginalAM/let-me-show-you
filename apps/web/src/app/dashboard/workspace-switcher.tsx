@@ -22,9 +22,13 @@ function initial(name: string | undefined): string {
 export function WorkspaceSwitcher({
   workspaces,
   activeId,
+  activeLogo = null,
+  activeColor = null,
 }: {
   workspaces: WS[]
   activeId: string | null
+  activeLogo?: string | null
+  activeColor?: string | null
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -57,12 +61,22 @@ export function WorkspaceSwitcher({
   return (
     <div className="flex flex-col gap-3">
       <div className="flex items-center gap-3">
-        <span
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-b from-[#8281ff] to-accent-strong text-base font-bold text-white shadow-[0_6px_16px_-6px_rgba(109,109,245,0.9)]"
-          aria-hidden
-        >
-          {initial(active?.name)}
-        </span>
+        {activeLogo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={activeLogo}
+            alt=""
+            className="h-11 w-11 shrink-0 rounded-xl bg-white/[0.04] object-contain p-1 ring-1 ring-white/10"
+          />
+        ) : (
+          <span
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-b from-[#8281ff] to-accent-strong text-base font-bold text-white shadow-[0_6px_16px_-6px_rgba(109,109,245,0.9)]"
+            style={activeColor ? { background: activeColor } : undefined}
+            aria-hidden
+          >
+            {initial(active?.name)}
+          </span>
+        )}
         <div className="min-w-0">
           <span className="block text-xs font-medium uppercase tracking-wider text-faint">
             Workspace

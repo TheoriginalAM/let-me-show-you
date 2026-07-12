@@ -157,6 +157,28 @@ export const videoComments = pgTable(
   (table) => [index('video_comments_video_id_created_at_idx').on(table.videoId, table.createdAt)],
 )
 
+/** In-app notifications shown in a user's inbox (new comment, member joined, etc.). */
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    type: text('type').notNull(), // 'comment' | 'member_joined' | ...
+    title: text('title').notNull(),
+    body: text('body'),
+    linkPath: text('link_path'), // same-origin relative path to open
+    read: boolean('read').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('notifications_user_id_created_at_idx').on(table.userId, table.createdAt.desc()),
+  ],
+)
+
 /** Long-lived bearer tokens for the desktop app — stored hashed, never plaintext. */
 export const apiTokens = pgTable(
   'api_tokens',

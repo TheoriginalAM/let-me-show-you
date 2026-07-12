@@ -3,6 +3,7 @@ import 'server-only'
 import { randomBytes } from 'node:crypto'
 import { and, asc, count, eq, gt, isNull } from 'drizzle-orm'
 import { getMux } from '../lib/mux'
+import { createNotifications, ownerIdsForWorkspace } from './app-notifications'
 import { db } from './index'
 import {
   user,
@@ -441,7 +442,8 @@ export async function acceptInvite(
     return { ok: false, error: `This invite was sent to ${invite.email}. Sign in with that email to accept.` }
   }
   // Add membership if not already present.
-  if (!(await memberRole(userId, invite.workspaceId))) {
+  const alreadyMember = Boolean(await memberRole(userId, invite.workspaceId))
+  if (!alreadyMember) {
     await db
       .insert(workspaceMembers)
       .values({ workspaceId: invite.workspaceId, userId, role: invite.role })
@@ -451,6 +453,20 @@ export async function acceptInvite(
     .set({ acceptedAt: new Date().toISOString() })
     .where(eq(workspaceInvites.token, token))
   await db.update(user).set({ activeWorkspaceId: invite.workspaceId }).where(eq(user.id, userId))
+
+  // Notify the workspace's owners that someone joined.
+  if (!alreadyMember) {
+    const owners = await ownerIdsForWorkspace(invite.workspaceId)
+    await createNotifications(
+      owners.filter((id) => id !== userId),
+      {
+        type: 'member_joined',
+        title: `New member in ${invite.workspaceName}`,
+        body: `${userEmail} joined the workspace.`,
+        linkPath: '/dashboard/workspace',
+      },
+    ).catch((error) => console.error('[invite] join notification failed:', error))
+  }
   return { ok: true, workspaceId: invite.workspaceId }
 }
 

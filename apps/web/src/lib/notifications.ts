@@ -35,19 +35,19 @@ export async function notifyUserApproved(u: { name: string; email: string }): Pr
   await sendEmail({ to: u.email, subject, html, text })
 }
 
-/** Email someone that they've been invited to a workspace. Best-effort. */
+/** Email someone that they've been invited to a workspace. Returns whether it sent. */
 export async function notifyWorkspaceInvite(opts: {
   email: string
   workspaceName: string
   inviterName: string
   url: string
-}): Promise<void> {
+}): Promise<boolean> {
   const { subject, html, text } = workspaceInviteEmail({
     workspaceName: opts.workspaceName,
     inviterName: opts.inviterName,
     url: opts.url,
   })
-  await sendEmail({ to: opts.email, subject, html, text })
+  return sendEmail({ to: opts.email, subject, html, text })
 }
 
 /** Email a video owner that someone left a comment on their recording. Best-effort. */

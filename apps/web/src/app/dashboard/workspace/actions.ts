@@ -35,23 +35,39 @@ export async function renameWorkspaceAction(name: string): Promise<Result> {
   return { ok: true }
 }
 
-export async function inviteMemberAction(email: string, role: 'owner' | 'member'): Promise<Result> {
+export async function inviteMemberAction(
+  email: string,
+  role: 'owner' | 'member',
+): Promise<{ ok: false; error: string } | { ok: true; url: string; emailed: boolean }> {
   const ctx = await context()
   if (!ctx) return { ok: false, error: 'Not signed in.' }
-  const res = await createInvite(ctx.userId, ctx.workspaceId, email, role === 'owner' ? 'owner' : 'member')
+  const res = await createInvite(
+    ctx.userId,
+    ctx.workspaceId,
+    email,
+    role === 'owner' ? 'owner' : 'member',
+  )
   if ('error' in res) return { ok: false, error: res.error }
 
-  // Send the invite email (best-effort; never fails the action).
+  const url = `https://${APP_DOMAIN}/invite/${res.token}`
   const ws = await getWorkspaceForMember(ctx.userId, ctx.workspaceId)
-  void notifyWorkspaceInvite({
-    email: email.trim().toLowerCase(),
-    workspaceName: ws?.name ?? 'a workspace',
-    inviterName: ctx.userName,
-    url: `https://${APP_DOMAIN}/invite/${res.token}`,
-  }).catch((error) => console.error('[workspace] invite email failed:', error))
+  // Await the email so it actually sends (a fire-and-forget promise after the
+  // action returns was not completing). The invite link is returned regardless,
+  // so the owner can always share it manually if delivery fails.
+  let emailed = false
+  try {
+    emailed = await notifyWorkspaceInvite({
+      email: email.trim().toLowerCase(),
+      workspaceName: ws?.name ?? 'a workspace',
+      inviterName: ctx.userName,
+      url,
+    })
+  } catch (error) {
+    console.error('[workspace] invite email failed:', error)
+  }
 
   revalidatePath('/dashboard/workspace')
-  return { ok: true }
+  return { ok: true, url, emailed }
 }
 
 export async function removeMemberAction(memberUserId: string): Promise<Result> {

@@ -4,7 +4,8 @@ import { buildShareUrl, formatRelativeDate, muxThumbnailUrl } from '@lmsy/shared
 import { getCurrentUser } from '@/lib/current-user'
 import { commentCountsByVideo } from '@/db/comments'
 import { listVideosByWorkspaceWithViews } from '@/db/queries'
-import { getActiveWorkspaceId, listWorkspacesForUser } from '@/db/workspaces'
+import { getActiveWorkspaceId, getWorkspaceForMember, listWorkspacesForUser } from '@/db/workspaces'
+import { NotificationsBell } from '@/components/notifications-bell'
 import { SignOutButton } from '@/components/sign-out-button'
 import { VideoCard } from '@/components/video-card'
 import { WorkspaceSwitcher } from './workspace-switcher'
@@ -25,13 +26,21 @@ export default async function DashboardPage() {
 
   const videos = active ? await listVideosByWorkspaceWithViews(active.id) : []
   const commentCounts = await commentCountsByVideo(videos.map((v) => v.id))
+  // The active workspace's branding flows into the dashboard (logo + accent).
+  const activeWs = active ? await getWorkspaceForMember(user.id, active.id) : null
   const now = Date.now()
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6">
       <header className="rise flex flex-wrap items-center justify-between gap-4">
-        <WorkspaceSwitcher workspaces={workspaces} activeId={active?.id ?? null} />
+        <WorkspaceSwitcher
+          workspaces={workspaces}
+          activeId={active?.id ?? null}
+          activeLogo={activeWs?.brand.logo ?? null}
+          activeColor={activeWs?.brand.color ?? null}
+        />
         <div className="flex items-center gap-2">
+          <NotificationsBell userId={user.id} />
           <Link href="/dashboard/settings" className="btn-ghost px-3 py-1.5 text-sm">
             Settings
           </Link>

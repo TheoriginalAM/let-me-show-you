@@ -125,12 +125,20 @@ export function BrandingForm({
                 {displayName.charAt(0).toUpperCase()}
               </span>
             )}
-            <span className="min-w-0">
-              <span className="block truncate font-semibold text-ink">{displayName}</span>
-              {tagline.trim() && (
-                <span className="block truncate text-xs text-muted">{tagline.trim()}</span>
-              )}
-            </span>
+            {/* With a logo, the name is optional (logo can stand alone). Without a
+                logo, fall back to a name so there is some identity. */}
+            {(logo ? name.trim() : displayName) || tagline.trim() ? (
+              <span className="min-w-0">
+                {(logo ? name.trim() : displayName) && (
+                  <span className="block truncate font-semibold text-ink">
+                    {logo ? name.trim() : displayName}
+                  </span>
+                )}
+                {tagline.trim() && (
+                  <span className="block truncate text-xs text-muted">{tagline.trim()}</span>
+                )}
+              </span>
+            ) : null}
           </span>
           {ctaLabel.trim() && ctaUrl.trim() && (
             <span

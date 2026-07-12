@@ -13,6 +13,7 @@ import {
   getVideoNotificationTarget,
   type PublicComment,
 } from '@/db/comments'
+import { createNotifications, memberIdsForVideo } from '@/db/app-notifications'
 import { getShareableVideoBySlug, recordVideoView } from '@/db/queries'
 import { getCurrentUser } from '@/lib/current-user'
 import { notifyOwnerOfComment } from '@/lib/notifications'
@@ -171,6 +172,18 @@ export async function postComment(
   // very recent comment already notified them (anti email-bomb), or the owner
   // posted it themselves.
   const me = await getCurrentUser()
+
+  // In-app notifications for the video's workspace members (except the commenter).
+  await createNotifications(
+    (await memberIdsForVideo(video.id)).filter((id) => id !== me?.id),
+    {
+      type: 'comment',
+      title: `New comment on ${video.title}`,
+      body: `${name}: ${body.length > 120 ? `${body.slice(0, 120)}…` : body}`,
+      linkPath: `/${SHARE_PATH}/${slug}`,
+    },
+  ).catch((error) => console.error('[comments] notification failed:', error))
+
   const shouldEmail = ipHash !== null && recentOnVideo === 0 && me?.id !== video.ownerId
   if (shouldEmail) {
     void getVideoNotificationTarget(video.id)

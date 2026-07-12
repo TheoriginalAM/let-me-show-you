@@ -30,6 +30,8 @@ export function Members({
   const [role, setRole] = useState<'owner' | 'member'>('member')
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
+  const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
   const [pending, startTransition] = useTransition()
 
   const ownerCount = members.filter((m) => m.role === 'owner').length
@@ -40,16 +42,34 @@ export function Members({
     if (!value || pending) return
     setError(null)
     setNotice(null)
+    setInviteLink(null)
+    setCopied(false)
     startTransition(async () => {
       const res = await inviteMemberAction(value, role)
       if (res.ok) {
         setEmail('')
-        setNotice(`Invite sent to ${value}.`)
+        setInviteLink(res.url)
+        setNotice(
+          res.emailed
+            ? `Invite emailed to ${value}. You can also share this link:`
+            : `Invite created for ${value}. The email could not be sent, so share this link:`,
+        )
         router.refresh()
       } else {
         setError(res.error ?? 'Could not send invite.')
       }
     })
+  }
+
+  async function copyLink(): Promise<void> {
+    if (!inviteLink) return
+    try {
+      await navigator.clipboard.writeText(inviteLink)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      /* ignore */
+    }
   }
 
   function remove(userId: string): void {
@@ -101,7 +121,25 @@ export function Members({
         </button>
       </form>
       {error && <p className="text-sm text-red-300">{error}</p>}
-      {notice && <p className="text-sm text-green-300">{notice}</p>}
+      {notice && (
+        <div className="flex flex-col gap-2 rounded-xl border border-line bg-white/[0.02] p-3">
+          <p className="text-sm text-muted">{notice}</p>
+          {inviteLink && (
+            <div className="flex items-center gap-2">
+              <code className="min-w-0 flex-1 truncate rounded-lg bg-white/[0.04] px-2.5 py-2 text-xs text-ink">
+                {inviteLink}
+              </code>
+              <button
+                onClick={copyLink}
+                className="btn-ghost shrink-0 px-3 py-2 text-xs"
+                type="button"
+              >
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <ul className="flex flex-col gap-2">
         {members.map((m) => {
