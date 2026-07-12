@@ -6,6 +6,9 @@ import { nextCookies } from 'better-auth/next-js'
 // resolve this module graph when generating the schema.
 import { db } from '../db'
 import * as schema from '../db/schema'
+import { sendEmail } from './email'
+import { magicLinkEmail } from './email-templates'
+import { notifyAdminsOfSignup } from './notifications'
 
 // Pin the origin explicitly. Without this, Better Auth would derive the base URL
 // (used to build magic-link URLs and to validate CSRF origins) from the incoming
@@ -25,16 +28,29 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  // Email the admins when a new (pending) user is created. Best-effort — never
+  // block or fail signup on a delivery hiccup.
+  databaseHooks: {
+    user: {
+      create: {
+        after: async (user) => {
+          // Fire-and-forget: return immediately so signup isn't blocked on email.
+          void notifyAdminsOfSignup(user).catch((error) =>
+            console.error('[notify] admin signup alert failed:', error),
+          )
+        },
+      },
+    },
+  },
   plugins: [
     magicLink({
       sendMagicLink: async ({ email, url }) => {
-        // TODO: wire up Resend for real delivery. Never log the token-bearing
-        // URL in production — it is a single-use login credential.
-        if (process.env.NODE_ENV === 'production') {
-          console.warn(`[magic-link] email delivery not configured; link for ${email} not sent`)
-          return
+        // Single-use login credential — deliver it, never log the URL in prod.
+        const { subject, html, text } = magicLinkEmail(url)
+        const ok = await sendEmail({ to: email, subject, html, text })
+        if (!ok && process.env.NODE_ENV !== 'production') {
+          console.log(`\n[magic-link] to: ${email}\n[magic-link] url: ${url}\n`)
         }
-        console.log(`\n[magic-link] to: ${email}\n[magic-link] url: ${url}\n`)
       },
     }),
     // Adds `role`/ban fields + admin APIs (list/set-role/ban/impersonate).

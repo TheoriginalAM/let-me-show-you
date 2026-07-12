@@ -13,6 +13,24 @@ export interface AdminUserRow {
   createdAt: Date
 }
 
+/** Email addresses of all admins — recipients for new-signup alerts. */
+export async function listAdminEmails(): Promise<string[]> {
+  const rows = await db.select({ email: user.email }).from(user).where(eq(user.role, 'admin'))
+  return rows.map((r) => r.email)
+}
+
+/** A user's name + email, for addressing them in an email. */
+export async function getUserContact(
+  userId: string,
+): Promise<{ name: string; email: string } | null> {
+  const rows = await db
+    .select({ name: user.name, email: user.email })
+    .from(user)
+    .where(eq(user.id, userId))
+    .limit(1)
+  return rows[0] ?? null
+}
+
 /** Whether a user is approved to use the app (invite gate). */
 export async function isUserApproved(userId: string): Promise<boolean> {
   const rows = await db
