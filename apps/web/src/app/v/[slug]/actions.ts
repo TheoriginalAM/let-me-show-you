@@ -1,16 +1,35 @@
 'use server'
 
 import { createHash } from 'node:crypto'
+import { revalidatePath } from 'next/cache'
 import { cookies, headers } from 'next/headers'
 import type { VideoStatus } from '@lmsy/shared'
-import { SHARE_PATH } from '@lmsy/shared'
+import { buildShareUrl, SHARE_PATH } from '@lmsy/shared'
+import {
+  addVideoComment,
+  countRecentCommentsByIp,
+  countVideoCommentsSince,
+  deleteOwnedVideoComment,
+  getVideoNotificationTarget,
+  type PublicComment,
+} from '@/db/comments'
 import { getShareableVideoBySlug, recordVideoView } from '@/db/queries'
+import { getCurrentUser } from '@/lib/current-user'
+import { notifyOwnerOfComment } from '@/lib/notifications'
 import {
   signUnlockToken,
   unlockCookieName,
   verifySharePassword,
   verifyUnlockToken,
 } from '@/lib/share-password'
+
+/** Comment field limits + anti-spam window (mirrored in the client form). */
+const MAX_NAME = 60
+const MAX_BODY = 2000
+const RATE_WINDOW_MS = 10 * 60 * 1000
+const RATE_MAX = 6
+/** Collapse bursts: at most one owner email per video per this window. */
+const EMAIL_DEBOUNCE_MS = 2 * 60 * 1000
 
 /** How long an unlock cookie stays valid (7 days). */
 const UNLOCK_MAX_AGE = 60 * 60 * 24 * 7
@@ -98,4 +117,85 @@ export async function unlockShare(slug: string, password: string): Promise<{ ok:
     maxAge: UNLOCK_MAX_AGE,
   })
   return { ok: true }
+}
+
+/**
+ * Post a login-free comment to a share's public thread. Re-resolves the slug
+ * server-side, requires the recording to be viewable (and unlocked, for
+ * protected ones), validates + rate-limits by IP hash, and emails the owner
+ * (best-effort, unless the owner posted it themselves).
+ */
+export async function postComment(
+  slug: string,
+  input: { name: string; body: string; website?: string },
+): Promise<{ ok: true; comment: PublicComment } | { ok: false; error: string }> {
+  // Honeypot: real users never fill the hidden "website" field. Coerce first so a
+  // non-string payload (array/object) can't slip past the check.
+  if (input.website != null && String(input.website).trim() !== '') {
+    return { ok: false, error: 'Unable to post your comment.' }
+  }
+
+  const name = String(input.name ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, MAX_NAME)
+  const body = String(input.body ?? '').trim().slice(0, MAX_BODY)
+  if (!name) return { ok: false, error: 'Please add your name.' }
+  if (!body) return { ok: false, error: 'Please write a comment.' }
+
+  const video = await getShareableVideoBySlug(slug)
+  if (!video || video.status === 'errored') {
+    return { ok: false, error: 'This recording is unavailable.' }
+  }
+  if (!(await isUnlocked(video))) {
+    return { ok: false, error: 'Unlock the recording before commenting.' }
+  }
+
+  const ipHash = await clientIpHash()
+  const since = new Date(Date.now() - RATE_WINDOW_MS)
+  if ((await countRecentCommentsByIp(video.id, ipHash, since)) >= RATE_MAX) {
+    return { ok: false, error: "You're posting a little fast. Please try again in a few minutes." }
+  }
+
+  // Debounce the owner email BEFORE inserting: if this video already had a
+  // comment in the last couple of minutes, the owner was just notified, so skip.
+  const recentOnVideo = await countVideoCommentsSince(
+    video.id,
+    new Date(Date.now() - EMAIL_DEBOUNCE_MS),
+  )
+
+  const comment = await addVideoComment({ videoId: video.id, authorName: name, body, ipHash })
+
+  // Email the owner, best-effort (a mail failure must never fail the comment).
+  // Suppressed when: we can't identify/rate-limit the poster (no IP salt), a
+  // very recent comment already notified them (anti email-bomb), or the owner
+  // posted it themselves.
+  const me = await getCurrentUser()
+  const shouldEmail = ipHash !== null && recentOnVideo === 0 && me?.id !== video.ownerId
+  if (shouldEmail) {
+    void getVideoNotificationTarget(video.id)
+      .then((target) => {
+        if (!target) return
+        return notifyOwnerOfComment({
+          ownerEmail: target.ownerEmail,
+          videoTitle: target.title,
+          authorName: name,
+          body,
+          shareUrl: buildShareUrl(slug),
+        })
+      })
+      .catch((error) => console.error('[comments] owner notify failed:', error))
+  }
+
+  revalidatePath(`/${SHARE_PATH}/${slug}`)
+  return { ok: true, comment }
+}
+
+/** Owner-only: remove a comment from one of their own videos' threads. */
+export async function deleteComment(slug: string, commentId: string): Promise<{ ok: boolean }> {
+  const me = await getCurrentUser()
+  if (!me) return { ok: false }
+  const ok = await deleteOwnedVideoComment(me.id, commentId)
+  if (ok) revalidatePath(`/${SHARE_PATH}/${slug}`)
+  return { ok }
 }

@@ -56,6 +56,30 @@ export const videoViews = pgTable(
   (table) => [index('video_views_video_id_idx').on(table.videoId)],
 )
 
+/**
+ * Public, login-free comments on a shared video (a lightweight thread for client
+ * feedback). Anyone who can view the share can post a name + comment; cascades
+ * away with the video.
+ */
+export const videoComments = pgTable(
+  'video_comments',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    videoId: uuid('video_id')
+      .notNull()
+      .references(() => videos.id, { onDelete: 'cascade' }),
+    authorName: text('author_name').notNull(),
+    body: text('body').notNull(),
+    // Salted IP hash for rate-limiting/abuse triage only (never shown).
+    authorIpHash: text('author_ip_hash'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  // Serves the share page's thread render: WHERE video_id = ? ORDER BY created_at.
+  (table) => [index('video_comments_video_id_created_at_idx').on(table.videoId, table.createdAt)],
+)
+
 /** Long-lived bearer tokens for the desktop app — stored hashed, never plaintext. */
 export const apiTokens = pgTable(
   'api_tokens',
@@ -96,5 +120,7 @@ export type VideoRow = typeof videos.$inferSelect
 export type NewVideoRow = typeof videos.$inferInsert
 export type VideoViewRow = typeof videoViews.$inferSelect
 export type NewVideoViewRow = typeof videoViews.$inferInsert
+export type VideoCommentRow = typeof videoComments.$inferSelect
+export type NewVideoCommentRow = typeof videoComments.$inferInsert
 export type ApiTokenRow = typeof apiTokens.$inferSelect
 export type DeviceCodeRow = typeof deviceCodes.$inferSelect

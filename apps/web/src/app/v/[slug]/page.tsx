@@ -10,8 +10,11 @@ import {
   formatRelativeDate,
   muxThumbnailUrl,
 } from '@lmsy/shared'
+import { listVideoComments } from '@/db/comments'
 import { getPublicVideoViewCount, getShareableVideoBySlug } from '@/db/queries'
+import { getCurrentUser } from '@/lib/current-user'
 import { unlockCookieName, verifyUnlockToken } from '@/lib/share-password'
+import { Comments } from './comments'
 import { PasswordGate } from './password-gate'
 import { ProcessingState } from './processing-state'
 import { ShareView } from './share-view'
@@ -115,6 +118,12 @@ export default async function SharePage({ params }: PageProps) {
 
   const isReady = video.status === 'ready' && Boolean(video.muxPlaybackId)
   const viewCount = !locked && isReady ? await getPublicVideoViewCount(video.id) : 0
+  // Public comment thread — only loaded (and only rendered) once unlocked, so a
+  // protected recording never leaks its discussion. The owner (if signed in)
+  // gets moderation controls.
+  const comments = locked ? [] : await listVideoComments(video.id)
+  const currentUser = locked ? null : await getCurrentUser()
+  const isOwner = Boolean(currentUser && currentUser.id === video.ownerId)
   const poster = video.muxPlaybackId
     ? muxThumbnailUrl(video.muxPlaybackId, { width: 1280, fitMode: 'preserve' })
     : ''
@@ -209,6 +218,8 @@ export default async function SharePage({ params }: PageProps) {
               )}
             </div>
           </div>
+
+          <Comments slug={slug} initialComments={comments} isOwner={isOwner} accent={accent} />
         </>
       )}
 

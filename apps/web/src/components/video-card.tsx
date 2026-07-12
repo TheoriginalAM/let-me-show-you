@@ -26,6 +26,7 @@ export type VideoCardProps = {
   isProtected: boolean
   durationSeconds: number | null
   viewCount: number
+  commentCount: number
   createdLabel: string
   thumbnailUrl: string | null
 }
@@ -233,6 +234,14 @@ export function VideoCard(props: VideoCardProps) {
 
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-faint">
           <span>{props.viewCount.toLocaleString()} views</span>
+          {props.commentCount > 0 && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="font-medium text-accent-ink">
+                {props.commentCount} {props.commentCount === 1 ? 'comment' : 'comments'}
+              </span>
+            </>
+          )}
           <span aria-hidden>·</span>
           <span>{props.createdLabel}</span>
           <span aria-hidden>·</span>

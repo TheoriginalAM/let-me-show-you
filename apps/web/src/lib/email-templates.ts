@@ -39,7 +39,7 @@ function layout(opts: {
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"></head>
 <body style="margin:0;padding:0;background:${CANVAS};">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${opts.preview}</div>
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(opts.preview)}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${CANVAS};">
     <tr><td align="center" style="padding:36px 16px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:${CARD};border:1px solid ${BORDER};border-radius:16px;overflow:hidden;">
@@ -98,6 +98,24 @@ export function adminSignupAlertEmail(opts: { name: string; email: string; admin
       cta: { label: 'Review in admin', url: opts.adminUrl },
     }),
     text: `${opts.name} (${opts.email}) just signed up and is waiting for your approval.\n\nReview them here: ${opts.adminUrl}`,
+  }
+}
+
+export function newCommentEmail(opts: {
+  authorName: string
+  videoTitle: string
+  body: string
+  shareUrl: string
+}) {
+  return {
+    subject: `New comment on "${opts.videoTitle}"`,
+    html: layout({
+      preview: `${opts.authorName} left a comment on ${opts.videoTitle}.`,
+      heading: 'New comment on your recording',
+      body: `<strong style="color:${INK};">${escapeHtml(opts.authorName)}</strong> commented on <strong style="color:${INK};">${escapeHtml(opts.videoTitle)}</strong>:<div style="margin:16px 0 0;padding:14px 16px;background:${HEADER};border:1px solid ${BORDER_SOFT};border-radius:10px;color:${INK};font-size:14px;line-height:1.55;white-space:pre-wrap;">${escapeHtml(opts.body)}</div>`,
+      cta: { label: 'View the thread', url: opts.shareUrl },
+    }),
+    text: `${opts.authorName} commented on "${opts.videoTitle}":\n\n${opts.body}\n\nView the thread: ${opts.shareUrl}`,
   }
 }
 

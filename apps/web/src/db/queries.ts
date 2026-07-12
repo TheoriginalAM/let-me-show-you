@@ -16,6 +16,8 @@ export type VideoWithViews = Video & { viewCount: number; hasPassword: boolean }
  */
 export type ShareableVideo = PublicVideo & {
   passwordHash: string | null
+  /** Owner's user id, so the share page can grant the owner moderation controls. */
+  ownerId: string
   /** Owner branding for the public share page (null → LMSY branding). */
   brand: { name: string | null; logo: string | null; color: string | null }
 }
@@ -123,6 +125,7 @@ export async function getShareableVideoBySlug(slug: string): Promise<ShareableVi
       durationSeconds: videos.durationSeconds,
       shareSlug: videos.shareSlug,
       ownerName: user.name,
+      ownerId: videos.ownerId,
       createdAt: videos.createdAt,
       passwordHash: videos.passwordHash,
       brandName: user.brandName,

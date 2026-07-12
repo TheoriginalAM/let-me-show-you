@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { buildShareUrl, formatRelativeDate, muxThumbnailUrl } from '@lmsy/shared'
 import { getCurrentUser } from '@/lib/current-user'
+import { commentCountsByVideo } from '@/db/comments'
 import { listVideosByOwnerWithViews } from '@/db/queries'
 import { SignOutButton } from '@/components/sign-out-button'
 import { VideoCard } from '@/components/video-card'
@@ -17,6 +18,7 @@ export default async function DashboardPage() {
   if (!user.approved) redirect('/pending')
 
   const videos = await listVideosByOwnerWithViews(user.id)
+  const commentCounts = await commentCountsByVideo(videos.map((v) => v.id))
   const now = Date.now()
 
   return (
@@ -60,6 +62,7 @@ export default async function DashboardPage() {
               isProtected={video.hasPassword}
               durationSeconds={video.durationSeconds}
               viewCount={video.viewCount}
+              commentCount={commentCounts[video.id] ?? 0}
               createdLabel={formatRelativeDate(video.createdAt, now)}
               thumbnailUrl={
                 video.muxPlaybackId
