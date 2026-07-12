@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { capture } from '../capture'
 import { useRecorderStore, type DeviceOption } from '../store'
-import { PermissionGate } from './PermissionGate'
 import { PermissionNotice } from './PermissionNotice'
+import { Preview } from './Preview'
+import { ModeTabs } from './ModeTabs'
 import { SourcePicker } from './SourcePicker'
+import { AreaPicker } from './AreaPicker'
+import { CameraPicker } from './CameraPicker'
 import { DeviceSelects } from './DeviceSelects'
 import { RecordingBar } from './RecordingBar'
 import { ProcessingScreen } from './ProcessingScreen'
@@ -36,8 +39,12 @@ async function enumerate(): Promise<{ mics: DeviceOption[]; cameras: DeviceOptio
 export function ControlPanel() {
   const permissions = useRecorderStore((s) => s.permissions)
   const status = useRecorderStore((s) => s.status)
+  const mode = useRecorderStore((s) => s.mode)
+  const areaRect = useRecorderStore((s) => s.areaRect)
+  const sources = useRecorderStore((s) => s.sources)
   const selectedSourceId = useRecorderStore((s) => s.selectedSourceId)
   const selectedCameraId = useRecorderStore((s) => s.selectedCameraId)
+  const cameras = useRecorderStore((s) => s.cameras)
   const onboardingComplete = useRecorderStore((s) => s.onboardingComplete)
   const [showSettings, setShowSettings] = useState(false)
 
@@ -129,10 +136,23 @@ export function ControlPanel() {
   // state (not the onChange handler) also covers the camera being unplugged,
   // which resets the selection to null and must hide the bubble.
   useEffect(() => {
-    void window.recorder.toggleWebcam(selectedCameraId).catch((error) => {
+    // In camera mode the camera IS the recording, so suppress the overlay bubble.
+    const overlayCam = mode === 'camera' ? null : selectedCameraId
+    void window.recorder.toggleWebcam(overlayCam).catch((error) => {
       console.error('[renderer] toggleWebcam failed:', error)
     })
-  }, [selectedCameraId])
+  }, [selectedCameraId, mode])
+
+  // Keep the selected source valid for the current screen/window mode.
+  useEffect(() => {
+    if (mode !== 'screen' && mode !== 'window') return
+    const store = useRecorderStore.getState()
+    const current = store.sources.find((s) => s.id === store.selectedSourceId)
+    if (!current || current.type !== mode) {
+      const first = store.sources.find((s) => s.type === mode)
+      if (first) store.selectSource(first.id)
+    }
+  }, [mode, sources])
 
   const screenGranted = permissions?.screen === 'granted'
   useEffect(() => {
@@ -147,16 +167,64 @@ export function ControlPanel() {
   }
 
   function startRecording(): void {
-    const store = useRecorderStore.getState()
-    if (!store.selectedSourceId) return
+    const s = useRecorderStore.getState()
+
+    if (s.mode === 'camera') {
+      const camId = s.cameraModeDeviceId ?? s.cameras[0]?.deviceId ?? null
+      if (!camId) return
+      void capture.start({
+        mode: 'camera',
+        sourceId: null,
+        micId: s.selectedMicId,
+        cameraId: camId,
+        areaRect: null,
+      })
+      return
+    }
+
+    if (s.mode === 'area') {
+      if (!s.areaRect) return
+      const screen =
+        s.sources.find(
+          (x) => x.type === 'screen' && x.displayId === String(s.areaRect?.displayId),
+        ) ?? s.sources.find((x) => x.type === 'screen')
+      if (!screen) return
+      void capture.start({
+        mode: 'area',
+        sourceId: screen.id,
+        micId: s.selectedMicId,
+        cameraId: s.selectedCameraId,
+        areaRect: s.areaRect,
+      })
+      return
+    }
+
+    if (!s.selectedSourceId) return
     void capture.start({
-      sourceId: store.selectedSourceId,
-      micId: store.selectedMicId,
-      cameraId: store.selectedCameraId,
+      mode: s.mode,
+      sourceId: s.selectedSourceId,
+      micId: s.selectedMicId,
+      cameraId: s.selectedCameraId,
+      areaRect: null,
     })
   }
 
   const { state } = status
+
+  const canRecord =
+    mode === 'camera'
+      ? cameras.length > 0
+      : mode === 'area'
+        ? screenGranted && Boolean(areaRect)
+        : screenGranted && Boolean(sources.find((x) => x.id === selectedSourceId && x.type === mode))
+  const recordLabel =
+    mode === 'camera'
+      ? 'Record camera'
+      : mode === 'area'
+        ? 'Record area'
+        : mode === 'window'
+          ? 'Record window'
+          : 'Record screen'
 
   return (
     <div className="panel">
@@ -214,25 +282,49 @@ export function ControlPanel() {
           <div className="pane">
             <div className="picker-empty">Checking permissions…</div>
           </div>
-        ) : !screenGranted ? (
-          <div className="pane">
-            <PermissionGate permissions={permissions} onRecheck={recheck} />
-          </div>
         ) : (
           <>
             <div className="source-scroll">
-              <SourcePicker />
+              <Preview />
+              {mode === 'camera' ? (
+                <CameraPicker />
+              ) : !screenGranted ? (
+                <div className="screen-note">
+                  <p className="screen-note-text">
+                    Allow <strong>Screen Recording</strong> for Let Me Show You in System Settings
+                    to capture your screen. (Camera recording works without it.)
+                  </p>
+                  <div className="screen-note-actions">
+                    <button
+                      className="btn-secondary no-drag"
+                      onClick={() =>
+                        void window.recorder.openPrivacySettings('screen').catch(console.error)
+                      }
+                    >
+                      Open System Settings
+                    </button>
+                    <button className="btn-ghost no-drag" onClick={recheck}>
+                      Re-check
+                    </button>
+                  </div>
+                </div>
+              ) : mode === 'area' ? (
+                <AreaPicker />
+              ) : (
+                <SourcePicker mode={mode} />
+              )}
               <PermissionNotice permissions={permissions} />
             </div>
             <div className="panel-footer">
-              <DeviceSelects />
+              <ModeTabs />
+              <DeviceSelects mode={mode} />
               <button
                 className="btn-record no-drag"
-                disabled={!selectedSourceId}
+                disabled={!canRecord}
                 onClick={startRecording}
               >
                 <span className="rec-dot" />
-                Start recording
+                {recordLabel}
               </button>
             </div>
           </>

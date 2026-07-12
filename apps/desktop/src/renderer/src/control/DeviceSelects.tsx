@@ -1,3 +1,4 @@
+import type { RecordingMode } from '@shared/ipc'
 import { useRecorderStore } from '../store'
 
 const MicIcon = (
@@ -28,7 +29,7 @@ const CameraIcon = (
   </svg>
 )
 
-export function DeviceSelects() {
+export function DeviceSelects({ mode }: { mode: RecordingMode }) {
   const mics = useRecorderStore((s) => s.mics)
   const cameras = useRecorderStore((s) => s.cameras)
   const selectedMicId = useRecorderStore((s) => s.selectedMicId)
@@ -66,27 +67,29 @@ export function DeviceSelects() {
         </span>
       </div>
 
-      <div className={`device-chip ${selectedCameraId ? 'on' : ''}`}>
-        <span className="device-icon" aria-hidden>
-          {CameraIcon}
-        </span>
-        <select
-          className="no-drag"
-          aria-label="Camera"
-          value={selectedCameraId ?? 'off'}
-          onChange={(event) => onCameraChange(event.target.value)}
-        >
-          <option value="off">Camera off</option>
-          {cameras.map((camera) => (
-            <option key={camera.deviceId} value={camera.deviceId}>
-              {camera.label}
-            </option>
-          ))}
-        </select>
-        <span className="chev" aria-hidden>
-          ▾
-        </span>
-      </div>
+      {mode !== 'camera' && (
+        <div className={`device-chip ${selectedCameraId ? 'on' : ''}`}>
+          <span className="device-icon" aria-hidden>
+            {CameraIcon}
+          </span>
+          <select
+            className="no-drag"
+            aria-label="Webcam overlay"
+            value={selectedCameraId ?? 'off'}
+            onChange={(event) => onCameraChange(event.target.value)}
+          >
+            <option value="off">No webcam</option>
+            {cameras.map((camera) => (
+              <option key={camera.deviceId} value={camera.deviceId}>
+                {camera.label}
+              </option>
+            ))}
+          </select>
+          <span className="chev" aria-hidden>
+            ▾
+          </span>
+        </div>
+      )}
     </div>
   )
 }

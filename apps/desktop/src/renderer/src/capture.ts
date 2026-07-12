@@ -1,4 +1,4 @@
-import type { StartRecordingPayload } from '@shared/ipc'
+import type { AreaRect, StartRecordingPayload } from '@shared/ipc'
 
 function message(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -17,6 +17,12 @@ const VIDEO_BITS_PER_SECOND = 8_000_000
 class CaptureController {
   private recorder: MediaRecorder | null = null
   private stream: MediaStream | null = null
+  // In 'area' mode the recorded stream is a canvas crop; the raw desktop feed is
+  // kept here so it can be stopped, and cropRaf/cropVideo drive the crop draw.
+  private sourceStream: MediaStream | null = null
+  private cropRaf: number | null = null
+  private cropVideo: HTMLVideoElement | null = null
+  private cropPaused = false
   private writeChain: Promise<unknown> = Promise.resolve()
   private starting = false
   private stopping = false
@@ -37,23 +43,39 @@ class CaptureController {
     this.settled = false
 
     try {
-      // Video: desktop capture via the legacy mandatory-constraints pattern.
+      // Video source depends on the mode: camera-only records the webcam;
+      // screen/window/area capture the desktop (area then crops via a canvas).
       let videoStream: MediaStream
       try {
-        videoStream = await navigator.mediaDevices.getUserMedia({
-          audio: false,
-          video: {
-            mandatory: {
-              chromeMediaSource: 'desktop',
-              chromeMediaSourceId: payload.sourceId,
-              maxWidth: 1920,
-              maxHeight: 1080,
-              maxFrameRate: 30,
+        if (payload.mode === 'camera') {
+          await window.recorder.requestMediaAccess('camera').catch(() => false)
+          videoStream = await navigator.mediaDevices.getUserMedia({
+            video: payload.cameraId
+              ? { deviceId: { exact: payload.cameraId }, width: 1280, height: 720 }
+              : { width: 1280, height: 720 },
+            audio: false,
+          })
+        } else {
+          const desktop = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              mandatory: {
+                chromeMediaSource: 'desktop',
+                chromeMediaSourceId: payload.sourceId,
+                maxWidth: 1920,
+                maxHeight: 1080,
+                maxFrameRate: 30,
+              },
             },
-          },
-        } as unknown as MediaStreamConstraints)
+          } as unknown as MediaStreamConstraints)
+          videoStream =
+            payload.mode === 'area' && payload.areaRect
+              ? this.cropToArea(desktop, payload.areaRect)
+              : desktop
+        }
       } catch (error) {
-        await window.recorder.abortRecording(`Could not capture the screen: ${message(error)}`)
+        this.releaseStream()
+        await window.recorder.abortRecording(`Could not start capture: ${message(error)}`)
         return
       }
 
@@ -83,8 +105,10 @@ class CaptureController {
       if (audioStream) for (const track of audioStream.getAudioTracks()) combined.addTrack(track)
       this.stream = combined
 
-      // If the user stops sharing via the OS overlay, finish gracefully.
+      // If the user stops sharing via the OS overlay, finish gracefully. In area
+      // mode the recorded track is the canvas, so also watch the raw desktop feed.
       combined.getVideoTracks()[0]?.addEventListener('ended', () => this.stop())
+      this.sourceStream?.getVideoTracks()[0]?.addEventListener('ended', () => this.stop())
 
       const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
         ? 'video/webm;codecs=vp9,opus'
@@ -136,6 +160,7 @@ class CaptureController {
   pause(): void {
     if (this.recorder?.state === 'recording') {
       this.recorder.pause()
+      this.cropPaused = true
       void window.recorder.pauseRecording()
     }
   }
@@ -143,6 +168,7 @@ class CaptureController {
   resume(): void {
     if (this.recorder?.state === 'paused') {
       this.recorder.resume()
+      this.cropPaused = false
       void window.recorder.resumeRecording()
     }
   }
@@ -228,7 +254,72 @@ class CaptureController {
     await window.recorder.abortRecording(reason)
   }
 
+  /**
+   * Draw a cropped region of a desktop stream onto a canvas and record THAT.
+   * Maps the DIP selection rect to captured-video pixels (the capture may be
+   * downscaled from native). The raw desktop stream is retained for cleanup.
+   */
+  private cropToArea(desktop: MediaStream, rect: AreaRect): MediaStream {
+    this.sourceStream = desktop
+    const video = document.createElement('video')
+    video.srcObject = desktop
+    video.muted = true
+    void video.play().catch(() => undefined)
+    this.cropVideo = video
+
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    let sx = 0
+    let sy = 0
+    let sw = 0
+    let sh = 0
+    let sized = false
+
+    const setup = (): boolean => {
+      const vw = video.videoWidth
+      const vh = video.videoHeight
+      if (!vw || !vh) return false
+      const scaleX = vw / rect.displayWidth
+      const scaleY = vh / rect.displayHeight
+      sx = Math.round(rect.x * scaleX)
+      sy = Math.round(rect.y * scaleY)
+      sw = Math.max(2, Math.round(rect.width * scaleX))
+      sh = Math.max(2, Math.round(rect.height * scaleY))
+      sw -= sw % 2 // even dims keep the downstream H.264 encoder happy
+      sh -= sh % 2
+      canvas.width = sw
+      canvas.height = sh
+      sized = true
+      return true
+    }
+
+    const draw = (): void => {
+      if (!sized && !setup()) {
+        this.cropRaf = requestAnimationFrame(draw)
+        return
+      }
+      // Skip the decode+draw while paused (no output is being recorded anyway).
+      if (!this.cropPaused && ctx) ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh)
+      this.cropRaf = requestAnimationFrame(draw)
+    }
+    this.cropPaused = false
+    this.cropRaf = requestAnimationFrame(draw)
+    return canvas.captureStream(30)
+  }
+
   private releaseStream(): void {
+    if (this.cropRaf !== null) {
+      cancelAnimationFrame(this.cropRaf)
+      this.cropRaf = null
+    }
+    if (this.cropVideo) {
+      this.cropVideo.srcObject = null
+      this.cropVideo = null
+    }
+    if (this.sourceStream) {
+      for (const track of this.sourceStream.getTracks()) track.stop()
+      this.sourceStream = null
+    }
     if (this.stream) {
       for (const track of this.stream.getTracks()) track.stop()
       this.stream = null

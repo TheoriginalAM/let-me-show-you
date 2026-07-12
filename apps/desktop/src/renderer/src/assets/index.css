@@ -872,16 +872,25 @@ a,
 /* ---------- Webcam bubble ---------- */
 .bubble {
   -webkit-app-region: drag;
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   background: #000;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
-  border: 3px solid rgba(255, 255, 255, 0.12);
+  border: 3px solid rgba(255, 255, 255, 0.14);
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+}
+.bubble[data-shape='circle'] {
+  border-radius: 50%;
+}
+.bubble[data-shape='rounded'] {
+  border-radius: 22%;
+}
+.bubble[data-shape='square'] {
+  border-radius: 14px;
 }
 .bubble-video {
   width: 100%;
@@ -894,6 +903,279 @@ a,
   font-size: 12px;
   text-align: center;
   padding: 0 16px;
+}
+
+/* Hover controls on the bubble: shape + size. */
+.bubble-controls {
+  position: absolute;
+  bottom: 9px;
+  left: 50%;
+  transform: translateX(-50%) translateY(6px);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s ease;
+}
+.bubble:hover .bubble-controls {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+.bubble-ctl-group {
+  display: flex;
+  gap: 2px;
+}
+.bubble-ctl-sep {
+  width: 1px;
+  height: 16px;
+  background: rgba(255, 255, 255, 0.18);
+}
+.bubble-ctl {
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+}
+.bubble-ctl:hover {
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+.bubble-ctl.on {
+  background: var(--accent);
+  color: #fff;
+}
+.shape-ico {
+  width: 12px;
+  height: 12px;
+  border: 1.6px solid currentColor;
+  display: block;
+}
+.shape-circle {
+  border-radius: 50%;
+}
+.shape-rounded {
+  border-radius: 4px;
+}
+.shape-square {
+  border-radius: 1px;
+}
+
+/* ---------- Preview ---------- */
+.preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 14px;
+  overflow: hidden;
+  background: linear-gradient(135deg, #16141f, #0c0b14);
+  border: 1px solid var(--border);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+.preview-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.preview-cam {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+.preview-empty {
+  color: var(--faint);
+  font-size: 13px;
+}
+.preview-badge {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+/* ---------- Mode tabs ---------- */
+.mode-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.mode-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 7px 4px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    color 0.12s ease;
+}
+.mode-tab:hover {
+  color: var(--fg);
+  background: var(--surface-2);
+}
+.mode-tab.on {
+  background: var(--accent-strong);
+  color: #fff;
+}
+.mode-tab-ico {
+  display: grid;
+  place-items: center;
+}
+.mode-tab-ico svg {
+  width: 17px;
+  height: 17px;
+}
+.mode-tab-label {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+/* ---------- Area + camera pickers ---------- */
+.area-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  text-align: center;
+}
+.area-pick .btn-secondary {
+  width: 100%;
+}
+.area-hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.cam-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cam-opt {
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+.cam-opt:hover {
+  border-color: var(--border-strong);
+}
+.cam-opt.on {
+  border-color: var(--accent);
+  background: rgba(139, 139, 246, 0.1);
+}
+.screen-note {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: center;
+}
+.screen-note-text {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.screen-note-actions {
+  display: flex;
+  gap: 8px;
+}
+.screen-note-actions .btn-secondary,
+.screen-note-actions .btn-ghost {
+  flex: 1;
+}
+
+/* ---------- Area-select overlay ---------- */
+:root[data-view='area'] body {
+  background: transparent;
+}
+.area-overlay {
+  position: fixed;
+  inset: 0;
+  cursor: crosshair;
+  user-select: none;
+  overflow: hidden;
+}
+.area-sel {
+  position: absolute;
+  border: 2px solid var(--accent);
+  border-radius: 2px;
+  box-shadow: 0 0 0 100vmax rgba(8, 8, 14, 0.5);
+}
+.area-dim {
+  position: absolute;
+  top: -26px;
+  left: 0;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.area-hint-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(8, 8, 14, 0.82);
+  color: var(--fg);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 12px 20px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
 /* ---------- First-run onboarding ---------- */

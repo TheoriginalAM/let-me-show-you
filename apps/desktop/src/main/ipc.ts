@@ -2,6 +2,7 @@ import { isAbsolute, join, relative, resolve } from 'path'
 import { app, desktopCapturer, ipcMain, shell, systemPreferences } from 'electron'
 import {
   IPC,
+  type AreaRect,
   type AuthState,
   type CaptureSource,
   type MediaPermissions,
@@ -9,9 +10,18 @@ import {
   type PermissionTarget,
   type StartUploadPayload,
   type UploadStatus,
+  type WebcamConfig,
+  type WebcamShape,
+  type WebcamSize,
 } from '../shared/ipc'
 import type { RecordingSession } from './recording-session'
-import { getOnboardingComplete, setOnboardingComplete } from './settings-store'
+import {
+  getOnboardingComplete,
+  getWebcamConfig,
+  setOnboardingComplete,
+  setWebcamShape,
+  setWebcamSize,
+} from './settings-store'
 import { restartToUpdate } from './updater'
 
 export interface IpcContext {
@@ -19,6 +29,9 @@ export interface IpcContext {
   showWebcam: (cameraId: string) => void
   hideWebcam: () => void
   getWebcamCamera: () => string | null
+  resizeWebcam: (size: WebcamSize) => void
+  selectArea: () => Promise<AreaRect | null>
+  cancelAreaSelect: () => void
   hideControlWindow: () => void
   quit: () => void
   // auth + upload
@@ -121,13 +134,37 @@ export function registerIpcHandlers(ctx: IpcContext): void {
     await shell.openExternal(PRIVACY_URLS[target])
   })
 
+  // ---- Webcam bubble customization ----
+  ipcMain.handle(IPC.getWebcamConfig, (): WebcamConfig => getWebcamConfig())
+
+  ipcMain.handle(IPC.setWebcamShape, (_event, shape: unknown) => {
+    if (shape !== 'circle' && shape !== 'rounded' && shape !== 'square') {
+      throw new Error('Invalid webcam shape')
+    }
+    setWebcamShape(shape as WebcamShape)
+  })
+
+  ipcMain.handle(IPC.setWebcamSize, (_event, size: unknown) => {
+    if (size !== 'small' && size !== 'medium' && size !== 'large') {
+      throw new Error('Invalid webcam size')
+    }
+    setWebcamSize(size as WebcamSize)
+    ctx.resizeWebcam(size as WebcamSize)
+  })
+
+  // ---- Area (region) selection ----
+  ipcMain.handle(IPC.selectArea, (): Promise<AreaRect | null> => ctx.selectArea())
+  ipcMain.handle(IPC.cancelAreaSelect, () => ctx.cancelAreaSelect())
+
   // ---- Recording lifecycle ----
   ipcMain.handle(IPC.startRecording, (_event, payload: unknown) => {
     if (!payload || typeof payload !== 'object') {
       throw new Error('Invalid start-recording payload')
     }
-    const { sourceId } = payload as Record<string, unknown>
-    if (typeof sourceId !== 'string' || !knownSourceIds.has(sourceId)) {
+    const { mode, sourceId } = payload as Record<string, unknown>
+    // Camera-only has no desktop source; every other mode must reference a source
+    // we actually handed out (so the renderer can't inject an arbitrary id).
+    if (mode !== 'camera' && (typeof sourceId !== 'string' || !knownSourceIds.has(sourceId))) {
       throw new Error('Unknown or missing sourceId')
     }
     ctx.session.begin()

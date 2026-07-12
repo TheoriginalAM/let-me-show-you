@@ -27,68 +27,32 @@ function SourceCard({
   )
 }
 
-function SourceGroup({
-  title,
-  items,
-  selectedSourceId,
-  onSelect,
-}: {
-  title: string
-  items: CaptureSource[]
-  selectedSourceId: string | null
-  onSelect: (id: string) => void
-}) {
-  return (
-    <div className="source-group">
-      <h3 className="group-title">{title}</h3>
-      <div className="source-grid">
-        {items.map((source) => (
-          <SourceCard
-            key={source.id}
-            source={source}
-            selected={source.id === selectedSourceId}
-            onSelect={onSelect}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-export function SourcePicker() {
+/** Grid of capturable sources for the current mode ('screen' or 'window'). */
+export function SourcePicker({ mode }: { mode: 'screen' | 'window' }) {
   const sources = useRecorderStore((s) => s.sources)
   const loading = useRecorderStore((s) => s.loadingSources)
   const selectedSourceId = useRecorderStore((s) => s.selectedSourceId)
   const selectSource = useRecorderStore((s) => s.selectSource)
 
-  if (loading && sources.length === 0) {
-    return <div className="picker-empty">Loading sources…</div>
-  }
-  if (sources.length === 0) {
-    return <div className="picker-empty">No capturable sources found.</div>
-  }
+  const items = sources.filter((s) => s.type === mode)
 
-  const screens = sources.filter((s) => s.type === 'screen')
-  const windows = sources.filter((s) => s.type === 'window')
+  if (loading && items.length === 0) {
+    return <div className="picker-empty">Loading {mode === 'screen' ? 'screens' : 'windows'}…</div>
+  }
+  if (items.length === 0) {
+    return <div className="picker-empty">No {mode === 'screen' ? 'screens' : 'windows'} found.</div>
+  }
 
   return (
-    <div className="sources">
-      {screens.length > 0 && (
-        <SourceGroup
-          title="Screens"
-          items={screens}
-          selectedSourceId={selectedSourceId}
+    <div className="source-grid">
+      {items.map((source) => (
+        <SourceCard
+          key={source.id}
+          source={source}
+          selected={source.id === selectedSourceId}
           onSelect={selectSource}
         />
-      )}
-      {windows.length > 0 && (
-        <SourceGroup
-          title="Windows"
-          items={windows}
-          selectedSourceId={selectedSourceId}
-          onSelect={selectSource}
-        />
-      )}
+      ))}
     </div>
   )
 }

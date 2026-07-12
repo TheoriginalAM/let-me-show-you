@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { app } from 'electron'
+import type { WebcamConfig, WebcamShape, WebcamSize } from '../shared/ipc'
 
 /**
  * Tiny non-secret settings persisted as JSON in userData. (Secrets like the API
@@ -8,7 +9,11 @@ import { app } from 'electron'
  */
 interface Settings {
   onboardingComplete?: boolean
+  webcamShape?: WebcamShape
+  webcamSize?: WebcamSize
 }
+
+const DEFAULT_WEBCAM: WebcamConfig = { shape: 'circle', size: 'medium' }
 
 function settingsPath(): string {
   return join(app.getPath('userData'), 'settings.json')
@@ -38,4 +43,20 @@ export function getOnboardingComplete(): boolean {
 
 export function setOnboardingComplete(value: boolean): void {
   write({ ...read(), onboardingComplete: value })
+}
+
+export function getWebcamConfig(): WebcamConfig {
+  const s = read()
+  return {
+    shape: s.webcamShape ?? DEFAULT_WEBCAM.shape,
+    size: s.webcamSize ?? DEFAULT_WEBCAM.size,
+  }
+}
+
+export function setWebcamShape(shape: WebcamShape): void {
+  write({ ...read(), webcamShape: shape })
+}
+
+export function setWebcamSize(size: WebcamSize): void {
+  write({ ...read(), webcamSize: size })
 }

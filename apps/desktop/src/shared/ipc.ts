@@ -13,6 +13,14 @@ export const IPC = {
   getPermissions: 'get-permissions',
   requestMediaAccess: 'request-media-access',
   openPrivacySettings: 'open-privacy-settings',
+  // Webcam bubble customization.
+  setWebcamShape: 'set-webcam-shape',
+  setWebcamSize: 'set-webcam-size',
+  getWebcamConfig: 'get-webcam-config',
+  // Area (region) selection overlay.
+  selectArea: 'select-area',
+  cancelAreaSelect: 'cancel-area-select',
+  areaSelected: 'area-selected',
   startRecording: 'start-recording',
   writeChunk: 'write-chunk',
   pauseRecording: 'pause-recording',
@@ -63,10 +71,41 @@ export interface CaptureSource {
   displayId: string | null
 }
 
+/** What the recorder captures. */
+export type RecordingMode = 'screen' | 'window' | 'area' | 'camera'
+
+/**
+ * A selected screen region, in DIP relative to the display's top-left, plus the
+ * display's id and DIP size so the renderer can scale the crop to the captured
+ * video (which may be downscaled from native resolution).
+ */
+export interface AreaRect {
+  x: number
+  y: number
+  width: number
+  height: number
+  displayId: number
+  displayWidth: number
+  displayHeight: number
+}
+
 export interface StartRecordingPayload {
-  sourceId: string
+  mode: RecordingMode
+  /** desktopCapturer id for screen/window/area; null for camera-only. */
+  sourceId: string | null
   micId: string | null
+  /** In 'camera' mode: the camera to record. In screen/window: the webcam overlay (or null). */
   cameraId: string | null
+  /** Crop rectangle for 'area' mode. */
+  areaRect: AreaRect | null
+}
+
+/** Webcam bubble appearance. */
+export type WebcamShape = 'circle' | 'rounded' | 'square'
+export type WebcamSize = 'small' | 'medium' | 'large'
+export interface WebcamConfig {
+  shape: WebcamShape
+  size: WebcamSize
 }
 
 export type PermissionState = 'granted' | 'denied' | 'restricted' | 'not-determined' | 'unknown'
@@ -183,6 +222,15 @@ export interface RecorderApi {
   /** Reveal a file in Finder/Explorer. */
   revealInFinder: (filePath: string) => Promise<void>
   toggleWebcam: (cameraId: string | null) => Promise<void>
+  /** Customize the webcam bubble; persisted and pushed live to the bubble window. */
+  setWebcamShape: (shape: WebcamShape) => Promise<void>
+  setWebcamSize: (size: WebcamSize) => Promise<void>
+  getWebcamConfig: () => Promise<WebcamConfig>
+  /** Open the drag-to-select region overlay; resolves to the chosen rect or null. */
+  selectArea: () => Promise<AreaRect | null>
+  cancelAreaSelect: () => Promise<void>
+  /** (area overlay window) report the drag rect in CSS px, or null to cancel. */
+  reportArea: (rect: { x: number; y: number; width: number; height: number } | null) => void
   /** (webcam window) current selected camera id, resolved without a race. */
   getWebcamCamera: () => Promise<string | null>
   /** Current recording status, so a freshly mounted renderer can sync immediately. */

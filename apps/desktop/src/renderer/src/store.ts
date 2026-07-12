@@ -1,8 +1,10 @@
 import { create } from 'zustand'
 import type {
+  AreaRect,
   AuthState,
   CaptureSource,
   MediaPermissions,
+  RecordingMode,
   RecordingStatus,
   SignInStatus,
   UpdateStatus,
@@ -34,13 +36,16 @@ const idleUpdate: UpdateStatus = { phase: 'idle', version: null }
 
 interface RecorderStore {
   permissions: MediaPermissions | null
+  mode: RecordingMode
+  areaRect: AreaRect | null
   sources: CaptureSource[]
   loadingSources: boolean
   selectedSourceId: string | null
   mics: DeviceOption[]
   cameras: DeviceOption[]
   selectedMicId: string | null
-  selectedCameraId: string | null // null = camera off
+  selectedCameraId: string | null // webcam OVERLAY device (screen/window/area); null = off
+  cameraModeDeviceId: string | null // the camera RECORDED in camera-only mode
   status: RecordingStatus
   auth: AuthState
   signIn: SignInStatus
@@ -50,12 +55,15 @@ interface RecorderStore {
   onboardingComplete: boolean | null
 
   setPermissions: (permissions: MediaPermissions) => void
+  setMode: (mode: RecordingMode) => void
+  setAreaRect: (rect: AreaRect | null) => void
   setSources: (sources: CaptureSource[]) => void
   setLoadingSources: (loading: boolean) => void
   selectSource: (id: string) => void
   setDevices: (mics: DeviceOption[], cameras: DeviceOption[]) => void
   selectMic: (id: string | null) => void
   selectCamera: (id: string | null) => void
+  selectCameraModeDevice: (id: string) => void
   setStatus: (status: RecordingStatus) => void
   setAuth: (auth: AuthState) => void
   setSignIn: (signIn: SignInStatus) => void
@@ -66,6 +74,8 @@ interface RecorderStore {
 
 export const useRecorderStore = create<RecorderStore>((set) => ({
   permissions: null,
+  mode: 'screen',
+  areaRect: null,
   sources: [],
   loadingSources: false,
   selectedSourceId: null,
@@ -73,6 +83,7 @@ export const useRecorderStore = create<RecorderStore>((set) => ({
   cameras: [],
   selectedMicId: null,
   selectedCameraId: null,
+  cameraModeDeviceId: null,
   status: idleStatus,
   auth: { signedIn: false },
   signIn: idleSignIn,
@@ -81,6 +92,8 @@ export const useRecorderStore = create<RecorderStore>((set) => ({
   onboardingComplete: null,
 
   setPermissions: (permissions) => set({ permissions }),
+  setMode: (mode) => set({ mode }),
+  setAreaRect: (areaRect) => set({ areaRect }),
   setSources: (sources) =>
     set((state) => ({
       sources,
@@ -102,9 +115,13 @@ export const useRecorderStore = create<RecorderStore>((set) => ({
       selectedCameraId: cameras.some((c) => c.deviceId === state.selectedCameraId)
         ? state.selectedCameraId
         : null,
+      cameraModeDeviceId: cameras.some((c) => c.deviceId === state.cameraModeDeviceId)
+        ? state.cameraModeDeviceId
+        : null,
     })),
   selectMic: (selectedMicId) => set({ selectedMicId }),
   selectCamera: (selectedCameraId) => set({ selectedCameraId }),
+  selectCameraModeDevice: (cameraModeDeviceId) => set({ cameraModeDeviceId }),
   setStatus: (status) => set({ status }),
   setAuth: (auth) => set({ auth }),
   setSignIn: (signIn) => set({ signIn }),
