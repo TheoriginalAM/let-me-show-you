@@ -57,29 +57,36 @@ export function WorkspaceSwitcher({
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-2.5 rounded-xl px-1.5 py-1 text-left transition hover:bg-white/[0.03]"
+        className="flex items-center gap-3 rounded-2xl border border-line bg-white/[0.03] px-3 py-2 text-left transition hover:border-line-strong hover:bg-white/[0.06]"
       >
         <span
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-gradient-to-b from-[#8281ff] to-accent-strong text-sm font-bold text-white shadow-[0_6px_16px_-6px_rgba(109,109,245,0.9)]"
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-b from-[#8281ff] to-accent-strong text-base font-bold text-white shadow-[0_6px_16px_-6px_rgba(109,109,245,0.9)]"
           aria-hidden
         >
           {initial(active?.name)}
         </span>
-        <span className="font-display text-2xl font-semibold tracking-tight">
-          {active?.name ?? 'No workspace'}
+        <span className="min-w-0">
+          <span className="block text-xs font-medium uppercase tracking-wider text-faint">
+            Workspace
+          </span>
+          <span className="flex items-center gap-2">
+            <span className="truncate font-display text-2xl font-semibold tracking-tight">
+              {active?.name ?? 'No workspace'}
+            </span>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`h-4 w-4 shrink-0 text-muted transition ${open ? 'rotate-180' : ''}`}
+              aria-hidden
+            >
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </span>
         </span>
-        <svg
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={`h-4 w-4 text-faint transition ${open ? 'rotate-180' : ''}`}
-          aria-hidden
-        >
-          <path d="M6 9l6 6 6-6" />
-        </svg>
       </button>
 
       {open && (
@@ -91,44 +98,68 @@ export function WorkspaceSwitcher({
             tabIndex={-1}
             onClick={() => setOpen(false)}
           />
-          <div className="glass absolute left-0 top-full z-20 mt-2 w-64 rounded-xl border border-line p-1.5 shadow-[0_30px_80px_-30px_rgba(0,0,0,0.8)]">
-            <p className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wider text-faint">
-              Workspaces
+          <div className="absolute left-0 top-full z-20 mt-2 w-80 overflow-hidden rounded-2xl border border-line-strong bg-[#14141e] p-2 shadow-[0_40px_100px_-30px_rgba(0,0,0,0.9)]">
+            <p className="px-3 pb-1.5 pt-2 text-xs font-semibold uppercase tracking-wider text-faint">
+              Your workspaces
             </p>
-            <div className="flex max-h-64 flex-col overflow-y-auto">
-              {workspaces.map((w) => (
-                <button
-                  key={w.id}
-                  onClick={() => switchTo(w.id)}
-                  disabled={pending}
-                  className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm transition hover:bg-white/[0.04] disabled:opacity-50"
-                >
-                  <span className="grid h-6 w-6 shrink-0 place-items-center rounded-md bg-white/5 text-[11px] font-bold text-ink">
-                    {initial(w.name)}
-                  </span>
-                  <span className="min-w-0 flex-1 truncate text-ink">{w.name}</span>
-                  {w.role === 'owner' && <span className="text-[10px] text-faint">Owner</span>}
-                  {w.id === active?.id && <span className="text-accent-ink">✓</span>}
-                </button>
-              ))}
+            <div className="flex max-h-72 flex-col overflow-y-auto">
+              {workspaces.map((w) => {
+                const isActive = w.id === active?.id
+                return (
+                  <button
+                    key={w.id}
+                    onClick={() => switchTo(w.id)}
+                    disabled={pending}
+                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition disabled:opacity-50 ${
+                      isActive ? 'bg-white/[0.07]' : 'hover:bg-white/[0.05]'
+                    }`}
+                  >
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white/[0.08] text-sm font-bold text-ink">
+                      {initial(w.name)}
+                    </span>
+                    <span className="min-w-0 flex-1 truncate text-[0.95rem] font-medium text-ink">
+                      {w.name}
+                    </span>
+                    {w.role === 'owner' && (
+                      <span className="rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[0.7rem] font-medium text-muted">
+                        Owner
+                      </span>
+                    )}
+                    {isActive && (
+                      <svg
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="h-4 w-4 shrink-0 text-accent-ink"
+                        aria-hidden
+                      >
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    )}
+                  </button>
+                )
+              })}
             </div>
 
-            <div className="my-1.5 border-t border-line" />
+            <div className="my-2 border-t border-line" />
 
             {creating ? (
-              <form onSubmit={create} className="flex gap-1.5 p-1">
+              <form onSubmit={create} className="flex gap-2 p-1">
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   maxLength={80}
                   autoFocus
                   placeholder="Workspace name"
-                  className="min-w-0 flex-1 rounded-lg border border-line bg-white/[0.03] px-2.5 py-1.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+                  className="min-w-0 flex-1 rounded-xl border border-line-strong bg-white/[0.04] px-3 py-2.5 text-[0.95rem] text-ink placeholder:text-faint focus:border-accent focus:outline-none"
                 />
                 <button
                   type="submit"
                   disabled={pending || !name.trim()}
-                  className="btn-primary px-2.5 py-1.5 text-xs disabled:opacity-50"
+                  className="btn-primary px-4 py-2.5 text-sm disabled:opacity-50"
                 >
                   Create
                 </button>
@@ -136,16 +167,22 @@ export function WorkspaceSwitcher({
             ) : (
               <button
                 onClick={() => setCreating(true)}
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-muted transition hover:bg-white/[0.04] hover:text-ink"
+                className="flex w-full items-center gap-3 rounded-xl border border-accent/30 bg-accent-strong/15 px-3 py-3 text-left font-semibold text-accent-ink transition hover:border-accent/50 hover:bg-accent-strong/25"
               >
-                <span className="text-base leading-none">+</span> New workspace
+                <span
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-accent-strong/30 text-lg leading-none text-white"
+                  aria-hidden
+                >
+                  +
+                </span>
+                New workspace
               </button>
             )}
 
             {active?.role === 'owner' && (
               <Link
                 href="/dashboard/workspace"
-                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm text-muted transition hover:bg-white/[0.04] hover:text-ink"
+                className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[0.95rem] font-medium text-muted transition hover:bg-white/[0.05] hover:text-ink"
                 onClick={() => setOpen(false)}
               >
                 <svg
@@ -155,7 +192,7 @@ export function WorkspaceSwitcher({
                   strokeWidth="1.8"
                   strokeLinecap="round"
                   strokeLinejoin="round"
-                  className="h-4 w-4"
+                  className="h-5 w-5 shrink-0"
                   aria-hidden
                 >
                   <circle cx="12" cy="12" r="3" />

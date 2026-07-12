@@ -33,6 +33,14 @@
 
 html {
   scroll-behavior: smooth;
+  /* Base type scale bumped up for readability — everything sized in rem grows
+     with this (text and spacing stay in proportion). */
+  font-size: 18px;
+}
+@media (max-width: 640px) {
+  html {
+    font-size: 16.5px;
+  }
 }
 
 body {
@@ -40,6 +48,7 @@ body {
   color: var(--color-ink);
   font-feature-settings: 'ss01', 'cv01';
   text-rendering: optimizeLegibility;
+  line-height: 1.55;
 }
 
 /* Layered ambient glow behind everything (fixed so it never scrolls away). */
