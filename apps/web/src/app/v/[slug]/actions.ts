@@ -10,10 +10,13 @@ import {
   countRecentCommentsByIp,
   countVideoCommentsSince,
   deleteOwnedVideoComment,
+  getCommentContact,
   getVideoNotificationTarget,
   type PublicComment,
 } from '@/db/comments'
 import { createNotifications, memberIdsForVideo } from '@/db/app-notifications'
+import { addApproval, countRecentApprovalsByIp } from '@/db/approvals'
+import { notifyApproval, notifyCommentReply } from '@/lib/notifications'
 import { getShareableVideoBySlug, recordVideoView } from '@/db/queries'
 import { getCurrentUser } from '@/lib/current-user'
 import { notifyOwnerOfComment } from '@/lib/notifications'
@@ -126,9 +129,11 @@ export async function unlockShare(slug: string, password: string): Promise<{ ok:
  * protected ones), validates + rate-limits by IP hash, and emails the owner
  * (best-effort, unless the owner posted it themselves).
  */
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
+
 export async function postComment(
   slug: string,
-  input: { name: string; body: string; website?: string },
+  input: { name: string; email: string; body: string; parentId?: string; website?: string },
 ): Promise<{ ok: true; comment: PublicComment } | { ok: false; error: string }> {
   // Honeypot: real users never fill the hidden "website" field. Coerce first so a
   // non-string payload (array/object) can't slip past the check.
@@ -140,8 +145,14 @@ export async function postComment(
     .trim()
     .replace(/\s+/g, ' ')
     .slice(0, MAX_NAME)
+  const email = String(input.email ?? '')
+    .trim()
+    .toLowerCase()
+    .slice(0, 200)
   const body = String(input.body ?? '').trim().slice(0, MAX_BODY)
+  const parentId = typeof input.parentId === 'string' && input.parentId ? input.parentId : null
   if (!name) return { ok: false, error: 'Please add your name.' }
+  if (!EMAIL_RE.test(email)) return { ok: false, error: 'Please add a valid email.' }
   if (!body) return { ok: false, error: 'Please write a comment.' }
 
   const video = await getShareableVideoBySlug(slug)
@@ -158,6 +169,14 @@ export async function postComment(
     return { ok: false, error: "You're posting a little fast. Please try again in a few minutes." }
   }
 
+  // A reply must point at a comment on THIS video; otherwise treat it as top-level.
+  let replyTo: Awaited<ReturnType<typeof getCommentContact>> = null
+  if (parentId) {
+    replyTo = await getCommentContact(parentId)
+    if (replyTo && replyTo.videoSlug !== slug) replyTo = null
+  }
+  const effectiveParent = replyTo ? parentId : null
+
   // Debounce the owner email BEFORE inserting: if this video already had a
   // comment in the last couple of minutes, the owner was just notified, so skip.
   const recentOnVideo = await countVideoCommentsSince(
@@ -165,12 +184,15 @@ export async function postComment(
     new Date(Date.now() - EMAIL_DEBOUNCE_MS),
   )
 
-  const comment = await addVideoComment({ videoId: video.id, authorName: name, body, ipHash })
+  const comment = await addVideoComment({
+    videoId: video.id,
+    authorName: name,
+    authorEmail: email,
+    body,
+    parentId: effectiveParent,
+    ipHash,
+  })
 
-  // Email the owner, best-effort (a mail failure must never fail the comment).
-  // Suppressed when: we can't identify/rate-limit the poster (no IP salt), a
-  // very recent comment already notified them (anti email-bomb), or the owner
-  // posted it themselves.
   const me = await getCurrentUser()
 
   // In-app notifications for the video's workspace members (except the commenter).
@@ -184,24 +206,88 @@ export async function postComment(
     },
   ).catch((error) => console.error('[comments] notification failed:', error))
 
-  const shouldEmail = ipHash !== null && recentOnVideo === 0 && me?.id !== video.ownerId
-  if (shouldEmail) {
-    void getVideoNotificationTarget(video.id)
-      .then((target) => {
-        if (!target) return
-        return notifyOwnerOfComment({
+  // Emails are awaited so they actually send (a fire-and-forget promise after the
+  // action returns was not completing).
+  if (replyTo?.authorEmail && replyTo.authorEmail !== email) {
+    // A reply notifies the person being replied to.
+    await notifyCommentReply({
+      email: replyTo.authorEmail,
+      replierName: name,
+      videoTitle: replyTo.videoTitle,
+      body,
+      url: buildShareUrl(slug),
+    }).catch((error) => console.error('[comments] reply notify failed:', error))
+  } else if (!effectiveParent) {
+    // A top-level comment notifies the owner (debounced, not self).
+    const shouldEmail = ipHash !== null && recentOnVideo === 0 && me?.id !== video.ownerId
+    if (shouldEmail) {
+      const target = await getVideoNotificationTarget(video.id)
+      if (target) {
+        await notifyOwnerOfComment({
           ownerEmail: target.ownerEmail,
           videoTitle: target.title,
           authorName: name,
           body,
           shareUrl: buildShareUrl(slug),
-        })
-      })
-      .catch((error) => console.error('[comments] owner notify failed:', error))
+        }).catch((error) => console.error('[comments] owner notify failed:', error))
+      }
+    }
   }
 
   revalidatePath(`/${SHARE_PATH}/${slug}`)
-  return { ok: true, comment }
+  // Never echo the email back to the client.
+  return { ok: true, comment: { ...comment, authorEmail: null } }
+}
+
+/** Record a client approve / request-changes decision from the share page. */
+export async function postApproval(
+  slug: string,
+  input: { name: string; email: string; status: 'approved' | 'changes'; note?: string },
+): Promise<{ ok: boolean; error?: string }> {
+  const name = String(input.name ?? '').trim().slice(0, MAX_NAME)
+  const email = String(input.email ?? '').trim().toLowerCase().slice(0, 200)
+  const status = input.status === 'approved' ? 'approved' : 'changes'
+  const note = input.note && String(input.note).trim() ? String(input.note).trim().slice(0, 1000) : null
+  if (!name) return { ok: false, error: 'Please add your name.' }
+  if (!EMAIL_RE.test(email)) return { ok: false, error: 'Please add a valid email.' }
+
+  const video = await getShareableVideoBySlug(slug)
+  if (!video || !video.approvalEnabled) return { ok: false, error: 'Approvals are not enabled here.' }
+  if (!(await isUnlocked(video))) return { ok: false, error: 'Unlock the recording first.' }
+
+  const ipHash = await clientIpHash()
+  const since = new Date(Date.now() - RATE_WINDOW_MS)
+  if ((await countRecentApprovalsByIp(video.id, ipHash, since)) >= 5) {
+    return { ok: false, error: 'Too many submissions. Please try again shortly.' }
+  }
+
+  await addApproval({ videoId: video.id, name, email, status, note, ipHash })
+
+  // Notify the workspace members in-app + email the owner (awaited).
+  await createNotifications(await memberIdsForVideo(video.id), {
+    type: 'approval',
+    title:
+      status === 'approved'
+        ? `${name} approved ${video.title}`
+        : `${name} requested changes on ${video.title}`,
+    body: note ?? undefined,
+    linkPath: `/${SHARE_PATH}/${slug}`,
+  }).catch((error) => console.error('[approval] notification failed:', error))
+
+  const target = await getVideoNotificationTarget(video.id)
+  if (target) {
+    await notifyApproval({
+      ownerEmail: target.ownerEmail,
+      approverName: name,
+      status,
+      videoTitle: target.title,
+      note,
+      url: buildShareUrl(slug),
+    }).catch((error) => console.error('[approval] owner notify failed:', error))
+  }
+
+  revalidatePath(`/${SHARE_PATH}/${slug}`)
+  return { ok: true }
 }
 
 /** Owner-only: remove a comment from one of their own videos' threads. */

@@ -15,6 +15,7 @@ import { getPublicVideoViewCount, getShareableVideoBySlug } from '@/db/queries'
 import { userCanAccessVideo } from '@/db/workspaces'
 import { getCurrentUser } from '@/lib/current-user'
 import { unlockCookieName, verifyUnlockToken } from '@/lib/share-password'
+import { ApprovalWidget } from './approval'
 import { Comments } from './comments'
 import { PasswordGate } from './password-gate'
 import { ProcessingState } from './processing-state'
@@ -124,8 +125,13 @@ export default async function SharePage({ params }: PageProps) {
   // gets moderation controls.
   const comments = locked ? [] : await listVideoComments(video.id)
   const currentUser = locked ? null : await getCurrentUser()
-  // Any member of the video's workspace can moderate its thread.
+  // Any member of the video's workspace can moderate its thread + see emails.
   const isOwner = Boolean(currentUser && (await userCanAccessVideo(currentUser.id, video.id)))
+  // Commenter emails are only ever sent to the owner/members, never the public.
+  const commentsForClient = comments.map((c) => ({
+    ...c,
+    authorEmail: isOwner ? c.authorEmail : null,
+  }))
   const poster = video.muxPlaybackId
     ? muxThumbnailUrl(video.muxPlaybackId, { width: 1280, fitMode: 'preserve' })
     : ''
@@ -243,12 +249,21 @@ export default async function SharePage({ params }: PageProps) {
             )}
           </div>
 
+          {video.approvalEnabled && isReady && (
+            <ApprovalWidget
+              slug={slug}
+              defaultName={currentUser?.name ?? ''}
+              defaultEmail={currentUser?.email ?? ''}
+            />
+          )}
+
           <Comments
             slug={slug}
-            initialComments={comments}
+            initialComments={commentsForClient}
             isOwner={isOwner}
             accent={accent}
             defaultName={currentUser?.name ?? ''}
+            defaultEmail={currentUser?.email ?? ''}
           />
         </>
       )}

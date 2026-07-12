@@ -1,4 +1,5 @@
 import {
+  type AnyPgColumn,
   boolean,
   index,
   integer,
@@ -107,6 +108,8 @@ export const videos = pgTable(
     shareSlug: text('share_slug').notNull().unique(),
     isPublic: boolean('is_public').notNull().default(true),
     passwordHash: text('password_hash'),
+    // When on, the share page shows an Approve / Request-changes control.
+    approvalEnabled: boolean('approval_enabled').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
       .notNull()
       .defaultNow(),
@@ -146,7 +149,14 @@ export const videoComments = pgTable(
       .notNull()
       .references(() => videos.id, { onDelete: 'cascade' }),
     authorName: text('author_name').notNull(),
+    // Commenter email: identifies who said what and enables reply notifications.
+    // Shown only to the video's owner, never to the public.
+    authorEmail: text('author_email'),
     body: text('body').notNull(),
+    // A reply points at the comment it answers (one level of threading).
+    parentId: uuid('parent_id').references((): AnyPgColumn => videoComments.id, {
+      onDelete: 'cascade',
+    }),
     // Salted IP hash for rate-limiting/abuse triage only (never shown).
     authorIpHash: text('author_ip_hash'),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
@@ -155,6 +165,26 @@ export const videoComments = pgTable(
   },
   // Serves the share page's thread render: WHERE video_id = ? ORDER BY created_at.
   (table) => [index('video_comments_video_id_created_at_idx').on(table.videoId, table.createdAt)],
+)
+
+/** Client approve / request-changes decisions recorded on a video's share page. */
+export const videoApprovals = pgTable(
+  'video_approvals',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    videoId: uuid('video_id')
+      .notNull()
+      .references(() => videos.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    email: text('email').notNull(),
+    status: text('status').notNull(), // 'approved' | 'changes'
+    note: text('note'),
+    authorIpHash: text('author_ip_hash'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index('video_approvals_video_id_created_at_idx').on(table.videoId, table.createdAt)],
 )
 
 /** In-app notifications shown in a user's inbox (new comment, member joined, etc.). */

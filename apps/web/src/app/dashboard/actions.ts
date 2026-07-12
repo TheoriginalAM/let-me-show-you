@@ -9,6 +9,7 @@ import {
   setOwnedVideoPassword,
   setOwnedVideoVisibility,
 } from '@/db/queries'
+import { setVideoApprovalEnabled } from '@/db/approvals'
 import { hashSharePassword } from '@/lib/share-password'
 
 type ActionResult = { ok: boolean; error?: string }
@@ -40,6 +41,17 @@ export async function setDescriptionAction(
   const userId = await requireUserId()
   const clean = description && description.trim() ? description.trim().slice(0, 2000) : null
   const ok = await setOwnedVideoDescription(userId, videoId, clean)
+  revalidatePath('/dashboard')
+  return { ok, error: ok ? undefined : 'Video not found' }
+}
+
+/** Toggle the client approve/request-changes control on a video's share page. */
+export async function setApprovalEnabledAction(
+  videoId: string,
+  enabled: boolean,
+): Promise<ActionResult> {
+  const userId = await requireUserId()
+  const ok = await setVideoApprovalEnabled(userId, videoId, enabled)
   revalidatePath('/dashboard')
   return { ok, error: ok ? undefined : 'Video not found' }
 }

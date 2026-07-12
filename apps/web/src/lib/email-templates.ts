@@ -133,6 +133,51 @@ export function resetPasswordEmail(url: string) {
   }
 }
 
+export function commentReplyEmail(opts: {
+  replierName: string
+  videoTitle: string
+  body: string
+  url: string
+}) {
+  return {
+    subject: `${opts.replierName} replied to your comment`,
+    html: layout({
+      preview: `${opts.replierName} replied on ${opts.videoTitle}.`,
+      heading: 'You have a reply',
+      body: `<strong style="color:${INK};">${escapeHtml(opts.replierName)}</strong> replied to your comment on <strong style="color:${INK};">${escapeHtml(opts.videoTitle)}</strong>:<div style="margin:16px 0 0;padding:14px 16px;background:${HEADER};border:1px solid ${BORDER_SOFT};border-radius:10px;color:${INK};font-size:14px;line-height:1.55;white-space:pre-wrap;">${escapeHtml(opts.body)}</div>`,
+      cta: { label: 'View the thread', url: opts.url },
+    }),
+    text: `${opts.replierName} replied to your comment on "${opts.videoTitle}":\n\n${opts.body}\n\nView the thread: ${opts.url}`,
+  }
+}
+
+export function approvalEmail(opts: {
+  approverName: string
+  status: 'approved' | 'changes'
+  videoTitle: string
+  note: string | null
+  url: string
+}) {
+  const approved = opts.status === 'approved'
+  const verb = approved ? 'approved' : 'requested changes on'
+  return {
+    subject: approved
+      ? `${opts.approverName} approved "${opts.videoTitle}"`
+      : `${opts.approverName} requested changes on "${opts.videoTitle}"`,
+    html: layout({
+      preview: `${opts.approverName} ${verb} ${opts.videoTitle}.`,
+      heading: approved ? 'Approved' : 'Changes requested',
+      body: `<strong style="color:${INK};">${escapeHtml(opts.approverName)}</strong> ${verb} <strong style="color:${INK};">${escapeHtml(opts.videoTitle)}</strong>.${
+        opts.note
+          ? `<div style="margin:16px 0 0;padding:14px 16px;background:${HEADER};border:1px solid ${BORDER_SOFT};border-radius:10px;color:${INK};font-size:14px;line-height:1.55;white-space:pre-wrap;">${escapeHtml(opts.note)}</div>`
+          : ''
+      }`,
+      cta: { label: 'Open the recording', url: opts.url },
+    }),
+    text: `${opts.approverName} ${verb} "${opts.videoTitle}".${opts.note ? `\n\nNote: ${opts.note}` : ''}\n\n${opts.url}`,
+  }
+}
+
 export function workspaceInviteEmail(opts: {
   workspaceName: string
   inviterName: string

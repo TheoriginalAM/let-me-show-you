@@ -4,11 +4,16 @@ import { and, asc, count, eq, gt, inArray } from 'drizzle-orm'
 import { db } from './index'
 import { user, videoComments, videos, workspaceMembers } from './schema'
 
-/** A comment as shown in the public thread (no IP hash, no internals). */
+/**
+ * A comment as shown in the thread. `authorEmail` is included from the DB but the
+ * caller must only forward it to the video's owner (never to the public).
+ */
 export interface PublicComment {
   id: string
   authorName: string
+  authorEmail: string | null
   body: string
+  parentId: string | null
   createdAt: string
 }
 
@@ -18,7 +23,9 @@ export async function listVideoComments(videoId: string): Promise<PublicComment[
     .select({
       id: videoComments.id,
       authorName: videoComments.authorName,
+      authorEmail: videoComments.authorEmail,
       body: videoComments.body,
+      parentId: videoComments.parentId,
       createdAt: videoComments.createdAt,
     })
     .from(videoComments)
@@ -30,7 +37,9 @@ export async function listVideoComments(videoId: string): Promise<PublicComment[
 export async function addVideoComment(input: {
   videoId: string
   authorName: string
+  authorEmail: string | null
   body: string
+  parentId: string | null
   ipHash: string | null
 }): Promise<PublicComment> {
   const rows = await db
@@ -38,16 +47,41 @@ export async function addVideoComment(input: {
     .values({
       videoId: input.videoId,
       authorName: input.authorName,
+      authorEmail: input.authorEmail,
       body: input.body,
+      parentId: input.parentId,
       authorIpHash: input.ipHash,
     })
     .returning({
       id: videoComments.id,
       authorName: videoComments.authorName,
+      authorEmail: videoComments.authorEmail,
       body: videoComments.body,
+      parentId: videoComments.parentId,
       createdAt: videoComments.createdAt,
     })
   return rows[0]!
+}
+
+/** The author contact + video context for a comment, to notify on a reply. */
+export async function getCommentContact(commentId: string): Promise<{
+  authorName: string
+  authorEmail: string | null
+  videoTitle: string
+  videoSlug: string
+} | null> {
+  const rows = await db
+    .select({
+      authorName: videoComments.authorName,
+      authorEmail: videoComments.authorEmail,
+      videoTitle: videos.title,
+      videoSlug: videos.shareSlug,
+    })
+    .from(videoComments)
+    .innerJoin(videos, eq(videoComments.videoId, videos.id))
+    .where(eq(videoComments.id, commentId))
+    .limit(1)
+  return rows[0] ?? null
 }
 
 /**

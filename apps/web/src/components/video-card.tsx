@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { formatDuration, type VideoStatus } from '@lmsy/shared'
 import {
   renameVideoAction,
+  setApprovalEnabledAction,
   setDescriptionAction,
   setVideoPasswordAction,
   setVisibilityAction,
@@ -29,6 +30,8 @@ export type VideoCardProps = {
   viewCount: number
   commentCount: number
   description: string | null
+  approvalEnabled: boolean
+  approvalCounts: { approved: number; changes: number }
   createdLabel: string
   thumbnailUrl: string | null
 }
@@ -50,6 +53,7 @@ export function VideoCard(props: VideoCardProps) {
   const [description, setDescription] = useState(props.description)
   const [managingDescription, setManagingDescription] = useState(false)
   const [descDraft, setDescDraft] = useState(props.description ?? '')
+  const [approvalOn, setApprovalOn] = useState(props.approvalEnabled)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -144,6 +148,19 @@ export function VideoCard(props: VideoCardProps) {
         setManagingDescription(false)
       } else {
         setError(result.error ?? 'Could not save description')
+      }
+    })
+  }
+
+  function toggleApproval() {
+    const next = !approvalOn
+    setApprovalOn(next)
+    setError(null)
+    startTransition(async () => {
+      const result = await setApprovalEnabledAction(props.id, next)
+      if (!result.ok) {
+        setApprovalOn(!next)
+        setError(result.error ?? 'Update failed')
       }
     })
   }
@@ -261,6 +278,22 @@ export function VideoCard(props: VideoCardProps) {
               </span>
             </>
           )}
+          {props.approvalCounts.approved > 0 && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="font-medium text-green-300">
+                {props.approvalCounts.approved} approved
+              </span>
+            </>
+          )}
+          {props.approvalCounts.changes > 0 && (
+            <>
+              <span aria-hidden>·</span>
+              <span className="font-medium text-amber-300">
+                {props.approvalCounts.changes} changes
+              </span>
+            </>
+          )}
           <span aria-hidden>·</span>
           <span>{props.createdLabel}</span>
           <span aria-hidden>·</span>
@@ -325,6 +358,18 @@ export function VideoCard(props: VideoCardProps) {
             className="btn-ghost px-2 py-1 text-xs disabled:opacity-50"
           >
             {description ? 'Description ✓' : 'Description'}
+          </button>
+          <button
+            onClick={toggleApproval}
+            disabled={busy}
+            className={`px-2 py-1 text-xs disabled:opacity-50 ${
+              approvalOn
+                ? 'rounded-lg border border-accent/30 bg-accent-strong/15 font-medium text-accent-ink transition hover:bg-accent-strong/25'
+                : 'btn-ghost'
+            }`}
+            title="Show an Approve / Request-changes button on the share page"
+          >
+            {approvalOn ? 'Approval on' : 'Approval'}
           </button>
 
           {confirmingDelete ? (

@@ -22,6 +22,7 @@ export type VideoWithViews = Video & {
   viewCount: number
   hasPassword: boolean
   description: string | null
+  approvalEnabled: boolean
 }
 
 /**
@@ -36,6 +37,8 @@ export type ShareableVideo = PublicVideo & {
   ownerId: string
   /** Optional description shown under the video. */
   description: string | null
+  /** Whether the Approve / Request-changes control is shown on the share page. */
+  approvalEnabled: boolean
   /** Workspace branding for the public share page (null fields → LMSY branding). */
   brand: {
     name: string | null
@@ -169,6 +172,7 @@ export async function getShareableVideoBySlug(slug: string): Promise<ShareableVi
       ownerName: user.name,
       ownerId: videos.ownerId,
       description: videos.description,
+      approvalEnabled: videos.approvalEnabled,
       createdAt: videos.createdAt,
       passwordHash: videos.passwordHash,
       // Branding now comes from the video's workspace, not the uploader.
@@ -260,6 +264,7 @@ export async function listVideosByWorkspaceWithViews(
     .select({
       ...ownerVideoColumns,
       description: videos.description,
+      approvalEnabled: videos.approvalEnabled,
       viewCount: count(videoViews.id),
       hasPassword: sql<boolean>`${videos.passwordHash} is not null`,
     })

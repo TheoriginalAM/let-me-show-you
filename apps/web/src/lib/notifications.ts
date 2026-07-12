@@ -6,7 +6,9 @@ import { listAdminEmails } from '../db/users'
 import { sendEmail } from './email'
 import {
   adminSignupAlertEmail,
+  approvalEmail,
   approvedEmail,
+  commentReplyEmail,
   newCommentEmail,
   workspaceInviteEmail,
 } from './email-templates'
@@ -48,6 +50,42 @@ export async function notifyWorkspaceInvite(opts: {
     url: opts.url,
   })
   return sendEmail({ to: opts.email, subject, html, text })
+}
+
+/** Email a commenter that someone replied to them. Returns whether it sent. */
+export async function notifyCommentReply(opts: {
+  email: string
+  replierName: string
+  videoTitle: string
+  body: string
+  url: string
+}): Promise<boolean> {
+  const { subject, html, text } = commentReplyEmail({
+    replierName: opts.replierName,
+    videoTitle: opts.videoTitle,
+    body: opts.body,
+    url: opts.url,
+  })
+  return sendEmail({ to: opts.email, subject, html, text })
+}
+
+/** Email a video owner that a client approved / requested changes. Returns whether it sent. */
+export async function notifyApproval(opts: {
+  ownerEmail: string
+  approverName: string
+  status: 'approved' | 'changes'
+  videoTitle: string
+  note: string | null
+  url: string
+}): Promise<boolean> {
+  const { subject, html, text } = approvalEmail({
+    approverName: opts.approverName,
+    status: opts.status,
+    videoTitle: opts.videoTitle,
+    note: opts.note,
+    url: opts.url,
+  })
+  return sendEmail({ to: opts.ownerEmail, subject, html, text })
 }
 
 /** Email a video owner that someone left a comment on their recording. Best-effort. */

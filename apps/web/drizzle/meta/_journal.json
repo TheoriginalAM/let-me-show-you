@@ -71,6 +71,13 @@
       "when": 1783859037914,
       "tag": "0009_parched_dust",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783860445905,
+      "tag": "0010_sparkling_paper_doll",
+      "breakpoints": true
     }
   ]
 }

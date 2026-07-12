@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { buildShareUrl, formatRelativeDate, muxThumbnailUrl } from '@lmsy/shared'
 import { getCurrentUser } from '@/lib/current-user'
 import { commentCountsByVideo } from '@/db/comments'
+import { approvalCountsByVideo } from '@/db/approvals'
 import { listVideosByWorkspaceWithViews } from '@/db/queries'
 import { getActiveWorkspaceId, getWorkspaceForMember, listWorkspacesForUser } from '@/db/workspaces'
 import { NotificationsBell } from '@/components/notifications-bell'
@@ -25,7 +26,9 @@ export default async function DashboardPage() {
   const active = workspaces.find((w) => w.id === activeId) ?? workspaces[0] ?? null
 
   const videos = active ? await listVideosByWorkspaceWithViews(active.id) : []
-  const commentCounts = await commentCountsByVideo(videos.map((v) => v.id))
+  const videoIds = videos.map((v) => v.id)
+  const commentCounts = await commentCountsByVideo(videoIds)
+  const approvalCounts = await approvalCountsByVideo(videoIds)
   // The active workspace's branding flows into the dashboard (logo + accent).
   const activeWs = active ? await getWorkspaceForMember(user.id, active.id) : null
   const now = Date.now()
@@ -83,6 +86,8 @@ export default async function DashboardPage() {
               viewCount={video.viewCount}
               commentCount={commentCounts[video.id] ?? 0}
               description={video.description}
+              approvalEnabled={video.approvalEnabled}
+              approvalCounts={approvalCounts[video.id] ?? { approved: 0, changes: 0 }}
               createdLabel={formatRelativeDate(video.createdAt, now)}
               thumbnailUrl={
                 video.muxPlaybackId
