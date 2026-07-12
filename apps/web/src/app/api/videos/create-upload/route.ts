@@ -4,6 +4,7 @@ import { getAuthedUserId } from '@/lib/api-auth'
 import { getMux } from '@/lib/mux'
 import { generateShareSlug } from '@/lib/slug'
 import { createVideoForUpload, deleteOwnedVideo, setOwnedVideoPassword } from '@/db/queries'
+import { getActiveWorkspaceId, memberRole } from '@/db/workspaces'
 import { isUserApproved } from '@/db/users'
 import { hashSharePassword } from '@/lib/share-password'
 
@@ -22,9 +23,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Your account is pending approval.' }, { status: 403 })
   }
 
-  const body = (await request.json().catch(() => ({}))) as { title?: unknown; password?: unknown }
+  const body = (await request.json().catch(() => ({}))) as {
+    title?: unknown
+    password?: unknown
+    workspaceId?: unknown
+  }
   const rawTitle = typeof body.title === 'string' ? body.title.trim() : ''
   const title = rawTitle ? rawTitle.slice(0, 200) : 'Untitled recording'
+
+  // Target workspace: the app may pass one (validated for membership); otherwise
+  // the user's active workspace. Recordings always land in exactly one workspace.
+  const requested = typeof body.workspaceId === 'string' ? body.workspaceId : null
+  const workspaceId =
+    requested && (await memberRole(userId, requested))
+      ? requested
+      : await getActiveWorkspaceId(userId)
+  if (!workspaceId) {
+    return NextResponse.json({ error: 'No workspace available for this account.' }, { status: 400 })
+  }
 
   // Optional share password: hashed here, stored on the row after creation.
   const rawPassword = typeof body.password === 'string' ? body.password : ''
@@ -35,7 +51,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const video = await createVideoForUpload(userId, title, generateShareSlug)
+  const video = await createVideoForUpload(userId, workspaceId, title, generateShareSlug)
   if (rawPassword) {
     await setOwnedVideoPassword(userId, video.id, hashSharePassword(rawPassword))
   }

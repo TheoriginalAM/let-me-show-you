@@ -4,7 +4,12 @@ import { APP_DOMAIN } from '@lmsy/shared'
 // Relative imports so this stays resolvable from the Better Auth config graph.
 import { listAdminEmails } from '../db/users'
 import { sendEmail } from './email'
-import { adminSignupAlertEmail, approvedEmail, newCommentEmail } from './email-templates'
+import {
+  adminSignupAlertEmail,
+  approvedEmail,
+  newCommentEmail,
+  workspaceInviteEmail,
+} from './email-templates'
 
 /** Email every admin that a new (pending) user just signed up. Best-effort. */
 export async function notifyAdminsOfSignup(u: {
@@ -28,6 +33,21 @@ export async function notifyUserApproved(u: { name: string; email: string }): Pr
     loginUrl: `https://${APP_DOMAIN}/login`,
   })
   await sendEmail({ to: u.email, subject, html, text })
+}
+
+/** Email someone that they've been invited to a workspace. Best-effort. */
+export async function notifyWorkspaceInvite(opts: {
+  email: string
+  workspaceName: string
+  inviterName: string
+  url: string
+}): Promise<void> {
+  const { subject, html, text } = workspaceInviteEmail({
+    workspaceName: opts.workspaceName,
+    inviterName: opts.inviterName,
+    url: opts.url,
+  })
+  await sendEmail({ to: opts.email, subject, html, text })
 }
 
 /** Email a video owner that someone left a comment on their recording. Best-effort. */

@@ -119,6 +119,24 @@ export function newCommentEmail(opts: {
   }
 }
 
+export function workspaceInviteEmail(opts: {
+  workspaceName: string
+  inviterName: string
+  url: string
+}) {
+  return {
+    subject: `You're invited to ${opts.workspaceName} on ${APP_NAME}`,
+    html: layout({
+      preview: `${opts.inviterName} invited you to ${opts.workspaceName}.`,
+      heading: `Join ${escapeHtml(opts.workspaceName)}`,
+      body: `<strong style="color:${INK};">${escapeHtml(opts.inviterName)}</strong> invited you to collaborate in the <strong style="color:${INK};">${escapeHtml(opts.workspaceName)}</strong> workspace on ${APP_NAME}. Accept to see and add recordings there.`,
+      cta: { label: 'Accept invite', url: opts.url },
+      footNote: "If you weren't expecting this, you can safely ignore this email.",
+    }),
+    text: `${opts.inviterName} invited you to ${opts.workspaceName} on ${APP_NAME}.\n\nAccept: ${opts.url}`,
+  }
+}
+
 export function approvedEmail(opts: { name: string; loginUrl: string }) {
   return {
     subject: `You're approved. Welcome to ${APP_NAME}`,

@@ -14,6 +14,7 @@ import {
   type WebcamConfig,
   type WebcamShape,
   type WebcamSize,
+  type WorkspacesResult,
 } from '../shared/ipc'
 import type { RecordingSession } from './recording-session'
 import {
@@ -44,6 +45,7 @@ export interface IpcContext {
   startUpload: (payload: StartUploadPayload) => Promise<void>
   retryUpload: () => Promise<void>
   getUploadStatus: () => UploadStatus
+  listWorkspaces: () => Promise<WorkspacesResult | null>
 }
 
 /** Confine an uploadable path to the app's own recordings directory. */
@@ -222,17 +224,24 @@ export function registerIpcHandlers(ctx: IpcContext): void {
   // ---- Upload & share ----
   ipcMain.handle(IPC.startUpload, (_event, payload: unknown) => {
     if (!payload || typeof payload !== 'object') throw new Error('Invalid upload payload')
-    const { filePath, title, password } = payload as Record<string, unknown>
+    const { filePath, title, password, workspaceId } = payload as Record<string, unknown>
     if (!isRecordingPath(filePath)) throw new Error('Refusing to upload a file outside recordings')
     const cleanTitle = typeof title === 'string' ? title.trim().slice(0, 200) : ''
     // Preserve the optional share password (server enforces the min length); an
     // empty/absent value means "no protection". Dropping it here was silently
     // un-protecting recordings even when the user set a password.
     const cleanPassword = typeof password === 'string' && password.length > 0 ? password : null
-    return ctx.startUpload({ filePath, title: cleanTitle, password: cleanPassword })
+    const cleanWorkspaceId = typeof workspaceId === 'string' && workspaceId ? workspaceId : null
+    return ctx.startUpload({
+      filePath,
+      title: cleanTitle,
+      password: cleanPassword,
+      workspaceId: cleanWorkspaceId,
+    })
   })
   ipcMain.handle(IPC.retryUpload, () => ctx.retryUpload())
   ipcMain.handle(IPC.getUploadStatus, () => ctx.getUploadStatus())
+  ipcMain.handle(IPC.listWorkspaces, () => ctx.listWorkspaces())
 
   ipcMain.handle(IPC.openExternalUrl, (_event, url: unknown) => {
     if (typeof url !== 'string') throw new Error('Invalid url')

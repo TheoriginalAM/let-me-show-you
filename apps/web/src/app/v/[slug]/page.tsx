@@ -12,6 +12,7 @@ import {
 } from '@lmsy/shared'
 import { listVideoComments } from '@/db/comments'
 import { getPublicVideoViewCount, getShareableVideoBySlug } from '@/db/queries'
+import { userCanAccessVideo } from '@/db/workspaces'
 import { getCurrentUser } from '@/lib/current-user'
 import { unlockCookieName, verifyUnlockToken } from '@/lib/share-password'
 import { Comments } from './comments'
@@ -123,7 +124,8 @@ export default async function SharePage({ params }: PageProps) {
   // gets moderation controls.
   const comments = locked ? [] : await listVideoComments(video.id)
   const currentUser = locked ? null : await getCurrentUser()
-  const isOwner = Boolean(currentUser && currentUser.id === video.ownerId)
+  // Any member of the video's workspace can moderate its thread.
+  const isOwner = Boolean(currentUser && (await userCanAccessVideo(currentUser.id, video.id)))
   const poster = video.muxPlaybackId
     ? muxThumbnailUrl(video.muxPlaybackId, { width: 1280, fitMode: 'preserve' })
     : ''

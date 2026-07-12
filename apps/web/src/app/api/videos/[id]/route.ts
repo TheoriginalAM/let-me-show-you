@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server'
 import { getAuthedUserId } from '@/lib/api-auth'
 import { getMux } from '@/lib/mux'
-import { deleteOwnedVideo, getOwnedVideo } from '@/db/queries'
+import { deleteOwnedVideo, getManageableVideo } from '@/db/queries'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-/** Delete a video the caller owns, including its Mux asset. */
+/** Delete a video the caller can manage (a member of its workspace), incl. its Mux asset. */
 export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const userId = await getAuthedUserId(request)
   if (!userId) {
@@ -14,8 +14,8 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   }
 
   const { id } = await params
-  // Owner-scoped fetch: confirms ownership and gives us the Mux asset id.
-  const video = await getOwnedVideo(userId, id)
+  // Membership-scoped fetch: confirms access and gives us the Mux asset id.
+  const video = await getManageableVideo(userId, id)
   if (!video) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }

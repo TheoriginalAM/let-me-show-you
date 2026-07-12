@@ -3,7 +3,19 @@ import 'server-only'
 import { and, count, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 import type { PublicVideo, Video } from '@lmsy/shared'
 import { db } from './index'
-import { user, videos, videoViews } from './schema'
+import { user, videos, videoViews, workspaceMembers, workspaces } from './schema'
+
+/**
+ * Subquery of the workspace ids a user belongs to. Video writes are scoped by
+ * workspace membership (any member of a video's workspace can manage it), not by
+ * the original uploader — this is what makes a workspace a shared team space.
+ */
+function memberWorkspaceIds(userId: string) {
+  return db
+    .select({ id: workspaceMembers.workspaceId })
+    .from(workspaceMembers)
+    .where(eq(workspaceMembers.userId, userId))
+}
 
 /** A video plus its total view count and whether it has a share password (dashboard rows). */
 export type VideoWithViews = Video & { viewCount: number; hasPassword: boolean }
@@ -52,6 +64,22 @@ export async function listVideosByOwner(ownerId: string): Promise<Video[]> {
     .from(videos)
     .where(eq(videos.ownerId, ownerId))
     .orderBy(desc(videos.createdAt))
+}
+
+/**
+ * A video the caller can MANAGE (a member of its workspace), with its Mux asset
+ * id, for the delete route. Membership-scoped like the other mutations.
+ */
+export async function getManageableVideo(
+  userId: string,
+  videoId: string,
+): Promise<{ id: string; muxAssetId: string | null } | null> {
+  const rows = await db
+    .select({ id: videos.id, muxAssetId: videos.muxAssetId })
+    .from(videos)
+    .where(and(eq(videos.id, videoId), inArray(videos.workspaceId, memberWorkspaceIds(userId))))
+    .limit(1)
+  return rows[0] ?? null
 }
 
 /** A single video, returned only if it belongs to `ownerId`. */
@@ -128,12 +156,14 @@ export async function getShareableVideoBySlug(slug: string): Promise<ShareableVi
       ownerId: videos.ownerId,
       createdAt: videos.createdAt,
       passwordHash: videos.passwordHash,
-      brandName: user.brandName,
-      brandLogo: user.brandLogo,
-      brandColor: user.brandColor,
+      // Branding now comes from the video's workspace, not the uploader.
+      brandName: workspaces.brandName,
+      brandLogo: workspaces.brandLogo,
+      brandColor: workspaces.brandColor,
     })
     .from(videos)
     .innerJoin(user, eq(videos.ownerId, user.id))
+    .innerJoin(workspaces, eq(videos.workspaceId, workspaces.id))
     .where(
       and(
         eq(videos.shareSlug, slug),
@@ -183,8 +213,10 @@ export async function recordVideoView(videoId: string, ipHash: string): Promise<
   return true
 }
 
-/** All of an owner's videos with their view counts, newest first (dashboard). */
-export async function listVideosByOwnerWithViews(ownerId: string): Promise<VideoWithViews[]> {
+/** All videos in a workspace with their view counts, newest first (dashboard). */
+export async function listVideosByWorkspaceWithViews(
+  workspaceId: string,
+): Promise<VideoWithViews[]> {
   const rows = await db
     .select({
       ...ownerVideoColumns,
@@ -193,7 +225,7 @@ export async function listVideosByOwnerWithViews(ownerId: string): Promise<Video
     })
     .from(videos)
     .leftJoin(videoViews, eq(videoViews.videoId, videos.id))
-    .where(eq(videos.ownerId, ownerId))
+    .where(eq(videos.workspaceId, workspaceId))
     .groupBy(videos.id)
     .orderBy(desc(videos.createdAt))
   return rows.map((row) => ({
@@ -205,45 +237,46 @@ export async function listVideosByOwnerWithViews(ownerId: string): Promise<Video
 
 /**
  * Set or clear a video's share password (pass a pre-hashed value, or `null` to
- * remove protection). Owner-scoped. Returns whether a row was updated.
+ * remove protection). Scoped to workspace membership. Returns whether a row was
+ * updated. `userId` must come from the verified session.
  */
 export async function setOwnedVideoPassword(
-  ownerId: string,
+  userId: string,
   videoId: string,
   passwordHash: string | null,
 ): Promise<boolean> {
   const rows = await db
     .update(videos)
     .set({ passwordHash })
-    .where(and(eq(videos.id, videoId), eq(videos.ownerId, ownerId)))
+    .where(and(eq(videos.id, videoId), inArray(videos.workspaceId, memberWorkspaceIds(userId))))
     .returning({ id: videos.id })
   return rows.length > 0
 }
 
-/** Rename a video the caller owns. Returns whether a row was updated. */
+/** Rename a video in one of the caller's workspaces. Returns whether a row was updated. */
 export async function renameOwnedVideo(
-  ownerId: string,
+  userId: string,
   videoId: string,
   title: string,
 ): Promise<boolean> {
   const rows = await db
     .update(videos)
     .set({ title })
-    .where(and(eq(videos.id, videoId), eq(videos.ownerId, ownerId)))
+    .where(and(eq(videos.id, videoId), inArray(videos.workspaceId, memberWorkspaceIds(userId))))
     .returning({ id: videos.id })
   return rows.length > 0
 }
 
-/** Toggle a video's public/private flag. Returns whether a row was updated. */
+/** Toggle a video's public/private flag (workspace-membership scoped). */
 export async function setOwnedVideoVisibility(
-  ownerId: string,
+  userId: string,
   videoId: string,
   isPublic: boolean,
 ): Promise<boolean> {
   const rows = await db
     .update(videos)
     .set({ isPublic })
-    .where(and(eq(videos.id, videoId), eq(videos.ownerId, ownerId)))
+    .where(and(eq(videos.id, videoId), inArray(videos.workspaceId, memberWorkspaceIds(userId))))
     .returning({ id: videos.id })
   return rows.length > 0
 }
@@ -266,6 +299,7 @@ export async function listPublicVideoSlugs(
  */
 export async function createVideoForUpload(
   ownerId: string,
+  workspaceId: string,
   title: string,
   makeSlug: () => string,
 ): Promise<Video> {
@@ -274,7 +308,7 @@ export async function createVideoForUpload(
     try {
       const rows = await db
         .insert(videos)
-        .values({ ownerId, title, shareSlug: makeSlug(), status: 'uploading' })
+        .values({ ownerId, workspaceId, title, shareSlug: makeSlug(), status: 'uploading' })
         .returning(ownerVideoColumns)
       return rows[0]!
     } catch (error) {
@@ -286,9 +320,11 @@ export async function createVideoForUpload(
   throw lastError
 }
 
-/** Delete an owner's video (used to roll back a failed upload creation). */
-export async function deleteOwnedVideo(ownerId: string, videoId: string): Promise<void> {
-  await db.delete(videos).where(and(eq(videos.id, videoId), eq(videos.ownerId, ownerId)))
+/** Delete a video in one of the caller's workspaces (also rolls back a failed upload). */
+export async function deleteOwnedVideo(userId: string, videoId: string): Promise<void> {
+  await db
+    .delete(videos)
+    .where(and(eq(videos.id, videoId), inArray(videos.workspaceId, memberWorkspaceIds(userId))))
 }
 
 /**

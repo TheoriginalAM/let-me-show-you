@@ -6,6 +6,7 @@ import { nextCookies } from 'better-auth/next-js'
 // resolve this module graph when generating the schema.
 import { db } from '../db'
 import * as schema from '../db/schema'
+import { ensureUserHasWorkspace } from '../db/workspaces'
 import { sendEmail } from './email'
 import { magicLinkEmail } from './email-templates'
 import { notifyAdminsOfSignup } from './notifications'
@@ -34,7 +35,13 @@ export const auth = betterAuth({
     user: {
       create: {
         after: async (user) => {
-          // Fire-and-forget: return immediately so signup isn't blocked on email.
+          // Every new user needs a workspace to record + upload into. Awaited so
+          // it exists before they reach the app (getActiveWorkspaceId also
+          // self-provisions as a backstop if this ever fails).
+          await ensureUserHasWorkspace(user.id, user.name).catch((error) =>
+            console.error('[workspace] default workspace creation failed:', error),
+          )
+          // Fire-and-forget: return without blocking signup on the email.
           void notifyAdminsOfSignup(user).catch((error) =>
             console.error('[notify] admin signup alert failed:', error),
           )

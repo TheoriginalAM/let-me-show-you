@@ -18,7 +18,7 @@ import { registerIpcHandlers } from './ipc'
 import { createTray } from './tray'
 import { clearToken, hasToken } from './token-store'
 import { cancelSignIn, runSignIn } from './device-auth'
-import { runUpload } from './uploader'
+import { fetchWorkspaces, runUpload } from './uploader'
 import {
   checkForUpdatesManual,
   getUpdateStatus,
@@ -483,6 +483,7 @@ app.whenReady().then(() => {
     startUpload,
     retryUpload,
     getUploadStatus: () => uploadStatus,
+    listWorkspaces: () => fetchWorkspaces(),
   })
 
   // Mirror recording status to the control panel renderer.

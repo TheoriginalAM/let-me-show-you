@@ -75,6 +75,7 @@ const api: RecorderApi = {
   startUpload: (payload) => ipcRenderer.invoke(IPC.startUpload, payload),
   retryUpload: () => ipcRenderer.invoke(IPC.retryUpload),
   getUploadStatus: () => ipcRenderer.invoke(IPC.getUploadStatus),
+  listWorkspaces: () => ipcRenderer.invoke(IPC.listWorkspaces),
   onUploadStatus: (cb) => {
     const listener = (_event: IpcRendererEvent, status: UploadStatus): void => cb(status)
     ipcRenderer.on(IPC.uploadStatus, listener)

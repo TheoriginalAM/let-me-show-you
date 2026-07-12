@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { formatDuration } from '@lmsy/shared'
+import type { Workspace } from '@shared/ipc'
 import { useRecorderStore } from '../store'
 
 const MIN_PASSWORD_LENGTH = 4
@@ -11,6 +12,22 @@ export function ReadyScreen() {
   const [title, setTitle] = useState('')
   const [withPassword, setWithPassword] = useState(false)
   const [password, setPassword] = useState('')
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([])
+  const [workspaceId, setWorkspaceId] = useState<string | null>(null)
+
+  // Load the signed-in user's workspaces so they can pick where this uploads.
+  useEffect(() => {
+    if (!auth.signedIn) return
+    let active = true
+    void window.recorder.listWorkspaces().then((res) => {
+      if (!active || !res) return
+      setWorkspaces(res.workspaces)
+      setWorkspaceId((prev) => prev ?? res.activeId ?? res.workspaces[0]?.id ?? null)
+    })
+    return () => {
+      active = false
+    }
+  }, [auth.signedIn])
 
   if (!result) return null
 
@@ -26,6 +43,7 @@ export function ReadyScreen() {
       filePath: result.filePath,
       title: title.trim() || defaultTitle,
       password: withPassword && password ? password : null,
+      workspaceId,
     })
   }
 
@@ -78,6 +96,22 @@ export function ReadyScreen() {
                 autoFocus
               />
             </div>
+            {workspaces.length > 1 && (
+              <div>
+                <label className="ufield-label">Workspace</label>
+                <select
+                  className="uinput no-drag"
+                  value={workspaceId ?? ''}
+                  onChange={(e) => setWorkspaceId(e.target.value)}
+                >
+                  {workspaces.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
             <label className="pw-toggle no-drag">
               <input
                 type="checkbox"

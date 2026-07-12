@@ -711,6 +711,14 @@ a,
   outline: none;
   border-color: var(--accent);
 }
+select.uinput {
+  cursor: pointer;
+  appearance: none;
+}
+select.uinput option {
+  background: #16161f;
+  color: var(--fg);
+}
 .pw-toggle {
   display: flex;
   align-items: center;

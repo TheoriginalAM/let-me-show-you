@@ -3,9 +3,11 @@ import { redirect } from 'next/navigation'
 import { buildShareUrl, formatRelativeDate, muxThumbnailUrl } from '@lmsy/shared'
 import { getCurrentUser } from '@/lib/current-user'
 import { commentCountsByVideo } from '@/db/comments'
-import { listVideosByOwnerWithViews } from '@/db/queries'
+import { listVideosByWorkspaceWithViews } from '@/db/queries'
+import { getActiveWorkspaceId, listWorkspacesForUser } from '@/db/workspaces'
 import { SignOutButton } from '@/components/sign-out-button'
 import { VideoCard } from '@/components/video-card'
+import { WorkspaceSwitcher } from './workspace-switcher'
 
 // The session lookup reads request headers, so this route is always dynamic.
 export const dynamic = 'force-dynamic'
@@ -17,21 +19,19 @@ export default async function DashboardPage() {
   if (!user) redirect('/login')
   if (!user.approved) redirect('/pending')
 
-  const videos = await listVideosByOwnerWithViews(user.id)
+  const workspaces = await listWorkspacesForUser(user.id)
+  const activeId = await getActiveWorkspaceId(user.id)
+  const active = workspaces.find((w) => w.id === activeId) ?? workspaces[0] ?? null
+
+  const videos = active ? await listVideosByWorkspaceWithViews(active.id) : []
   const commentCounts = await commentCountsByVideo(videos.map((v) => v.id))
   const now = Date.now()
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-8 px-4 py-10 sm:px-6">
+    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6">
       <header className="rise flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">Your recordings</h1>
-          <p className="mt-1 text-sm text-muted">Signed in as {user.name}</p>
-        </div>
+        <WorkspaceSwitcher workspaces={workspaces} activeId={active?.id ?? null} />
         <div className="flex items-center gap-2">
-          <Link href="/dashboard/branding" className="btn-ghost px-3 py-1.5 text-sm">
-            Branding
-          </Link>
           {user.role === 'admin' && (
             <Link href="/admin" className="btn-ghost px-3 py-1.5 text-sm">
               Admin
@@ -40,6 +40,13 @@ export default async function DashboardPage() {
           <SignOutButton />
         </div>
       </header>
+
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm text-muted">
+          {videos.length} recording{videos.length === 1 ? '' : 's'} in this workspace
+        </p>
+        <p className="text-sm text-faint">Signed in as {user.name}</p>
+      </div>
 
       {videos.length === 0 ? (
         <div className="glass rise rounded-2xl border-dashed p-12 text-center">

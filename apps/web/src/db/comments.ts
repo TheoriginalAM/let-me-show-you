@@ -2,7 +2,7 @@ import 'server-only'
 
 import { and, asc, count, eq, gt, inArray } from 'drizzle-orm'
 import { db } from './index'
-import { user, videoComments, videos } from './schema'
+import { user, videoComments, videos, workspaceMembers } from './schema'
 
 /** A comment as shown in the public thread (no IP hash, no internals). */
 export interface PublicComment {
@@ -87,19 +87,20 @@ export async function countVideoCommentsSince(videoId: string, since: Date): Pro
 }
 
 /**
- * Delete a comment, but only if `ownerId` owns the video it belongs to (a join
- * guard so moderation can't touch other owners' threads). Returns whether a row
- * was deleted.
+ * Delete a comment, but only if `userId` is a member of the workspace that owns
+ * the comment's video (a join guard so moderation can't touch other teams'
+ * threads). Returns whether a row was deleted.
  */
 export async function deleteOwnedVideoComment(
-  ownerId: string,
+  userId: string,
   commentId: string,
 ): Promise<boolean> {
   const owned = await db
     .select({ id: videoComments.id })
     .from(videoComments)
     .innerJoin(videos, eq(videoComments.videoId, videos.id))
-    .where(and(eq(videoComments.id, commentId), eq(videos.ownerId, ownerId)))
+    .innerJoin(workspaceMembers, eq(videos.workspaceId, workspaceMembers.workspaceId))
+    .where(and(eq(videoComments.id, commentId), eq(workspaceMembers.userId, userId)))
     .limit(1)
   if (owned.length === 0) return false
   await db.delete(videoComments).where(eq(videoComments.id, commentId))

@@ -42,6 +42,7 @@ export const IPC = {
   startUpload: 'start-upload',
   retryUpload: 'retry-upload',
   getUploadStatus: 'get-upload-status',
+  listWorkspaces: 'list-workspaces',
   openExternalUrl: 'open-external-url',
   // onboarding + auto-update
   getOnboardingComplete: 'get-onboarding-complete',
@@ -186,6 +187,19 @@ export interface StartUploadPayload {
   title: string
   /** Optional share password. When set, the recording is password-protected. */
   password?: string | null
+  /** Workspace to upload into (null = the account's active workspace). */
+  workspaceId?: string | null
+}
+
+/** A workspace the signed-in user belongs to (for the upload picker). */
+export interface Workspace {
+  id: string
+  name: string
+}
+
+export interface WorkspacesResult {
+  workspaces: Workspace[]
+  activeId: string | null
 }
 
 export type UpdatePhase = 'idle' | 'downloading' | 'ready'
@@ -259,6 +273,7 @@ export interface RecorderApi {
   startUpload: (payload: StartUploadPayload) => Promise<void>
   retryUpload: () => Promise<void>
   getUploadStatus: () => Promise<UploadStatus>
+  listWorkspaces: () => Promise<WorkspacesResult | null>
   onUploadStatus: (cb: (status: UploadStatus) => void) => () => void
   /** Open an http(s) URL in the default browser (e.g. the share link). */
   openExternalUrl: (url: string) => Promise<void>

@@ -2,9 +2,24 @@ import { createReadStream, statSync } from 'fs'
 import { request as httpsRequest } from 'https'
 import { clipboard } from 'electron'
 import type { CreateUploadResponse } from '@lmsy/shared'
-import type { StartUploadPayload, UploadStatus } from '../shared/ipc'
+import type { StartUploadPayload, UploadStatus, WorkspacesResult } from '../shared/ipc'
 import { API_BASE_URL } from './config'
 import { loadToken } from './token-store'
+
+/** Fetch the signed-in user's workspaces for the upload picker. Null if signed out. */
+export async function fetchWorkspaces(): Promise<WorkspacesResult | null> {
+  const token = loadToken()
+  if (!token) return null
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/workspaces`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) return null
+    return (await res.json()) as WorkspacesResult
+  } catch {
+    return null
+  }
+}
 
 type Emit = (status: UploadStatus) => void
 
@@ -66,7 +81,11 @@ export async function runUpload(payload: StartUploadPayload, emit: Emit): Promis
     const res = await fetch(`${API_BASE_URL}/api/videos/create-upload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ title: payload.title, password: payload.password ?? null }),
+      body: JSON.stringify({
+        title: payload.title,
+        password: payload.password ?? null,
+        workspaceId: payload.workspaceId ?? null,
+      }),
     })
     if (res.status === 401) throw new Error('Your session expired — sign in again.')
     if (!res.ok) throw new Error(`Could not create upload (${res.status})`)

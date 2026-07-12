@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, uuid } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
   id: text("id").primaryKey(),
@@ -20,11 +20,14 @@ export const user = pgTable("user", {
   // Invite-gating: new signups start unapproved and can't use the app until an
   // admin approves them. Existing users are grandfathered to true in the migration.
   approved: boolean("approved").default(false).notNull(),
-  // Branding: personalizes the public share pages (/v/<slug>) with the owner's
-  // logo, name, and accent colour. All nullable — unset falls back to LMSY branding.
+  // DEPRECATED (moved to workspaces): kept for backward-compat + the workspace
+  // backfill. Branding now lives on the active workspace; these are vestigial.
   brandName: text("brand_name"),
-  brandLogo: text("brand_logo"), // data URL (small, resized client-side)
-  brandColor: text("brand_color"), // accent hex, e.g. #8b8bf6
+  brandLogo: text("brand_logo"),
+  brandColor: text("brand_color"),
+  // The workspace this user is currently acting in (dashboard + desktop uploads).
+  // No DB FK (avoids a circular ref with schema.ts); validity is enforced in code.
+  activeWorkspaceId: uuid("active_workspace_id"),
 });
 
 export const session = pgTable(

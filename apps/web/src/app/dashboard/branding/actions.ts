@@ -2,7 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/current-user'
-import { setUserBrand, type Brand } from '@/db/users'
+import type { Brand } from '@/db/users'
+import { getActiveWorkspaceId, setWorkspaceBrand } from '@/db/workspaces'
 
 type Result = { ok: boolean; error?: string }
 
@@ -30,7 +31,11 @@ export async function saveBrandAction(input: Brand): Promise<Result> {
     logo = input.logo
   }
 
-  await setUserBrand(user.id, { name, logo, color })
-  revalidatePath('/dashboard/branding')
+  const workspaceId = await getActiveWorkspaceId(user.id)
+  if (!workspaceId) return { ok: false, error: 'No active workspace.' }
+  const ok = await setWorkspaceBrand(user.id, workspaceId, { name, logo, color })
+  if (!ok) return { ok: false, error: 'Only a workspace owner can edit branding.' }
+  revalidatePath('/dashboard/workspace')
+  revalidatePath('/dashboard')
   return { ok: true }
 }
