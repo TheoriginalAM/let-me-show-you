@@ -14,13 +14,13 @@ interface SendArgs {
 
 /**
  * Send one transactional email via the SendGrid v3 API. Returns whether it was
- * accepted. Never throws — a failed send should not break the calling flow
+ * accepted. Never throws; a failed send should not break the calling flow
  * (signup, approval, etc.). No-ops with a warning if SENDGRID_API_KEY is unset.
  */
 export async function sendEmail({ to, subject, html, text }: SendArgs): Promise<boolean> {
   const key = process.env.SENDGRID_API_KEY
   if (!key) {
-    console.warn(`[email] SENDGRID_API_KEY not set — skipped "${subject}" to ${to}`)
+    console.warn(`[email] SENDGRID_API_KEY not set, skipped "${subject}" to ${to}`)
     return false
   }
   try {
