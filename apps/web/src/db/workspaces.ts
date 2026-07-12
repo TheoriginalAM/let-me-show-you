@@ -180,10 +180,20 @@ export async function deleteWorkspace(userId: string, workspaceId: string): Prom
   return true
 }
 
+export interface WorkspaceBrand {
+  name: string | null
+  logo: string | null
+  color: string | null
+  tagline: string | null
+  logoSize: string | null
+  ctaLabel: string | null
+  ctaUrl: string | null
+}
+
 export interface WorkspaceMeta {
   id: string
   name: string
-  brand: { name: string | null; logo: string | null; color: string | null }
+  brand: WorkspaceBrand
 }
 
 /** Workspace name + branding, for a member. Null if missing or not a member. */
@@ -200,6 +210,10 @@ export async function getWorkspaceForMember(
       brandName: workspaces.brandName,
       brandLogo: workspaces.brandLogo,
       brandColor: workspaces.brandColor,
+      brandTagline: workspaces.brandTagline,
+      brandLogoSize: workspaces.brandLogoSize,
+      brandCtaLabel: workspaces.brandCtaLabel,
+      brandCtaUrl: workspaces.brandCtaUrl,
     })
     .from(workspaces)
     .where(eq(workspaces.id, workspaceId))
@@ -210,7 +224,15 @@ export async function getWorkspaceForMember(
     id: w.id,
     name: w.name,
     role,
-    brand: { name: w.brandName, logo: w.brandLogo, color: w.brandColor },
+    brand: {
+      name: w.brandName,
+      logo: w.brandLogo,
+      color: w.brandColor,
+      tagline: w.brandTagline,
+      logoSize: w.brandLogoSize,
+      ctaLabel: w.brandCtaLabel,
+      ctaUrl: w.brandCtaUrl,
+    },
   }
 }
 
@@ -218,12 +240,20 @@ export async function getWorkspaceForMember(
 export async function setWorkspaceBrand(
   userId: string,
   workspaceId: string,
-  brand: { name: string | null; logo: string | null; color: string | null },
+  brand: WorkspaceBrand,
 ): Promise<boolean> {
   if ((await memberRole(userId, workspaceId)) !== 'owner') return false
   await db
     .update(workspaces)
-    .set({ brandName: brand.name, brandLogo: brand.logo, brandColor: brand.color })
+    .set({
+      brandName: brand.name,
+      brandLogo: brand.logo,
+      brandColor: brand.color,
+      brandTagline: brand.tagline,
+      brandLogoSize: brand.logoSize,
+      brandCtaLabel: brand.ctaLabel,
+      brandCtaUrl: brand.ctaUrl,
+    })
     .where(eq(workspaces.id, workspaceId))
   return true
 }

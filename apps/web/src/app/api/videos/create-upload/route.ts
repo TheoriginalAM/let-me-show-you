@@ -3,7 +3,12 @@ import { buildShareUrl, type CreateUploadResponse } from '@lmsy/shared'
 import { getAuthedUserId } from '@/lib/api-auth'
 import { getMux } from '@/lib/mux'
 import { generateShareSlug } from '@/lib/slug'
-import { createVideoForUpload, deleteOwnedVideo, setOwnedVideoPassword } from '@/db/queries'
+import {
+  createVideoForUpload,
+  deleteOwnedVideo,
+  setOwnedVideoDescription,
+  setOwnedVideoPassword,
+} from '@/db/queries'
 import { getActiveWorkspaceId, memberRole } from '@/db/workspaces'
 import { isUserApproved } from '@/db/users'
 import { hashSharePassword } from '@/lib/share-password'
@@ -25,11 +30,16 @@ export async function POST(request: Request) {
 
   const body = (await request.json().catch(() => ({}))) as {
     title?: unknown
+    description?: unknown
     password?: unknown
     workspaceId?: unknown
   }
   const rawTitle = typeof body.title === 'string' ? body.title.trim() : ''
   const title = rawTitle ? rawTitle.slice(0, 200) : 'Untitled recording'
+  const description =
+    typeof body.description === 'string' && body.description.trim()
+      ? body.description.trim().slice(0, 2000)
+      : null
 
   // Target workspace: the app may pass one (validated for membership); otherwise
   // the user's active workspace. Recordings always land in exactly one workspace.
@@ -54,6 +64,9 @@ export async function POST(request: Request) {
   const video = await createVideoForUpload(userId, workspaceId, title, generateShareSlug)
   if (rawPassword) {
     await setOwnedVideoPassword(userId, video.id, hashSharePassword(rawPassword))
+  }
+  if (description) {
+    await setOwnedVideoDescription(userId, video.id, description)
   }
 
   try {

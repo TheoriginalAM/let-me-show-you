@@ -135,24 +135,35 @@ export default async function SharePage({ params }: PageProps) {
   const { brand } = video
   const accent = brand.color ?? DEFAULT_ACCENT
   const branded = Boolean(brand.name || brand.logo)
+  const logoH =
+    brand.logoSize === 'small' ? 'h-9' : brand.logoSize === 'large' ? 'h-16' : 'h-12'
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         {branded ? (
-          <span className="flex min-w-0 items-center gap-2.5 text-sm font-semibold tracking-tight text-ink">
+          <span className="flex min-w-0 items-center gap-3 tracking-tight text-ink">
             {brand.logo ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={brand.logo} alt="" className="h-7 w-7 rounded-md object-contain" />
+              <img src={brand.logo} alt="" className={`${logoH} w-auto rounded-md object-contain`} />
             ) : brand.name ? (
               <span
-                className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-[11px] font-bold text-white"
+                className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-sm font-bold text-white"
                 style={{ background: accent }}
               >
                 {brand.name.charAt(0).toUpperCase()}
               </span>
             ) : null}
-            {brand.name && <span className="truncate">{brand.name}</span>}
+            <span className="min-w-0">
+              {brand.name && (
+                <span className="block truncate font-semibold">{brand.name}</span>
+              )}
+              {brand.tagline && (
+                <span className="block truncate text-sm font-normal text-muted">
+                  {brand.tagline}
+                </span>
+              )}
+            </span>
           </span>
         ) : (
           <Link
@@ -164,6 +175,17 @@ export default async function SharePage({ params }: PageProps) {
             </span>
             {APP_NAME}
           </Link>
+        )}
+        {branded && brand.ctaLabel && brand.ctaUrl && (
+          <a
+            href={brand.ctaUrl}
+            target="_blank"
+            rel="noopener noreferrer nofollow"
+            className="shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_30px_-12px_rgba(109,109,245,0.7)] transition hover:opacity-90"
+            style={{ background: accent }}
+          >
+            {brand.ctaLabel}
+          </a>
         )}
       </div>
 
@@ -214,6 +236,11 @@ export default async function SharePage({ params }: PageProps) {
                 </>
               )}
             </div>
+            {video.description && (
+              <p className="mt-2 whitespace-pre-wrap leading-relaxed text-muted">
+                {video.description}
+              </p>
+            )}
           </div>
 
           <Comments

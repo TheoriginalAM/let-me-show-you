@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { formatDuration, type VideoStatus } from '@lmsy/shared'
 import {
   renameVideoAction,
+  setDescriptionAction,
   setVideoPasswordAction,
   setVisibilityAction,
 } from '@/app/dashboard/actions'
@@ -27,6 +28,7 @@ export type VideoCardProps = {
   durationSeconds: number | null
   viewCount: number
   commentCount: number
+  description: string | null
   createdLabel: string
   thumbnailUrl: string | null
 }
@@ -45,6 +47,9 @@ export function VideoCard(props: VideoCardProps) {
   const [copied, setCopied] = useState(false)
   const [managingPassword, setManagingPassword] = useState(false)
   const [passwordDraft, setPasswordDraft] = useState('')
+  const [description, setDescription] = useState(props.description)
+  const [managingDescription, setManagingDescription] = useState(false)
+  const [descDraft, setDescDraft] = useState(props.description ?? '')
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -125,6 +130,20 @@ export function VideoCard(props: VideoCardProps) {
         setPasswordDraft('')
       } else {
         setError(result.error ?? 'Could not remove password')
+      }
+    })
+  }
+
+  function saveDescription() {
+    const next = descDraft.trim()
+    setError(null)
+    startTransition(async () => {
+      const result = await setDescriptionAction(props.id, next || null)
+      if (result.ok) {
+        setDescription(next || null)
+        setManagingDescription(false)
+      } else {
+        setError(result.error ?? 'Could not save description')
       }
     })
   }
@@ -297,6 +316,16 @@ export function VideoCard(props: VideoCardProps) {
           >
             {isProtected ? 'Password ✓' : 'Password'}
           </button>
+          <button
+            onClick={() => {
+              setDescDraft(description ?? '')
+              setManagingDescription((v) => !v)
+            }}
+            disabled={busy}
+            className="btn-ghost px-2 py-1 text-xs disabled:opacity-50"
+          >
+            {description ? 'Description ✓' : 'Description'}
+          </button>
 
           {confirmingDelete ? (
             <span className="ml-auto flex items-center gap-1.5">
@@ -325,6 +354,39 @@ export function VideoCard(props: VideoCardProps) {
             </button>
           )}
         </div>
+
+        {managingDescription && (
+          <div className="flex flex-col gap-2 rounded-lg border border-line bg-white/[0.02] p-2.5">
+            <textarea
+              autoFocus
+              value={descDraft}
+              onChange={(e) => setDescDraft(e.target.value)}
+              maxLength={2000}
+              rows={3}
+              placeholder="Add a description shown under the video on its share page…"
+              className="w-full resize-y rounded-lg border border-line bg-white/[0.03] px-2 py-1.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+            />
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                onClick={saveDescription}
+                disabled={busy}
+                className="btn-primary px-2.5 py-1 text-xs disabled:opacity-50"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setManagingDescription(false)
+                  setDescDraft(description ?? '')
+                }}
+                disabled={busy}
+                className="btn-ghost px-2 py-1 text-xs disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {managingPassword && (
           <div className="flex flex-col gap-2 rounded-lg border border-line bg-white/[0.02] p-2.5">

@@ -18,7 +18,11 @@ function memberWorkspaceIds(userId: string) {
 }
 
 /** A video plus its total view count and whether it has a share password (dashboard rows). */
-export type VideoWithViews = Video & { viewCount: number; hasPassword: boolean }
+export type VideoWithViews = Video & {
+  viewCount: number
+  hasPassword: boolean
+  description: string | null
+}
 
 /**
  * A share-link video that MAY be password-protected. Includes the server-only
@@ -30,8 +34,18 @@ export type ShareableVideo = PublicVideo & {
   passwordHash: string | null
   /** Owner's user id, so the share page can grant the owner moderation controls. */
   ownerId: string
-  /** Owner branding for the public share page (null → LMSY branding). */
-  brand: { name: string | null; logo: string | null; color: string | null }
+  /** Optional description shown under the video. */
+  description: string | null
+  /** Workspace branding for the public share page (null fields → LMSY branding). */
+  brand: {
+    name: string | null
+    logo: string | null
+    color: string | null
+    tagline: string | null
+    logoSize: string | null
+    ctaLabel: string | null
+    ctaUrl: string | null
+  }
 }
 
 /**
@@ -154,12 +168,17 @@ export async function getShareableVideoBySlug(slug: string): Promise<ShareableVi
       shareSlug: videos.shareSlug,
       ownerName: user.name,
       ownerId: videos.ownerId,
+      description: videos.description,
       createdAt: videos.createdAt,
       passwordHash: videos.passwordHash,
       // Branding now comes from the video's workspace, not the uploader.
       brandName: workspaces.brandName,
       brandLogo: workspaces.brandLogo,
       brandColor: workspaces.brandColor,
+      brandTagline: workspaces.brandTagline,
+      brandLogoSize: workspaces.brandLogoSize,
+      brandCtaLabel: workspaces.brandCtaLabel,
+      brandCtaUrl: workspaces.brandCtaUrl,
     })
     .from(videos)
     .innerJoin(user, eq(videos.ownerId, user.id))
@@ -174,8 +193,28 @@ export async function getShareableVideoBySlug(slug: string): Promise<ShareableVi
     .limit(1)
   const row = rows[0]
   if (!row) return null
-  const { brandName, brandLogo, brandColor, ...video } = row
-  return { ...video, brand: { name: brandName, logo: brandLogo, color: brandColor } }
+  const {
+    brandName,
+    brandLogo,
+    brandColor,
+    brandTagline,
+    brandLogoSize,
+    brandCtaLabel,
+    brandCtaUrl,
+    ...video
+  } = row
+  return {
+    ...video,
+    brand: {
+      name: brandName,
+      logo: brandLogo,
+      color: brandColor,
+      tagline: brandTagline,
+      logoSize: brandLogoSize,
+      ctaLabel: brandCtaLabel,
+      ctaUrl: brandCtaUrl,
+    },
+  }
 }
 
 /**
@@ -220,6 +259,7 @@ export async function listVideosByWorkspaceWithViews(
   const rows = await db
     .select({
       ...ownerVideoColumns,
+      description: videos.description,
       viewCount: count(videoViews.id),
       hasPassword: sql<boolean>`${videos.passwordHash} is not null`,
     })
@@ -248,6 +288,20 @@ export async function setOwnedVideoPassword(
   const rows = await db
     .update(videos)
     .set({ passwordHash })
+    .where(and(eq(videos.id, videoId), inArray(videos.workspaceId, memberWorkspaceIds(userId))))
+    .returning({ id: videos.id })
+  return rows.length > 0
+}
+
+/** Set a video's description (null clears it). Workspace-membership scoped. */
+export async function setOwnedVideoDescription(
+  userId: string,
+  videoId: string,
+  description: string | null,
+): Promise<boolean> {
+  const rows = await db
+    .update(videos)
+    .set({ description })
     .where(and(eq(videos.id, videoId), inArray(videos.workspaceId, memberWorkspaceIds(userId))))
     .returning({ id: videos.id })
   return rows.length > 0

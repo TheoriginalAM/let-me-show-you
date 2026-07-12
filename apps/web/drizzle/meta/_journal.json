@@ -57,6 +57,13 @@
       "when": 1783852627451,
       "tag": "0007_short_dazzler",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1783857366775,
+      "tag": "0008_tranquil_wasp",
+      "breakpoints": true
     }
   ]
 }

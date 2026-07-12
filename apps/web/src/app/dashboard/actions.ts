@@ -3,7 +3,12 @@
 import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { auth } from '@/lib/auth'
-import { renameOwnedVideo, setOwnedVideoPassword, setOwnedVideoVisibility } from '@/db/queries'
+import {
+  renameOwnedVideo,
+  setOwnedVideoDescription,
+  setOwnedVideoPassword,
+  setOwnedVideoVisibility,
+} from '@/db/queries'
 import { hashSharePassword } from '@/lib/share-password'
 
 type ActionResult = { ok: boolean; error?: string }
@@ -23,6 +28,18 @@ export async function renameVideoAction(videoId: string, title: string): Promise
   const clean = title.trim().slice(0, 200)
   if (!clean) return { ok: false, error: 'Title cannot be empty' }
   const ok = await renameOwnedVideo(userId, videoId, clean)
+  revalidatePath('/dashboard')
+  return { ok, error: ok ? undefined : 'Video not found' }
+}
+
+/** Set (or clear) a video's description. Workspace-membership scoped. */
+export async function setDescriptionAction(
+  videoId: string,
+  description: string | null,
+): Promise<ActionResult> {
+  const userId = await requireUserId()
+  const clean = description && description.trim() ? description.trim().slice(0, 2000) : null
+  const ok = await setOwnedVideoDescription(userId, videoId, clean)
   revalidatePath('/dashboard')
   return { ok, error: ok ? undefined : 'Video not found' }
 }

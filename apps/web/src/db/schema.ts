@@ -27,8 +27,12 @@ export const workspaces = pgTable('workspaces', {
   name: text('name').notNull(),
   // Branding for this workspace's public share pages (moved off `user`).
   brandName: text('brand_name'),
-  brandLogo: text('brand_logo'), // data URL (small, resized client-side)
+  brandLogo: text('brand_logo'), // data URL (resized client-side)
   brandColor: text('brand_color'), // accent hex, e.g. #8b8bf6
+  brandTagline: text('brand_tagline'), // short line shown under the brand name
+  brandLogoSize: text('brand_logo_size'), // 'small' | 'medium' | 'large' (null = medium)
+  brandCtaLabel: text('brand_cta_label'), // optional call-to-action button label
+  brandCtaUrl: text('brand_cta_url'), // optional call-to-action button URL
   createdByUserId: text('created_by_user_id').references(() => user.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
     .notNull()
@@ -94,6 +98,8 @@ export const videos = pgTable(
       .notNull()
       .references(() => workspaces.id, { onDelete: 'cascade' }),
     title: text('title').notNull(),
+    // Optional description shown under the video on its share page.
+    description: text('description'),
     status: videoStatus('status').notNull().default('uploading'),
     muxAssetId: text('mux_asset_id'),
     muxPlaybackId: text('mux_playback_id'),

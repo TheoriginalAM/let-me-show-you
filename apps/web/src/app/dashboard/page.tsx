@@ -73,6 +73,7 @@ export default async function DashboardPage() {
               durationSeconds={video.durationSeconds}
               viewCount={video.viewCount}
               commentCount={commentCounts[video.id] ?? 0}
+              description={video.description}
               createdLabel={formatRelativeDate(video.createdAt, now)}
               thumbnailUrl={
                 video.muxPlaybackId
