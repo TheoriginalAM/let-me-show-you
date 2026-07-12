@@ -5,6 +5,7 @@ import { ControlPanel } from './control/ControlPanel'
 import { WebcamBubble } from './webcam/WebcamBubble'
 import { AreaOverlay } from './area/AreaOverlay'
 import { RecordingIndicator } from './indicator/RecordingIndicator'
+import { RecordingPill } from './indicator/RecordingPill'
 import './assets/index.css'
 
 // Renderer crash reporting. Events forward to the main-process Sentry client,
@@ -23,6 +24,7 @@ function Root() {
   if (view === 'webcam') return <WebcamBubble />
   if (view === 'area') return <AreaOverlay />
   if (view === 'indicator') return <RecordingIndicator />
+  if (view === 'pill') return <RecordingPill />
   return <ControlPanel />
 }
 

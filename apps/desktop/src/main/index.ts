@@ -343,32 +343,20 @@ function hideRecordingIndicator(): void {
   indicatorWindow = null
 }
 
-function showRecordingIndicator(payload: {
-  mode: string
-  areaRect: AreaRect | null
-  displayId?: string | null
-}): void {
-  syncBubbleForRecording(payload.mode, true)
-  hideRecordingIndicator()
-  // Area outlines the exact region; screen + window outline the whole display
-  // being recorded (a window's live bounds aren't exposed, so we frame its
-  // display as a "recording on this screen" cue). Camera has nothing on screen.
-  let bounds: { x: number; y: number; width: number; height: number } | null = null
-  if (payload.mode === 'area' && payload.areaRect) {
-    const r = payload.areaRect
-    const d =
-      screen.getAllDisplays().find((x) => x.id === r.displayId) ?? screen.getPrimaryDisplay()
-    bounds = { x: d.bounds.x + r.x, y: d.bounds.y + r.y, width: r.width, height: r.height }
-  } else if (payload.mode === 'screen' || payload.mode === 'window') {
-    // Frame the display actually being recorded, not just wherever the cursor is.
-    const byId =
-      payload.displayId != null && payload.displayId !== ''
-        ? screen.getAllDisplays().find((x) => String(x.id) === payload.displayId)
-        : undefined
-    bounds = { ...(byId ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint())).bounds }
-  }
-  if (!bounds) return
+/** The display a screen/window recording lives on (by id, else the cursor's). */
+function displayForRecording(displayId?: string | null): Electron.Display {
+  const byId =
+    displayId != null && displayId !== ''
+      ? screen.getAllDisplays().find((x) => String(x.id) === displayId)
+      : undefined
+  return byId ?? screen.getDisplayNearestPoint(screen.getCursorScreenPoint())
+}
 
+/** Create the click-through, capture-excluded indicator window over `bounds`. */
+function createIndicatorWindow(
+  bounds: { x: number; y: number; width: number; height: number },
+  view: 'indicator' | 'pill',
+): void {
   const win = new BrowserWindow({
     ...bounds,
     frame: false,
@@ -388,12 +376,55 @@ function showRecordingIndicator(payload: {
   win.setContentProtection(true) // visible to the user, excluded from the recording
   win.setAlwaysOnTop(true, 'screen-saver')
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true })
-  loadRenderer(win, 'indicator')
+  loadRenderer(win, view)
   win.showInactive()
   win.on('closed', () => {
     if (indicatorWindow === win) indicatorWindow = null
   })
   indicatorWindow = win
+}
+
+function showRecordingIndicator(payload: {
+  mode: string
+  areaRect: AreaRect | null
+  displayId?: string | null
+}): void {
+  syncBubbleForRecording(payload.mode, true)
+  hideRecordingIndicator()
+
+  // Area + screen have an exact on-screen region to outline with the glow border.
+  if (payload.mode === 'area' && payload.areaRect) {
+    const r = payload.areaRect
+    const d =
+      screen.getAllDisplays().find((x) => x.id === r.displayId) ?? screen.getPrimaryDisplay()
+    createIndicatorWindow(
+      { x: d.bounds.x + r.x, y: d.bounds.y + r.y, width: r.width, height: r.height },
+      'indicator',
+    )
+    return
+  }
+  if (payload.mode === 'screen') {
+    createIndicatorWindow({ ...displayForRecording(payload.displayId).bounds }, 'indicator')
+    return
+  }
+  // Window: the OS doesn't expose a window's live bounds, and glowing its whole
+  // display would wrongly imply a full-screen capture. Show a small "Recording"
+  // pill (bottom-centre of the window's display) as an honest status cue instead.
+  if (payload.mode === 'window') {
+    const area = displayForRecording(payload.displayId).workArea
+    const w = 168
+    const h = 44
+    createIndicatorWindow(
+      {
+        x: Math.round(area.x + (area.width - w) / 2),
+        y: area.y + area.height - h - 24,
+        width: w,
+        height: h,
+      },
+      'pill',
+    )
+  }
+  // Camera: nothing on screen to indicate.
 }
 
 /**
