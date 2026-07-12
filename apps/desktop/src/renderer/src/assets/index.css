@@ -681,6 +681,11 @@ a,
   flex: 1;
 }
 
+.ready-edit {
+  padding: 7px 18px;
+  font-size: 12px;
+}
+
 /* Title + password fields on the share screen. */
 .upload-fields {
   width: 100%;
@@ -809,6 +814,88 @@ select.uinput option {
 .settings-sub {
   font-size: 13px;
   line-height: 1.4;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+.settings-row-label {
+  font-size: 13px;
+  color: var(--fg);
+}
+.settings-select {
+  width: auto;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+.seg {
+  display: inline-flex;
+  padding: 2px;
+  gap: 2px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.seg-btn {
+  padding: 4px 9px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.seg-btn:hover {
+  color: var(--fg);
+}
+.seg-btn.active {
+  background: var(--accent-strong);
+  color: #fff;
+}
+
+/* ---------- Pre-record countdown overlay ---------- */
+.countdown-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  background: rgba(8, 8, 14, 0.82);
+  backdrop-filter: blur(8px);
+}
+.countdown-num {
+  font-size: 108px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--fg);
+  text-shadow: 0 0 42px rgba(139, 139, 246, 0.65);
+  animation: countdown-pop 0.9s ease-out;
+}
+@keyframes countdown-pop {
+  0% {
+    transform: scale(1.5);
+    opacity: 0.2;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0.85;
+  }
+}
+.countdown-label {
+  font-size: 13px;
+  color: var(--muted);
 }
 .signin-waiting {
   display: flex;
@@ -1350,6 +1437,11 @@ select.uinput option {
 .btn-mini:hover {
   background: var(--surface);
 }
+.btn-mini.active {
+  border-color: var(--danger);
+  background: rgba(255, 84, 104, 0.16);
+  color: #ffb3bd;
+}
 .badge-unknown {
   background: var(--surface-2);
   color: var(--muted);
@@ -1406,4 +1498,234 @@ select.uinput option {
   font-size: 16px;
   line-height: 1;
   cursor: pointer;
+}
+
+/* ---------- Trim & cut editor ---------- */
+.editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 8px;
+  -webkit-app-region: drag;
+}
+.editor-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.editor-x {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+.editor-x:hover:not(:disabled) {
+  color: var(--fg);
+}
+.editor-x:disabled {
+  opacity: 0.5;
+}
+.editor-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 16px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.editor-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: #000;
+}
+.editor-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  cursor: pointer;
+}
+.editor-play {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid var(--border-strong);
+  background: rgba(10, 10, 16, 0.55);
+  backdrop-filter: blur(6px);
+  color: var(--fg);
+  font-size: 15px;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  opacity: 0.85;
+  transition: opacity 120ms ease;
+}
+.editor-play:hover {
+  opacity: 1;
+}
+.editor-times {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  margin-top: -4px;
+}
+.editor-times-total {
+  color: var(--faint);
+}
+.editor-track {
+  position: relative;
+  height: 46px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, rgba(139, 139, 246, 0.22), rgba(139, 139, 246, 0.1));
+  border: 1px solid var(--border);
+  cursor: pointer;
+  touch-action: none;
+  overflow: hidden;
+}
+.editor-trimmed {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(8, 8, 14, 0.72);
+}
+.editor-cut {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    45deg,
+    rgba(255, 84, 104, 0.5),
+    rgba(255, 84, 104, 0.5) 5px,
+    rgba(255, 84, 104, 0.28) 5px,
+    rgba(255, 84, 104, 0.28) 10px
+  );
+}
+.editor-cut.pending {
+  background: rgba(255, 84, 104, 0.3);
+}
+.editor-handle {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 12px;
+  margin-left: -6px;
+  border-radius: 4px;
+  background: var(--fg);
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: ew-resize;
+  touch-action: none;
+}
+.editor-handle::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 16px;
+  border-radius: 2px;
+  background: rgba(10, 10, 16, 0.4);
+}
+.editor-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: #fff;
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+}
+.editor-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.editor-tools .btn-mini {
+  padding: 6px 10px;
+}
+.editor-cuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.editor-cutchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 9px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #ffb3bd;
+  background: rgba(255, 84, 104, 0.14);
+  border: 1px solid rgba(255, 84, 104, 0.28);
+}
+.editor-cutchip button {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.editor-cutchip button:hover {
+  background: rgba(255, 84, 104, 0.25);
+}
+.editor-foot {
+  padding: 10px 16px 15px;
+  border-top: 1px solid var(--border);
+  background: rgba(10, 10, 16, 0.55);
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.editor-summary {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+.editor-summary strong {
+  color: var(--fg);
+  font-weight: 600;
+}
+.editor-summary-was {
+  color: var(--faint);
+}
+.editor-foot-actions {
+  display: flex;
+  gap: 8px;
+}
+.editor-foot-actions .btn-ghost {
+  flex: 0 0 auto;
+  padding-left: 18px;
+  padding-right: 18px;
+}
+.editor-foot-actions .btn-record {
+  flex: 1;
 }

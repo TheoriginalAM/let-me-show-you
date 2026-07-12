@@ -1,8 +1,11 @@
-import { join } from 'path'
+import { isAbsolute, join, relative, resolve } from 'path'
+import { pathToFileURL } from 'url'
 import {
   app,
   BrowserWindow,
   ipcMain,
+  net,
+  protocol,
   screen,
   session,
   shell,
@@ -12,7 +15,7 @@ import {
 import { APP_NAME } from '@lmsy/shared'
 import { IPC, type SignInStatus, type StartUploadPayload, type UploadStatus } from '../shared/ipc'
 import { RecordingSession } from './recording-session'
-import { getWebcamConfig } from './settings-store'
+import { getGuardrails, getWebcamConfig } from './settings-store'
 import type { AreaRect, WebcamSize } from '../shared/ipc'
 import { registerIpcHandlers } from './ipc'
 import { createTray } from './tray'
@@ -31,6 +34,31 @@ import { initSentryMain } from './sentry'
 initSentryMain()
 // Ensure the product name is used everywhere (dev menu, About panel, userData).
 app.setName(APP_NAME)
+
+// A private, streaming scheme so the trim/cut editor can scrub the finished
+// recording without loading the whole MP4 into memory. Must be registered before
+// the app is ready. `stream` enables Range requests (seeking); `bypassCSP` lets
+// the packaged CSP still play it via net.fetch below.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'lmsy-media',
+    privileges: { standard: true, secure: true, stream: true, bypassCSP: true },
+  },
+])
+
+/**
+ * Confine media streaming to finished .mp4 recordings inside the app's own
+ * folder. The sandboxed renderer can only pass a string, and `resolve`+`relative`
+ * rejects `..` traversal and sibling dirs — so it can't read arbitrary files.
+ * (A symlink planted *inside* the recordings dir would need separate local-FS
+ * access, which is outside this threat model.)
+ */
+function isMediaReadablePath(filePath: string): boolean {
+  if (!filePath || !/\.mp4$/i.test(filePath)) return false
+  const root = resolve(join(app.getPath('videos'), 'LetMeShowYou'))
+  const rel = relative(root, resolve(filePath))
+  return rel !== '' && !rel.startsWith('..') && !isAbsolute(rel)
+}
 
 const isDev = !app.isPackaged
 const devServerUrl = process.env.ELECTRON_RENDERER_URL
@@ -52,6 +80,9 @@ let controlWindow: BrowserWindow | null = null
 let webcamWindow: BrowserWindow | null = null
 let currentCameraId: string | null = null
 let isQuitting = false
+// Auto-stop guardrail bookkeeping (see the recordingSession.onChange handler).
+let autoStopTimer: ReturnType<typeof setTimeout> | null = null
+let recordingWasActive = false
 
 const recordingSession = new RecordingSession()
 
@@ -443,6 +474,21 @@ function syncBubbleForRecording(mode: string, recording: boolean): void {
 }
 
 app.whenReady().then(() => {
+  // Serve finished recordings to the editor over a Range-capable stream. Using
+  // net.fetch on a file: URL gives seeking for free; the path is confined to the
+  // app's recordings folder.
+  protocol.handle('lmsy-media', (request) => {
+    let filePath = ''
+    try {
+      // URLSearchParams already percent-decodes; do NOT decode a second time.
+      filePath = new URL(request.url).searchParams.get('path') ?? ''
+    } catch {
+      return new Response('Bad request', { status: 400 })
+    }
+    if (!isMediaReadablePath(filePath)) return new Response('Forbidden', { status: 403 })
+    return net.fetch(pathToFileURL(filePath).toString(), { headers: request.headers })
+  })
+
   // Allow the renderers to use camera/microphone (getUserMedia). The OS still
   // gates access separately on macOS via the system permission prompts.
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
@@ -458,7 +504,7 @@ app.whenReady().then(() => {
         responseHeaders: {
           ...details.responseHeaders,
           'Content-Security-Policy': [
-            "default-src 'self'; img-src 'self' data:; media-src 'self' blob:; style-src 'self' 'unsafe-inline'",
+            "default-src 'self'; img-src 'self' data:; media-src 'self' blob: lmsy-media:; style-src 'self' 'unsafe-inline'",
           ],
         },
       })
@@ -494,6 +540,25 @@ app.whenReady().then(() => {
       hideRecordingIndicator()
       syncBubbleForRecording('', false)
     }
+    // Auto-stop guardrail: arm a max-duration timer on the idle→recording edge,
+    // and clear it whenever the session leaves the active states. Pauses keep the
+    // timer running (a paused session is still "active").
+    const active = status.state === 'recording' || status.state === 'paused'
+    if (active && !recordingWasActive) {
+      const { autoStopMinutes } = getGuardrails()
+      if (autoStopMinutes > 0) {
+        autoStopTimer = setTimeout(() => {
+          autoStopTimer = null
+          if (recordingSession.isActive()) requestStop()
+        }, autoStopMinutes * 60_000)
+      }
+    } else if (!active && recordingWasActive) {
+      if (autoStopTimer) {
+        clearTimeout(autoStopTimer)
+        autoStopTimer = null
+      }
+    }
+    recordingWasActive = active
     // A new recording (or dismissal) clears any prior upload result.
     if (
       (status.state === 'recording' || status.state === 'idle') &&

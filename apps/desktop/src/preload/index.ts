@@ -26,6 +26,7 @@ const api: RecorderApi = {
   finishRecording: () => ipcRenderer.invoke(IPC.finishRecording),
   abortRecording: (message) => ipcRenderer.invoke(IPC.abortRecording, message),
   dismissResult: () => ipcRenderer.invoke(IPC.dismissResult),
+  applyEdits: (keep) => ipcRenderer.invoke(IPC.applyEdits, keep),
   revealInFinder: (filePath) => ipcRenderer.invoke(IPC.revealInFinder, filePath),
   requestMediaAccess: (target) => ipcRenderer.invoke(IPC.requestMediaAccess, target),
   toggleWebcam: (cameraId) => ipcRenderer.invoke(IPC.toggleWebcam, cameraId),
@@ -82,6 +83,10 @@ const api: RecorderApi = {
     return () => ipcRenderer.removeListener(IPC.uploadStatus, listener)
   },
   openExternalUrl: (url) => ipcRenderer.invoke(IPC.openExternalUrl, url),
+
+  // Recording guardrails
+  getGuardrails: () => ipcRenderer.invoke(IPC.getGuardrails),
+  setGuardrails: (config) => ipcRenderer.invoke(IPC.setGuardrails, config),
 
   // Onboarding
   getOnboardingComplete: () => ipcRenderer.invoke(IPC.getOnboardingComplete),

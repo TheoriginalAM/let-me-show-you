@@ -5,6 +5,7 @@ import {
   type AreaRect,
   type AuthState,
   type CaptureSource,
+  type EditSegment,
   type MediaPermissions,
   type PermissionState,
   type PermissionTarget,
@@ -18,8 +19,10 @@ import {
 } from '../shared/ipc'
 import type { RecordingSession } from './recording-session'
 import {
+  getGuardrails,
   getOnboardingComplete,
   getWebcamConfig,
+  setGuardrails,
   setOnboardingComplete,
   setWebcamShape,
   setWebcamSize,
@@ -194,6 +197,16 @@ export function registerIpcHandlers(ctx: IpcContext): void {
   })
 
   ipcMain.handle(IPC.dismissResult, () => ctx.session.dismiss())
+
+  ipcMain.handle(IPC.applyEdits, (_event, keep: unknown) => {
+    if (!Array.isArray(keep)) throw new Error('Invalid edit segments')
+    // Coerce to plain {start,end} numbers; the session re-validates + clamps.
+    const segments: EditSegment[] = keep
+      .filter((s): s is { start: unknown; end: unknown } => Boolean(s) && typeof s === 'object')
+      .map((s) => ({ start: Number(s.start), end: Number(s.end) }))
+    return ctx.session.applyEdits(segments)
+  })
+
   ipcMain.handle(IPC.getRecordingStatus, () => ctx.session.getStatus())
 
   ipcMain.handle(IPC.revealInFinder, (_event, filePath: unknown) => {
@@ -257,6 +270,16 @@ export function registerIpcHandlers(ctx: IpcContext): void {
     } catch {
       // ignore malformed url
     }
+  })
+
+  // ---- Recording guardrails ----
+  ipcMain.handle(IPC.getGuardrails, () => getGuardrails())
+  ipcMain.handle(IPC.setGuardrails, (_event, config: unknown) => {
+    const c = (config ?? {}) as Record<string, unknown>
+    return setGuardrails({
+      countdownSeconds: Number(c.countdownSeconds),
+      autoStopMinutes: Number(c.autoStopMinutes),
+    })
   })
 
   // ---- Onboarding ----

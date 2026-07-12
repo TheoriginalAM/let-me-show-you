@@ -47,6 +47,8 @@ export function ControlPanel() {
   const cameras = useRecorderStore((s) => s.cameras)
   const onboardingComplete = useRecorderStore((s) => s.onboardingComplete)
   const [showSettings, setShowSettings] = useState(false)
+  // Non-null while the pre-recording countdown is ticking down (guardrail).
+  const [countdown, setCountdown] = useState<number | null>(null)
 
   const refreshPermissions = useCallback(async () => {
     useRecorderStore.getState().setPermissions(await window.recorder.getPermissions())
@@ -108,6 +110,9 @@ export function ControlPanel() {
     void window.recorder.getAuthState().then(store.setAuth)
     void window.recorder.getUploadStatus().then(store.setUpload)
     void window.recorder
+      .getGuardrails()
+      .then((g) => useRecorderStore.getState().setGuardrails(g))
+    void window.recorder
       .getOnboardingComplete()
       .then((done) => useRecorderStore.getState().setOnboardingComplete(done))
 
@@ -166,7 +171,7 @@ export function ControlPanel() {
     void refreshDevices()
   }
 
-  function startRecording(): void {
+  const startRecording = useCallback((): void => {
     const s = useRecorderStore.getState()
 
     if (s.mode === 'camera') {
@@ -210,7 +215,26 @@ export function ControlPanel() {
       cameraId: s.selectedCameraId,
       areaRect: null,
     })
+  }, [])
+
+  // Record button: run the countdown guardrail first (if enabled), else start now.
+  function handleRecord(): void {
+    const seconds = useRecorderStore.getState().guardrails.countdownSeconds
+    if (seconds > 0) setCountdown(seconds)
+    else startRecording()
   }
+
+  // Tick the countdown down once per second; at zero, begin capturing.
+  useEffect(() => {
+    if (countdown === null) return
+    if (countdown <= 0) {
+      setCountdown(null)
+      startRecording()
+      return
+    }
+    const timer = setTimeout(() => setCountdown((c) => (c === null ? null : c - 1)), 1000)
+    return () => clearTimeout(timer)
+  }, [countdown, startRecording])
 
   const { state } = status
 
@@ -323,11 +347,7 @@ export function ControlPanel() {
             </div>
             <div className="panel-footer">
               <DeviceSelects mode={mode} />
-              <button
-                className="btn-record no-drag"
-                disabled={!canRecord}
-                onClick={startRecording}
-              >
+              <button className="btn-record no-drag" disabled={!canRecord} onClick={handleRecord}>
                 <span className="rec-dot" />
                 {recordLabel}
               </button>
@@ -335,6 +355,17 @@ export function ControlPanel() {
           </>
         )}
       </main>
+      {countdown !== null && (
+        <div className="countdown-overlay">
+          <div className="countdown-num" key={countdown}>
+            {countdown}
+          </div>
+          <div className="countdown-label">Recording starts…</div>
+          <button className="btn-ghost no-drag" onClick={() => setCountdown(null)}>
+            Cancel
+          </button>
+        </div>
+      )}
       <UpdateToast />
     </div>
   )

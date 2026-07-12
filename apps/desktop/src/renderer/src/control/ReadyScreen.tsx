@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { formatDuration } from '@lmsy/shared'
 import type { Workspace } from '@shared/ipc'
 import { useRecorderStore } from '../store'
+import { VideoEditor } from './VideoEditor'
 
 const MIN_PASSWORD_LENGTH = 4
 
@@ -15,6 +16,7 @@ export function ReadyScreen() {
   const [password, setPassword] = useState('')
   const [workspaces, setWorkspaces] = useState<Workspace[]>([])
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
 
   // Load the signed-in user's workspaces so they can pick where this uploads.
   useEffect(() => {
@@ -32,7 +34,14 @@ export function ReadyScreen() {
 
   if (!result) return null
 
-  const defaultTitle = result.fileName.replace(/\.mp4$/i, '')
+  // The trim/cut editor takes over the whole panel; on apply/cancel it swaps back.
+  if (editing) {
+    return <VideoEditor result={result} onClose={() => setEditing(false)} />
+  }
+
+  const defaultTitle = result.fileName
+    .replace(/\.mp4$/i, '')
+    .replace(/ \(edited\)( \(\d+\))?$/i, '')
   const uploading = upload.phase === 'creating' || upload.phase === 'uploading'
   const pwTooShort = withPassword && password.length > 0 && password.length < MIN_PASSWORD_LENGTH
   const canUpload =
@@ -60,6 +69,12 @@ export function ReadyScreen() {
         ) : null}
 
         <div className="ready-sub">{formatDuration(result.durationSeconds)} · saved locally</div>
+
+        {upload.phase === 'idle' && (
+          <button className="btn-secondary no-drag ready-edit" onClick={() => setEditing(true)}>
+            ✂ Trim &amp; cut
+          </button>
+        )}
 
         {upload.phase === 'done' ? (
           <div className="upload-done">

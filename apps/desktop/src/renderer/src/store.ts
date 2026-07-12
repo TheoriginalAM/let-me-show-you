@@ -3,6 +3,7 @@ import type {
   AreaRect,
   AuthState,
   CaptureSource,
+  GuardrailConfig,
   MediaPermissions,
   RecordingMode,
   RecordingStatus,
@@ -33,6 +34,7 @@ const idleSignIn: SignInStatus = {
   message: null,
 }
 const idleUpdate: UpdateStatus = { phase: 'idle', version: null }
+const defaultGuardrails: GuardrailConfig = { countdownSeconds: 3, autoStopMinutes: 0 }
 
 interface RecorderStore {
   permissions: MediaPermissions | null
@@ -51,6 +53,7 @@ interface RecorderStore {
   signIn: SignInStatus
   upload: UploadStatus
   update: UpdateStatus
+  guardrails: GuardrailConfig
   /** null until the first-run flag has been read from main. */
   onboardingComplete: boolean | null
 
@@ -69,6 +72,7 @@ interface RecorderStore {
   setSignIn: (signIn: SignInStatus) => void
   setUpload: (upload: UploadStatus) => void
   setUpdate: (update: UpdateStatus) => void
+  setGuardrails: (guardrails: GuardrailConfig) => void
   setOnboardingComplete: (value: boolean) => void
 }
 
@@ -89,6 +93,7 @@ export const useRecorderStore = create<RecorderStore>((set) => ({
   signIn: idleSignIn,
   upload: idleUpload,
   update: idleUpdate,
+  guardrails: defaultGuardrails,
   onboardingComplete: null,
 
   setPermissions: (permissions) => set({ permissions }),
@@ -135,5 +140,6 @@ export const useRecorderStore = create<RecorderStore>((set) => ({
   setSignIn: (signIn) => set({ signIn }),
   setUpload: (upload) => set({ upload }),
   setUpdate: (update) => set({ update }),
+  setGuardrails: (guardrails) => set({ guardrails }),
   setOnboardingComplete: (onboardingComplete) => set({ onboardingComplete }),
 }))

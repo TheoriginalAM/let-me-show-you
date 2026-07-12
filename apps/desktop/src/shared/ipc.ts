@@ -28,6 +28,7 @@ export const IPC = {
   finishRecording: 'finish-recording',
   abortRecording: 'abort-recording',
   dismissResult: 'dismiss-result',
+  applyEdits: 'apply-edits',
   revealInFinder: 'reveal-in-finder',
   toggleWebcam: 'toggle-webcam',
   getWebcamCamera: 'get-webcam-camera',
@@ -48,6 +49,9 @@ export const IPC = {
   getOnboardingComplete: 'get-onboarding-complete',
   completeOnboarding: 'complete-onboarding',
   restartToUpdate: 'restart-to-update',
+  // recording guardrails
+  getGuardrails: 'get-guardrails',
+  setGuardrails: 'set-guardrails',
   // main -> renderer (events)
   recordingStatus: 'recording-status',
   requestStop: 'request-stop',
@@ -111,6 +115,15 @@ export interface WebcamConfig {
   size: WebcamSize
 }
 
+/**
+ * Recording guardrails: a countdown before capture starts (0 = off) and an
+ * auto-stop after a maximum number of minutes (0 = off).
+ */
+export interface GuardrailConfig {
+  countdownSeconds: number
+  autoStopMinutes: number
+}
+
 export type PermissionState = 'granted' | 'denied' | 'restricted' | 'not-determined' | 'unknown'
 
 export type PermissionTarget = 'screen' | 'microphone' | 'camera'
@@ -131,6 +144,15 @@ export interface RecordingResult {
   /** JPEG data URL of a frame grabbed ~1s in, or null if it couldn't be made. */
   thumbnailDataUrl: string | null
   durationSeconds: number
+}
+
+/**
+ * A span of the recording (in seconds) to keep. The trim/cut editor sends the
+ * ordered list of spans that survive; ffmpeg concatenates them into a new MP4.
+ */
+export interface EditSegment {
+  start: number
+  end: number
 }
 
 /** A failed recording. The webm is preserved for recovery when possible. */
@@ -237,6 +259,12 @@ export interface RecorderApi {
   abortRecording: (message: string) => Promise<void>
   /** Dismiss the ready/error screen and return to idle. */
   dismissResult: () => Promise<void>
+  /**
+   * Trim/cut the finished recording: re-encode keeping only `keep` (ordered
+   * spans, in seconds), then swap it in as the ready result. Resolves to the new
+   * result (edited file path, thumbnail, duration).
+   */
+  applyEdits: (keep: EditSegment[]) => Promise<RecordingResult>
   /** Reveal a file in Finder/Explorer. */
   revealInFinder: (filePath: string) => Promise<void>
   toggleWebcam: (cameraId: string | null) => Promise<void>
@@ -285,6 +313,12 @@ export interface RecorderApi {
   getOnboardingComplete: () => Promise<boolean>
   /** Mark onboarding as done so it isn't shown again. */
   completeOnboarding: () => Promise<void>
+
+  // ---- Recording guardrails ----
+  /** Read the countdown + auto-stop settings. */
+  getGuardrails: () => Promise<GuardrailConfig>
+  /** Persist the countdown + auto-stop settings. */
+  setGuardrails: (config: GuardrailConfig) => Promise<GuardrailConfig>
 
   // ---- Auto-update ----
   /** Quit and install a downloaded update (from the "Update ready" toast). */

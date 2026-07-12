@@ -3,12 +3,18 @@ import { mkdir, stat, unlink } from 'fs/promises'
 import { join } from 'path'
 import { app } from 'electron'
 import type {
+  EditSegment,
   RecordingError,
   RecordingResult,
   RecordingState,
   RecordingStatus,
 } from '../shared/ipc'
-import { makeThumbnailDataUrl, transcodeToMp4 } from './ffmpeg'
+import {
+  applyEdits,
+  makeThumbnailDataUrl,
+  probeDurationSeconds,
+  transcodeToMp4,
+} from './ffmpeg'
 
 type StatusListener = (status: RecordingStatus) => void
 
@@ -54,6 +60,9 @@ export class RecordingSession {
   private tempWebmPath = ''
   private wallClockStart = 0
   private transcodeAbort: AbortController | null = null
+  private editAbort: AbortController | null = null
+  /** The last edit we generated, so re-editing replaces it rather than piling up. */
+  private lastEditedPath: string | null = null
 
   private readonly listeners = new Set<StatusListener>()
 
@@ -225,9 +234,10 @@ export class RecordingSession {
     this.emit()
   }
 
-  /** Kill any in-flight ffmpeg transcode (called on app quit). */
+  /** Kill any in-flight ffmpeg work — transcode or edit — (called on app quit). */
   dispose(): void {
     this.transcodeAbort?.abort()
+    this.editAbort?.abort()
   }
 
   /** Dismiss the ready/error screen and return to idle. */
@@ -240,7 +250,90 @@ export class RecordingSession {
     this.result = null
     this.error = null
     this.tempWebmPath = ''
+    this.lastEditedPath = null
     this.emit()
+  }
+
+  /**
+   * Trim/cut the ready recording, keeping only `keep` (ordered spans in seconds),
+   * and swap the edited MP4 in as the new result. The original file is always
+   * preserved; a previous edit (if any) is replaced. Returns the new result.
+   */
+  async applyEdits(keep: EditSegment[]): Promise<RecordingResult> {
+    if (this.state !== 'ready' || !this.result) {
+      throw new Error('No finished recording to edit')
+    }
+    const source = this.result.filePath
+    // Clamp spans against the file's ACTUAL duration, not the rounded wall-clock
+    // estimate shown in the UI — otherwise a "trim the start, keep the rest" edit
+    // would lose the final fraction of a second (or more). Fall back to the
+    // estimate only if the probe fails.
+    const mediaDuration = (await probeDurationSeconds(source)) ?? this.result.durationSeconds
+    const segments = keep
+      .filter(
+        (s) =>
+          s &&
+          Number.isFinite(s.start) &&
+          Number.isFinite(s.end) &&
+          s.end - s.start > 0.05,
+      )
+      .map((s) => ({
+        start: Math.max(0, Math.min(s.start, mediaDuration)),
+        end: Math.max(0, Math.min(s.end, mediaDuration)),
+      }))
+      .filter((s) => s.end - s.start > 0.05)
+      .slice(0, 100)
+    if (segments.length === 0) throw new Error('Nothing to keep')
+
+    const { filePath, fileName } = await this.buildEditedTarget()
+    this.editAbort = new AbortController()
+    try {
+      await applyEdits(source, filePath, segments, () => undefined, this.editAbort.signal)
+    } finally {
+      this.editAbort = null
+    }
+
+    let thumbnailDataUrl: string | null = null
+    try {
+      thumbnailDataUrl = await makeThumbnailDataUrl(filePath)
+    } catch {
+      thumbnailDataUrl = null
+    }
+    const durationSeconds = Math.max(
+      1,
+      Math.round(segments.reduce((sum, s) => sum + (s.end - s.start), 0)),
+    )
+
+    // Drop the previous edit so repeated edits don't pile up on disk. ffmpeg has
+    // finished reading `source` by now, so deleting it here is safe even when the
+    // previous edit WAS the source of this one. The original is never touched
+    // (it's only recorded in lastEditedPath after the first edit).
+    if (this.lastEditedPath && this.lastEditedPath !== filePath) {
+      await unlink(this.lastEditedPath).catch(() => undefined)
+    }
+    this.lastEditedPath = filePath
+
+    const result: RecordingResult = { filePath, fileName, thumbnailDataUrl, durationSeconds }
+    if (this.state !== 'ready') return result // superseded (e.g. dismissed)
+    this.result = result
+    this.emit()
+    return result
+  }
+
+  /** A distinct "(edited)" filename in the recordings dir, deduped with a suffix. */
+  private async buildEditedTarget(): Promise<{ filePath: string; fileName: string }> {
+    const dir = join(app.getPath('videos'), 'LetMeShowYou')
+    await mkdir(dir, { recursive: true })
+    const base = (this.result?.fileName ?? 'Recording.mp4')
+      .replace(/\.mp4$/i, '')
+      .replace(/ \(edited\)( \(\d+\))?$/i, '')
+    let fileName = `${base} (edited).mp4`
+    let filePath = join(dir, fileName)
+    for (let n = 2; await pathExists(filePath); n++) {
+      fileName = `${base} (edited) (${n}).mp4`
+      filePath = join(dir, fileName)
+    }
+    return { filePath, fileName }
   }
 
   private async buildOutputTarget(): Promise<{ filePath: string; fileName: string }> {
