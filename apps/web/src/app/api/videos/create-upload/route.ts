@@ -3,8 +3,12 @@ import { buildShareUrl, type CreateUploadResponse } from '@lmsy/shared'
 import { getAuthedUserId } from '@/lib/api-auth'
 import { getMux } from '@/lib/mux'
 import { generateShareSlug } from '@/lib/slug'
-import { createVideoForUpload, deleteOwnedVideo } from '@/db/queries'
+import { createVideoForUpload, deleteOwnedVideo, setOwnedVideoPassword } from '@/db/queries'
 import { isUserApproved } from '@/db/users'
+import { hashSharePassword } from '@/lib/share-password'
+
+/** Minimum share-password length (mirrors the dashboard action). */
+const MIN_PASSWORD_LENGTH = 4
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,11 +22,23 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Your account is pending approval.' }, { status: 403 })
   }
 
-  const body = (await request.json().catch(() => ({}))) as { title?: unknown }
+  const body = (await request.json().catch(() => ({}))) as { title?: unknown; password?: unknown }
   const rawTitle = typeof body.title === 'string' ? body.title.trim() : ''
   const title = rawTitle ? rawTitle.slice(0, 200) : 'Untitled recording'
 
+  // Optional share password: hashed here, stored on the row after creation.
+  const rawPassword = typeof body.password === 'string' ? body.password : ''
+  if (rawPassword && rawPassword.length < MIN_PASSWORD_LENGTH) {
+    return NextResponse.json(
+      { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters.` },
+      { status: 400 },
+    )
+  }
+
   const video = await createVideoForUpload(userId, title, generateShareSlug)
+  if (rawPassword) {
+    await setOwnedVideoPassword(userId, video.id, hashSharePassword(rawPassword))
+  }
 
   try {
     // Direct upload → bytes go straight to Mux, never through our server. The

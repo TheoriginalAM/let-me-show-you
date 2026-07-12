@@ -143,6 +143,8 @@ export interface UploadStatus {
 export interface StartUploadPayload {
   filePath: string
   title: string
+  /** Optional share password. When set, the recording is password-protected. */
+  password?: string | null
 }
 
 export type UpdatePhase = 'idle' | 'downloading' | 'ready'

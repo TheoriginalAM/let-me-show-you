@@ -66,7 +66,7 @@ export async function runUpload(payload: StartUploadPayload, emit: Emit): Promis
     const res = await fetch(`${API_BASE_URL}/api/videos/create-upload`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ title: payload.title }),
+      body: JSON.stringify({ title: payload.title, password: payload.password ?? null }),
     })
     if (res.status === 401) throw new Error('Your session expired — sign in again.')
     if (!res.ok) throw new Error(`Could not create upload (${res.status})`)

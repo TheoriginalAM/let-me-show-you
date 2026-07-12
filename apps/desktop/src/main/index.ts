@@ -72,8 +72,8 @@ function hardenWindow(win: BrowserWindow): void {
 
 function createControlWindow(): BrowserWindow {
   const win = new BrowserWindow({
-    width: 360,
-    height: 520,
+    width: 380,
+    height: 580,
     show: false,
     resizable: false,
     maximizable: false,
@@ -81,7 +81,7 @@ function createControlWindow(): BrowserWindow {
     frame: false,
     titleBarStyle: 'hidden',
     alwaysOnTop: true,
-    backgroundColor: '#0b0b12',
+    backgroundColor: '#0a0a0f',
     title: APP_NAME,
     webPreferences: baseWebPreferences,
   })

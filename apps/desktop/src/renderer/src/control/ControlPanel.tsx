@@ -185,35 +185,56 @@ export function ControlPanel() {
 
       <main className="panel-body">
         {onboardingComplete === null ? (
-          <div className="picker-empty">Loading…</div>
+          <div className="pane">
+            <div className="picker-empty">Loading…</div>
+          </div>
         ) : onboardingComplete === false ? (
-          <Onboarding onRecheck={recheck} />
+          <div className="pane">
+            <Onboarding onRecheck={recheck} />
+          </div>
         ) : showSettings ? (
-          <Settings onClose={() => setShowSettings(false)} />
+          <div className="pane">
+            <Settings onClose={() => setShowSettings(false)} />
+          </div>
         ) : state === 'recording' || state === 'paused' ? (
-          <RecordingBar />
+          <div className="pane">
+            <RecordingBar />
+          </div>
         ) : state === 'processing' ? (
-          <ProcessingScreen />
+          <div className="pane">
+            <ProcessingScreen />
+          </div>
         ) : state === 'ready' ? (
           <ReadyScreen />
         ) : state === 'error' ? (
-          <ErrorScreen />
+          <div className="pane">
+            <ErrorScreen />
+          </div>
         ) : !permissions ? (
-          <div className="picker-empty">Checking permissions…</div>
+          <div className="pane">
+            <div className="picker-empty">Checking permissions…</div>
+          </div>
         ) : !screenGranted ? (
-          <PermissionGate permissions={permissions} onRecheck={recheck} />
+          <div className="pane">
+            <PermissionGate permissions={permissions} onRecheck={recheck} />
+          </div>
         ) : (
           <>
-            <SourcePicker />
-            <PermissionNotice permissions={permissions} />
-            <DeviceSelects />
-            <button
-              className="btn-record no-drag"
-              disabled={!selectedSourceId}
-              onClick={startRecording}
-            >
-              Start recording
-            </button>
+            <div className="source-scroll">
+              <SourcePicker />
+              <PermissionNotice permissions={permissions} />
+            </div>
+            <div className="panel-footer">
+              <DeviceSelects />
+              <button
+                className="btn-record no-drag"
+                disabled={!selectedSourceId}
+                onClick={startRecording}
+              >
+                <span className="rec-dot" />
+                Start recording
+              </button>
+            </div>
           </>
         )}
       </main>
