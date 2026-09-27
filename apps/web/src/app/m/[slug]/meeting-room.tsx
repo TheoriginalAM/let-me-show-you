@@ -72,6 +72,8 @@ function isDeviceError(error: Error): boolean {
 
 const DEVICE_NOTICE =
   "We couldn't start your camera or microphone. Check your browser's permissions or close other apps using it, then turn it on from the controls below."
+const PREVIEW_NOTICE =
+  "We couldn't reach your camera or microphone. Check your browser's permissions, or join with them turned off."
 
 /** LiveKit's dark theme, tinted with the workspace accent. */
 function themeVars(accent: string): CSSProperties {
@@ -248,7 +250,7 @@ export function MeetingRoom({
     console.error('[meeting] room error:', error)
   }, [])
 
-  const onPreviewError = useCallback(() => setDeviceNotice(DEVICE_NOTICE), [])
+  const onPreviewError = useCallback(() => setDeviceNotice(PREVIEW_NOTICE), [])
 
   const onDeviceFailure = useCallback((_failure?: MediaDeviceFailure, kind?: MediaDeviceKind) => {
     // Screen-share failures (e.g. cancelling the picker) arrive with no kind:
@@ -386,7 +388,8 @@ export function MeetingRoom({
           {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
           {copy.rejoin && choices && (
             <button
-              className="btn-primary mt-5 px-5 py-2.5 text-sm"
+              className="mt-5 rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+              style={{ background: brand.accent }}
               disabled={busy}
               onClick={() => void join(choices)}
             >
@@ -475,11 +478,7 @@ export function MeetingRoom({
             <div className="grid aspect-video place-items-center text-sm text-faint">Loading…</div>
           )}
         </div>
-        {deviceNotice && (
-          <p className="mt-3 text-center text-sm text-amber-200">
-            {deviceNotice} You can still join with it turned off.
-          </p>
-        )}
+        {deviceNotice && <p className="mt-3 text-center text-sm text-amber-200">{deviceNotice}</p>}
         {error && <p className="mt-3 text-center text-sm text-red-300">{error}</p>}
       </div>
     </Shell>
