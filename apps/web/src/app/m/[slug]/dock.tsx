@@ -17,8 +17,15 @@ import {
   switchDevice,
   useActiveDevice,
 } from './_lib/call-media'
-import { deviceLabel, sourceTrack, useDeviceList, useSpeakerSelectable } from './_lib/devices'
-import { shortcut } from './_lib/shortcuts'
+import {
+  cameraSide,
+  deviceLabel,
+  isRearCamera,
+  sourceTrack,
+  useDeviceList,
+  useSpeakerSelectable,
+} from './_lib/devices'
+import { withShortcut } from './_lib/shortcuts'
 import { useMeetPrefs } from './_lib/prefs'
 import { maxCameraHeight, QUALITY, QUALITY_ORDER } from './_lib/quality'
 import {
@@ -50,6 +57,7 @@ import {
   SparklesIcon,
   SpotlightIcon,
   StopIcon,
+  SwitchCameraIcon,
   UsersIcon,
   VideoIcon,
   VideoOffIcon,
@@ -114,7 +122,8 @@ function SplitButton({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
-        className="-ml-1 grid h-11 w-6 place-items-center rounded-r-full text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-[var(--room-accent-ring)]"
+        // Wider on touch screens, so a thumb aimed at it doesn't hit the toggle.
+        className="-ml-1 grid h-11 w-6 place-items-center rounded-r-full text-muted transition hover:text-ink focus-visible:outline-2 focus-visible:outline-[var(--room-accent-ring)] [@media(pointer:coarse)]:ml-0 [@media(pointer:coarse)]:w-9"
       >
         <ChevronUpIcon size={14} />
       </button>
@@ -178,7 +187,10 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
   const isRecording = useIsRecording()
   const hand = useParticipantAttribute('hand', { participant: localParticipant })
   const call = useCall()
-  const { role, slug, guestKey, notify, panel, togglePanel, chat, layout, setLayout } = call
+  const { role, slug, guestKey, notify, panel, togglePanel, chat, layout, setLayout, mediaStarting } = call
+  // While the call is still switching the mic/camera on, show them as on.
+  const micOn = isMicrophoneEnabled || mediaStarting.audio
+  const camOn = isCameraEnabled || mediaStarting.video
   const isHost = role === 'host'
   const [prefs, setPrefs] = useMeetPrefs()
   const canShare = useCanShareScreen()
@@ -226,6 +238,7 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
 
   const toggleMic = (): Promise<void> =>
     once('mic', async () => {
+      if (mediaStarting.audio) return // coming on: a toggle now would open a second mic
       userMicToggle.at = Date.now()
       try {
         await localParticipant.setMicrophoneEnabled(!isMicrophoneEnabled)
@@ -237,6 +250,7 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
   // The camera is also restarted by a quality change, so they share a guard.
   const toggleCam = (): Promise<void> =>
     once('cam', async () => {
+      if (mediaStarting.video) return // coming on: a toggle now would open a second camera
       try {
         if ((await setCameraOn(room, !isCameraEnabled)) === 'blur-failed') notify(BLUR_FAILED_COPY, 'warn')
       } catch {
@@ -261,13 +275,35 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
 
   const setQuality = (q: (typeof QUALITY_ORDER)[number]): Promise<void> =>
     once('cam', async () => {
-      if (q === prefs.quality) return
+      if (q === prefs.quality || mediaStarting.video) return
       notify(`Switching to ${QUALITY[q].label}…`)
       try {
         if ((await changeCameraQuality(room, q)) === 'blur-failed') notify(BLUR_FAILED_COPY, 'warn')
         else notify(`Video quality set to ${QUALITY[q].label}`, 'success')
       } catch {
         notify("Couldn't change video quality. Try turning your camera off and on.", 'error')
+      }
+    })
+
+  /**
+   * Flip between the front and back camera. Phones list several lenses per
+   * side (Back, Back Ultra Wide, ...), so go by which way the lens faces and
+   * prefer the plain one. A quick flip isn't saved as the default camera.
+   */
+  const switchCamera = (): Promise<void> =>
+    once('cam', async () => {
+      if (mediaStarting.video) return
+      const current = cams.find((d) => d.deviceId === activeCam)
+      const side = (current && cameraSide(current)) ?? (isRearCamera(camTrack) ? 'back' : 'front')
+      const others = cams.filter((d) => d.deviceId !== activeCam && cameraSide(d) !== side && cameraSide(d) !== null)
+      const next =
+        others.find((d) => /^(front|back) camera$/i.test(d.label)) ??
+        others[0] ??
+        // No facing info (e.g. two webcams): just take the next one.
+        cams[(cams.findIndex((d) => d.deviceId === activeCam) + 1) % cams.length]
+      if (!next || next.deviceId === activeCam) return
+      if (!(await switchDevice(room, 'videoinput', next.deviceId, false))) {
+        notify("Couldn't switch camera. It may be in use by another app.", 'error')
       }
     })
 
@@ -404,11 +440,17 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
           )}
         >
           <IconButton
-            label={`${isMicrophoneEnabled ? 'Turn off' : 'Turn on'} microphone (${shortcut('D')})`}
-            tone={isMicrophoneEnabled ? 'default' : 'off'}
+            label={
+              mediaStarting.audio
+                ? 'Microphone starting…'
+                : withShortcut(`${isMicrophoneEnabled ? 'Turn off' : 'Turn on'} microphone`, 'D')
+            }
+            tone={micOn ? 'default' : 'off'}
+            aria-busy={mediaStarting.audio || undefined}
+            className={mediaStarting.audio ? 'motion-safe:animate-pulse' : undefined}
             onClick={() => void toggleMic()}
           >
-            {isMicrophoneEnabled ? <MicIcon /> : <MicOffIcon />}
+            {micOn ? <MicIcon /> : <MicOffIcon />}
           </IconButton>
         </SplitButton>
 
@@ -421,7 +463,7 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
               {cams.length === 0 && <p className="px-3 py-2 text-faint">No cameras available</p>}
               {cams.map((d, i) => (
                 <MenuItem key={d.deviceId} selected={d.deviceId === activeCam} onSelect={() => (void pickDevice('videoinput', d.deviceId), close())}>
-                  {deviceLabel(d, i, 'Camera')}
+                  {deviceLabel(d, i, 'Camera', cams)}
                 </MenuItem>
               ))}
               <MenuDivider />
@@ -450,11 +492,17 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
           )}
         >
           <IconButton
-            label={`${isCameraEnabled ? 'Turn off' : 'Turn on'} camera (${shortcut('E')})`}
-            tone={isCameraEnabled ? 'default' : 'off'}
+            label={
+              mediaStarting.video
+                ? 'Camera starting…'
+                : withShortcut(`${isCameraEnabled ? 'Turn off' : 'Turn on'} camera`, 'E')
+            }
+            tone={camOn ? 'default' : 'off'}
+            aria-busy={mediaStarting.video || undefined}
+            className={mediaStarting.video ? 'motion-safe:animate-pulse' : undefined}
             onClick={() => void toggleCam()}
           >
-            {isCameraEnabled ? <VideoIcon /> : <VideoOffIcon />}
+            {camOn ? <VideoIcon /> : <VideoOffIcon />}
           </IconButton>
         </SplitButton>
 
@@ -523,6 +571,12 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
             <div className="max-h-[60vh] overflow-y-auto">
               {/* Phone-only shortcuts to things hidden from the compact bar */}
               <div className="min-[50rem]:hidden">
+                {camOn && cams.length > 1 && (
+                  // One tap between the front and back camera (the 'let me show you' move).
+                  <MenuItem icon={<SwitchCameraIcon size={16} />} onSelect={() => (void switchCamera(), close())}>
+                    Switch camera
+                  </MenuItem>
+                )}
                 {canShare && (
                   <MenuItem icon={<ShareIcon size={16} />} onSelect={() => (void toggleShare(), close())}>
                     {isScreenShareEnabled ? 'Stop presenting' : 'Share your screen'}

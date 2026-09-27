@@ -1,7 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { MediaDeviceFailure, supportsAudioOutputSelection } from 'livekit-client'
+import {
+  MediaDeviceFailure,
+  supportsAudioOutputSelection,
+  TrackEvent,
+  type LocalVideoTrack,
+} from 'livekit-client'
 
 /**
  * Whether this browser lets us choose the speaker. LiveKit allows it on Chrome,
@@ -73,11 +78,68 @@ export function sourceTrack(track: {
   return list?.[0] ?? track.mediaStreamTrack
 }
 
-/** A readable name for a device (browsers hide labels until permission). */
-export function deviceLabel(d: MediaDeviceInfo | undefined, index: number, kind: string): string {
-  if (!d) return `${kind} ${index + 1}`
-  if (d.label) return d.label.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '')
-  return `${kind} ${index + 1}`
+function friendlyLabel(label: string): string {
+  // Android names cameras like "camera2 1, facing front".
+  if (/facing front/i.test(label)) return 'Front camera'
+  if (/facing back/i.test(label)) return 'Back camera'
+  return label.replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '')
+}
+
+/**
+ * A readable name for a device (browsers hide labels until permission). Pass
+ * the whole list so repeats get numbered: phones with several lenses per side
+ * would otherwise show "Back camera" twice.
+ */
+export function deviceLabel(
+  d: MediaDeviceInfo | undefined,
+  index: number,
+  kind: string,
+  all?: MediaDeviceInfo[],
+): string {
+  if (!d?.label) return `${kind} ${index + 1}`
+  const name = friendlyLabel(d.label)
+  if (!all) return name
+  const same = all.filter((x) => x.label && friendlyLabel(x.label) === name)
+  const n = same.findIndex((x) => x.deviceId === d.deviceId)
+  return same.length > 1 && n > 0 ? `${name} ${n + 1}` : name
+}
+
+/** Which way a camera faces, from its label (for flipping front/back). */
+export function cameraSide(d: MediaDeviceInfo): 'front' | 'back' | null {
+  if (/facing front|front|user|facetime/i.test(d.label)) return 'front'
+  if (/facing back|back|rear|environment/i.test(d.label)) return 'back'
+  return null
+}
+
+/**
+ * Whether a camera track points away from the user (a phone's back camera).
+ * Its picture must never be mirrored, or text you show reads backwards.
+ */
+export function isRearCamera(track: Parameters<typeof sourceTrack>[0] | null | undefined): boolean {
+  if (!track) return false
+  try {
+    return sourceTrack(track).getSettings().facingMode === 'environment'
+  } catch {
+    return false
+  }
+}
+
+/** isRearCamera, kept up to date as the camera is switched (the track restarts). */
+export function useIsRearCamera(track: LocalVideoTrack | null | undefined): boolean {
+  const [rear, setRear] = useState(false)
+  useEffect(() => {
+    if (!track) {
+      setRear(false)
+      return
+    }
+    const update = (): void => setRear(isRearCamera(track))
+    update()
+    track.on(TrackEvent.Restarted, update)
+    return () => {
+      track.off(TrackEvent.Restarted, update)
+    }
+  }, [track])
+  return rear
 }
 
 export type MediaProblem = 'denied' | 'busy' | 'notfound' | 'other'

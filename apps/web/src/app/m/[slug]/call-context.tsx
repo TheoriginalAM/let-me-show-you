@@ -37,6 +37,7 @@ const CHAT_OPTS: Parameters<typeof useChat>[0] = {
 }
 
 export type Panel = 'people' | 'chat' | null
+export type MediaStarting = { audio: boolean; video: boolean }
 export type LayoutMode = 'auto' | 'grid' | 'speaker'
 
 export interface Notice {
@@ -65,6 +66,12 @@ interface CallState {
   setSettingsOpen: (open: boolean) => void
   lobbyEnabled: boolean
   setLobbyEnabled: (on: boolean) => void
+  /**
+   * The mic/camera being switched on as the call starts. Until they're live the
+   * buttons ignore taps, or a tap would start a second, un-mutable capture.
+   */
+  mediaStarting: MediaStarting
+  setMediaStarting: (update: (cur: MediaStarting) => MediaStarting) => void
   notices: Notice[]
   notify: (text: string, tone?: Notice['tone'], action?: Notice['action']) => void
   dismiss: (id: number) => void
@@ -98,6 +105,7 @@ export function CallProvider({
   role,
   guestKey,
   initialLobby,
+  initialMediaStarting,
   endedByMeRef,
   children,
 }: {
@@ -107,6 +115,7 @@ export function CallProvider({
   role: 'host' | 'guest'
   guestKey: string
   initialLobby: boolean
+  initialMediaStarting: MediaStarting
   endedByMeRef: { current: boolean }
   children: ReactNode
 }) {
@@ -115,6 +124,7 @@ export function CallProvider({
   const [pinned, setPinned] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [lobbyEnabled, setLobbyEnabled] = useState(initialLobby)
+  const [mediaStarting, setMediaStarting] = useState(initialMediaStarting)
   const [notices, setNotices] = useState<Notice[]>([])
   const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>())
 
@@ -175,6 +185,8 @@ export function CallProvider({
       setSettingsOpen,
       lobbyEnabled,
       setLobbyEnabled,
+      mediaStarting,
+      setMediaStarting,
       notices,
       notify,
       dismiss,
@@ -199,6 +211,7 @@ export function CallProvider({
       pinned,
       settingsOpen,
       lobbyEnabled,
+      mediaStarting,
       notices,
       notify,
       dismiss,

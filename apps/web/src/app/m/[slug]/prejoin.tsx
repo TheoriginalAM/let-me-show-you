@@ -15,6 +15,7 @@ import {
   deviceLabel,
   mediaProblemCopy,
   sourceTrack,
+  useIsRearCamera,
   useDeviceList,
   useSpeakerSelectable,
   type MediaProblem,
@@ -175,8 +176,19 @@ function usePreviewMedia(opts: {
   }
 }
 
-function PreviewVideo({ track, mirror }: { track: LocalVideoTrack; mirror: boolean }) {
+function PreviewVideo({
+  track,
+  mirror,
+  onRatio,
+}: {
+  track: LocalVideoTrack
+  mirror: boolean
+  /** The picture's width/height, e.g. under 1 for a phone held upright. */
+  onRatio: (ratio: number) => void
+}) {
   const ref = useRef<HTMLVideoElement>(null)
+  // Never mirror a phone's back camera (text you hold up would read backwards).
+  const rear = useIsRearCamera(track)
   useEffect(() => {
     const el = ref.current
     if (!el) return
@@ -185,13 +197,19 @@ function PreviewVideo({ track, mirror }: { track: LocalVideoTrack; mirror: boole
       track.detach(el)
     }
   }, [track])
+  const report = (): void => {
+    const v = ref.current
+    if (v?.videoWidth && v.videoHeight) onRatio(v.videoWidth / v.videoHeight)
+  }
   return (
     <video
       ref={ref}
       muted
       playsInline
       autoPlay
-      className={cx('h-full w-full object-cover', mirror && '-scale-x-100')}
+      onLoadedMetadata={report}
+      onResize={report}
+      className={cx('h-full w-full object-cover', mirror && !rear && '-scale-x-100')}
     />
   )
 }
@@ -354,6 +372,8 @@ export function PreJoinScreen({
   const maxHeight = media.videoTrack ? maxCameraHeight(sourceTrack(media.videoTrack)) : null
   const fhdSupported = maxHeight === null || maxHeight >= 1080
 
+  const [previewRatio, setPreviewRatio] = useState<number | null>(null)
+  const portraitPreview = videoOn && !!media.videoTrack && previewRatio !== null && previewRatio < 1
   const problem = mediaProblemCopy(videoOn ? media.videoError : null, audioOn ? media.audioError : null)
   const nameOk = name.trim().length > 0
   const emailOk = isHost || EMAIL_RE.test(email.trim())
@@ -405,6 +425,7 @@ export function PreJoinScreen({
 
   return (
     <main
+      data-meeting-page=""
       className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-4 pb-6 pt-5 sm:px-6 sm:pt-8"
       style={brandVars(brand.accent)}
     >
@@ -413,9 +434,21 @@ export function PreJoinScreen({
       <div className="grid flex-1 items-center gap-8 py-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-12">
         {/* Preview */}
         <section aria-label="Camera and microphone check" className="rise min-w-0">
-          <div className="relative aspect-[4/3] overflow-hidden rounded-3xl bg-[#101019] ring-1 ring-white/10 sm:aspect-video">
+          <div
+            className="relative mx-auto aspect-[4/3] overflow-hidden rounded-3xl bg-[#101019] ring-1 ring-white/10 sm:aspect-video"
+            // A phone held upright films portrait: show all of it, in its own
+            // shape (at most half the screen tall), not a landscape slice.
+            style={
+              portraitPreview && previewRatio
+                ? {
+                    aspectRatio: String(Math.max(9 / 16, previewRatio)),
+                    width: `min(100%, calc(50dvh * ${Math.max(9 / 16, previewRatio)}))`,
+                  }
+                : undefined
+            }
+          >
             {videoOn && media.videoTrack ? (
-              <PreviewVideo track={media.videoTrack} mirror={prefs.mirror} />
+              <PreviewVideo track={media.videoTrack} mirror={prefs.mirror} onRatio={setPreviewRatio} />
             ) : (
               <div className="grid h-full place-items-center">
                 <span className="grid h-20 w-20 place-items-center rounded-full bg-[var(--room-accent-soft)] font-display text-3xl font-semibold text-ink">
@@ -425,7 +458,8 @@ export function PreJoinScreen({
             )}
 
             {problem && (
-              <div className="absolute inset-0 grid place-items-center bg-black/65 p-6 text-center backdrop-blur-sm">
+              // Bottom padding keeps "Try again" clear of the toggles on small phones.
+              <div className="absolute inset-0 grid place-items-center bg-black/65 p-6 pb-20 text-center backdrop-blur-sm">
                 <div className="max-w-sm">
                   <p className="text-sm leading-relaxed text-ink">{problem}</p>
                   <button
@@ -545,7 +579,7 @@ export function PreJoinScreen({
 
             <Chip
               icon={<VideoIcon size={16} />}
-              label={cams.length ? deviceLabel(cams[camIndex], camIndex, 'Camera') : 'Camera'}
+              label={cams.length ? deviceLabel(cams[camIndex], camIndex, 'Camera', cams) : 'Camera'}
               menuLabel="Choose a camera"
             >
               {(close) => (
@@ -561,7 +595,7 @@ export function PreJoinScreen({
                         close()
                       }}
                     >
-                      {deviceLabel(d, i, 'Camera')}
+                      {deviceLabel(d, i, 'Camera', cams)}
                     </MenuItem>
                   ))}
                 </>
@@ -624,7 +658,8 @@ export function PreJoinScreen({
                 <p className="font-medium text-ink">Asking to join…</p>
               </div>
               <p className="mt-2 text-sm text-muted">
-                The host will let you in soon. You can keep checking your camera and mic.
+                The host will let you in soon. Keep this page open; you can check your camera and mic
+                while you wait.
               </p>
               <button
                 type="button"

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { brandVars, type MeetingBrand } from './_lib/brand'
 import { cancelKnock, checkJoin, requestJoin, type JoinResult } from './actions'
+import { useWakeLock } from './_lib/wake-lock'
 import { BrandMark } from './brand-mark'
 import { CallRoot, type EndReason, type JoinTracks } from './call'
 import { PreJoinScreen, type JoinDetails, type PreJoinPhase, type PreviewMedia } from './prejoin'
@@ -199,6 +200,9 @@ export function MeetingRoom({
   }, [waiting, slug, applyResult])
 
   const onEnded = useCallback((reason: EndReason) => setStage({ kind: 'ended', reason }), [])
+
+  // Keep a phone awake while waiting to be let in and during the call.
+  useWakeLock(waiting || stage.kind === 'call')
 
   if (!configured) {
     return (

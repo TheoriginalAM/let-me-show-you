@@ -58,11 +58,17 @@ const PREF_KEY: Record<MediaDeviceKind, 'audioInputId' | 'videoInputId' | 'audio
  * old capture, so switch back to the previous device rather than leaving the
  * mic or camera silently dead.
  */
-export async function switchDevice(room: Room, kind: MediaDeviceKind, deviceId: string): Promise<boolean> {
+export async function switchDevice(
+  room: Room,
+  kind: MediaDeviceKind,
+  deviceId: string,
+  /** Save as the default for next time (not for a quick front/back flip). */
+  remember = true,
+): Promise<boolean> {
   const previous = room.getActiveDevice(kind)
   try {
     await room.switchActiveDevice(kind, deviceId)
-    setPrefs({ [PREF_KEY[kind]]: deviceId })
+    if (remember) setPrefs({ [PREF_KEY[kind]]: deviceId })
     return true
   } catch (error) {
     console.error('[meeting] device switch failed:', error)

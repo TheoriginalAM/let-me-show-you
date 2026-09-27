@@ -89,7 +89,9 @@ export function SidePanel({
   return (
     <aside
       aria-label={panel === 'chat' ? 'Chat' : 'People'}
-      className="fixed inset-x-0 bottom-0 top-[20%] z-40 flex flex-col rounded-t-3xl border border-white/10 bg-[#0d0d15] shadow-2xl sm:static sm:top-auto sm:z-auto sm:w-[22rem] sm:shrink-0 sm:rounded-2xl sm:bg-[#0d0d15]/80"
+      // As a sheet it spans the screen, so keep its content clear of a landscape
+      // phone's notch and rounded corners (the side column sits inside the padded call).
+      className="fixed inset-x-0 bottom-0 top-[20%] z-40 flex flex-col rounded-t-3xl border border-white/10 bg-[#0d0d15] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] shadow-2xl panel-column:static panel-column:px-0 panel-column:top-auto panel-column:z-auto panel-column:w-[22rem] panel-column:shrink-0 panel-column:rounded-2xl panel-column:bg-[#0d0d15]/80"
     >
       <div className="flex items-center gap-1 border-b border-white/[0.07] p-2">
         <h2 ref={headingRef} tabIndex={-1} className="sr-only">
@@ -170,7 +172,7 @@ function PeoplePanel({ guests, refreshLobby }: { guests: LobbyGuest[]; refreshLo
   }
 
   return (
-    <div className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4">
+    <div className="min-h-0 flex-1 space-y-6 overflow-y-auto overscroll-contain p-4">
       {isHost && guests.length > 0 && (
         <section>
           <div className="mb-2 flex items-center justify-between">
@@ -515,7 +517,7 @@ function ChatPanel() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div ref={listRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
+      <div ref={listRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4" aria-live="polite">
         {groups.length === 0 && (
           <p className="mt-6 text-center text-sm text-faint">
             Messages are visible to everyone in the call and disappear when it ends.

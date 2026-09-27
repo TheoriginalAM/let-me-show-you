@@ -16,10 +16,16 @@ import {
   useKrispSupported,
 } from './_lib/call-media'
 import { useBlurSupported } from './_lib/blur'
-import { deviceLabel, sourceTrack, useDeviceList, useSpeakerSelectable } from './_lib/devices'
+import {
+  deviceLabel,
+  sourceTrack,
+  useDeviceList,
+  useIsRearCamera,
+  useSpeakerSelectable,
+} from './_lib/devices'
 import { useMeetPrefs, type NoiseMode } from './_lib/prefs'
 import { maxCameraHeight, QUALITY, QUALITY_ORDER } from './_lib/quality'
-import { shortcut } from './_lib/shortcuts'
+import { hasKeyboard, shortcut } from './_lib/shortcuts'
 import { playTestTone } from './_lib/sounds'
 import { useCall } from './call-context'
 import { CloseIcon, PlayIcon } from './icons'
@@ -72,7 +78,7 @@ export function SettingsDialog() {
       className="m-auto w-[min(46rem,calc(100vw-1.5rem))] max-w-none overflow-hidden rounded-3xl border border-white/10 bg-[#0f0f17] p-0 text-ink shadow-2xl backdrop:bg-black/70 backdrop:backdrop-blur-sm"
     >
       {settingsOpen && (
-        <div className="flex max-h-[min(40rem,calc(100dvh-2rem))] flex-col sm:flex-row">
+        <div className="relative flex max-h-[min(40rem,calc(100dvh-2rem))] flex-col sm:flex-row">
           <nav
             aria-label="Settings sections"
             className="flex gap-1 border-b border-white/[0.07] p-3 sm:w-44 sm:flex-col sm:border-b-0 sm:border-r"
@@ -103,15 +109,16 @@ export function SettingsDialog() {
               <CloseIcon size={18} />
             </button>
           </nav>
-          <div className="relative min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
-            <button
-              type="button"
-              onClick={() => setSettingsOpen(false)}
-              aria-label="Close settings"
-              className="absolute right-4 top-4 hidden h-9 w-9 place-items-center rounded-full text-muted hover:bg-white/[0.07] hover:text-ink sm:grid"
-            >
-              <CloseIcon size={18} />
-            </button>
+          {/* Outside the scrolling area, so it stays put on short (landscape) screens. */}
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(false)}
+            aria-label="Close settings"
+            className="absolute right-4 top-4 z-10 hidden h-9 w-9 place-items-center rounded-full bg-[#0f0f17]/80 text-muted hover:bg-white/[0.07] hover:text-ink sm:grid"
+          >
+            <CloseIcon size={18} />
+          </button>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6">
             {tab === 'audio' && <AudioTab />}
             {tab === 'video' && <VideoTab />}
             {tab === 'general' && <GeneralTab />}
@@ -244,6 +251,7 @@ function VideoTab() {
   const activeCam = useActiveDevice('videoinput')
   const switching = useRef(false)
   const camTrack = cameraTrack?.track as LocalVideoTrack | undefined
+  const rear = useIsRearCamera(camTrack)
   const maxHeight = maxCameraHeight(camTrack ? sourceTrack(camTrack) : undefined)
   const fhdSupported = maxHeight === null || maxHeight >= 1080
   const showPreview = cameraTrack && camTrack && !cameraTrack.isMuted
@@ -267,14 +275,14 @@ function VideoTab() {
       <Select
         label="Camera"
         value={activeCam ?? ''}
-        options={cams.map((d, i) => ({ value: d.deviceId, label: deviceLabel(d, i, 'Camera') }))}
+        options={cams.map((d, i) => ({ value: d.deviceId, label: deviceLabel(d, i, 'Camera', cams) }))}
         onChange={(id) => void pick(room, 'videoinput', id, notify)}
       />
       <div className="aspect-video overflow-hidden rounded-2xl bg-[#101019] ring-1 ring-white/10">
         {showPreview ? (
           <VideoTrack
             trackRef={{ participant: localParticipant, source: Track.Source.Camera, publication: cameraTrack }}
-            className={cx('h-full w-full object-cover', prefs.mirror && '-scale-x-100')}
+            className={cx('h-full w-full object-cover', prefs.mirror && !rear && '-scale-x-100')}
           />
         ) : (
           <div className="grid h-full place-items-center text-sm text-faint">Your camera is off</div>
@@ -330,17 +338,19 @@ function GeneralTab() {
         <Switch checked={prefs.hideSelf} onChange={(v) => setPrefs({ hideSelf: v })} label="Hide my own video" hint="Others still see you" />
         <Switch checked={prefs.sounds} onChange={(v) => setPrefs({ sounds: v })} label="Play sounds" hint="When someone asks to join" />
       </div>
-      <div>
-        <span className="mb-2 block text-xs font-medium text-faint">Keyboard shortcuts</span>
-        <dl className="divide-y divide-white/[0.06] rounded-xl border border-white/10">
-          {shortcuts().map(([what, keys]) => (
-            <div key={what} className="flex items-center justify-between px-3 py-2.5 text-sm">
-              <dt className="text-muted">{what}</dt>
-              <dd className="font-mono text-xs text-ink">{keys}</dd>
-            </div>
-          ))}
-        </dl>
-      </div>
+      {hasKeyboard() && (
+        <div>
+          <span className="mb-2 block text-xs font-medium text-faint">Keyboard shortcuts</span>
+          <dl className="divide-y divide-white/[0.06] rounded-xl border border-white/10">
+            {shortcuts().map(([what, keys]) => (
+              <div key={what} className="flex items-center justify-between px-3 py-2.5 text-sm">
+                <dt className="text-muted">{what}</dt>
+                <dd className="font-mono text-xs text-ink">{keys}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
     </div>
   )
 }

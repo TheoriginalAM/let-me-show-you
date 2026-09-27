@@ -41,7 +41,7 @@ import {
 import { sourceTrack } from './_lib/devices'
 import { audioConstraints, getPrefs } from './_lib/prefs'
 import { QUALITY } from './_lib/quality'
-import { shortcut } from './_lib/shortcuts'
+import { unmuteHint } from './_lib/shortcuts'
 import { BrandMark } from './brand-mark'
 import { CallProvider, useCall } from './call-context'
 import { Dock, userMicToggle } from './dock'
@@ -79,6 +79,8 @@ function createRoom(): Room {
   return new Room({
     adaptiveStream: true,
     dynacast: true,
+    // Handled by usePageLeave (so "Stay on this page" really stays).
+    disconnectOnPageLeave: false,
     videoCaptureDefaults: {
       ...(prefs.videoInputId ? { deviceId: prefs.videoInputId } : {}),
       resolution: q.preset.resolution,
@@ -206,6 +208,7 @@ export function CallRoot({
         role={role}
         guestKey={guestKey}
         initialLobby={lobbyEnabled}
+        initialMediaStarting={{ audio: !!tracks.audio, video: !!tracks.video || blurredJoin }}
         endedByMeRef={endedByMe}
       >
         <CallView
@@ -221,6 +224,18 @@ export function CallRoot({
 }
 
 // ---------------------------------------------------------------------------
+
+function useMediaQuery(query: string): boolean {
+  const [matches, setMatches] = useState(false)
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const update = (): void => setMatches(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
+  }, [query])
+  return matches
+}
 
 function formatClock(ms: number): string {
   const s = Math.max(0, Math.floor(ms / 1000))
@@ -262,6 +277,7 @@ function CallView({
   const connection = useConnectionState()
   const { quality } = useConnectionQualityIndicator({ participant: localParticipant })
   const { guests, lobbyEnabled: serverLobby, refresh } = useLobby(slug, roomName, isHost)
+  const compactScreen = useMediaQuery('(max-width: 639px), (max-height: 500px)')
   const reactions = useReactionFeed()
   const now = useNow()
 
@@ -269,6 +285,8 @@ function CallView({
   useCallBlur(() => notify("Background blur couldn't start on this device, so it's been turned off.", 'warn'))
   useCallNoise()
   useShortcuts()
+  useBackGuard()
+  usePageLeave()
   useTalkingWhileMuted()
   useHostMuteNotice()
   useChatToasts()
@@ -310,7 +328,9 @@ function CallView({
     if (askConsent) setSettingsOpen(false)
   }, [askConsent, setSettingsOpen])
 
-  const reconnecting = connection === ConnectionState.Reconnecting
+  // Includes the quick signal-only resume (e.g. a phone moving from Wi-Fi to cellular).
+  const reconnecting =
+    connection === ConnectionState.Reconnecting || connection === ConnectionState.SignalReconnecting
   const signal: 0 | 1 | 2 | 3 =
     quality === ConnectionQuality.Excellent
       ? 3
@@ -381,16 +401,23 @@ function CallView({
 
       <Dock onReaction={(e) => reactions.add(e, 'You')} />
 
-      {/* Toasts: knock requests first (hosts), then notices */}
+      {/* Toasts: knock requests first (hosts), then notices. On a phone they sit
+          over the header, one at a time, so they don't cover the chat/people
+          sheet or (on its side) run down over the controls. */}
       <div
         className={cx(
-          'pointer-events-none absolute right-3 top-[calc(4rem+env(safe-area-inset-top))] z-50 flex w-[min(22rem,calc(100vw-1.5rem))] flex-col gap-2',
+          'pointer-events-none absolute right-[calc(0.75rem+env(safe-area-inset-right))] z-50 flex w-[min(22rem,calc(100vw-1.5rem))] flex-col gap-2',
+          compactScreen ? 'top-[calc(0.5rem+env(safe-area-inset-top))]' : 'top-[calc(4rem+env(safe-area-inset-top))]',
           // Keep clear of the side panel (22rem + the stage's gap and padding).
-          panel ? 'sm:right-[24.75rem] sm:w-[min(22rem,calc(100vw-26.25rem))]' : 'sm:right-5',
+          panel
+            ? 'panel-column:right-[24.75rem] panel-column:w-[min(22rem,calc(100vw-26.25rem))]'
+            : 'sm:right-[calc(1.25rem+env(safe-area-inset-right))]',
         )}
         aria-live="polite"
       >
-        {isHost && guests[0] && panel !== 'people' && (
+        {/* On a phone with the chat sheet open, the People tab's dot (and the
+            chime) say someone's waiting; the card would cover the sheet. */}
+        {isHost && guests[0] && panel !== 'people' && !(compactScreen && panel) && (
           <div className="pointer-events-auto rounded-2xl border border-amber-400/30 bg-[#15151f]/95 p-3 shadow-2xl backdrop-blur-xl">
             <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-300">
               Wants to join
@@ -407,7 +434,7 @@ function CallView({
             )}
           </div>
         )}
-        {notices.map((n) => (
+        {(compactScreen ? notices.slice(-1) : notices).map((n) => (
           <div
             key={n.id}
             role="status"
@@ -451,7 +478,7 @@ function CallView({
       {/* Audio blocked by the browser (e.g. joined from the lobby without a click) */}
       <div className="absolute inset-x-0 top-[calc(5rem+env(safe-area-inset-top))] z-40 flex justify-center">
         <StartAudio
-          label="Click to turn on sound"
+          label="Turn on sound"
           className="rounded-full bg-[var(--room-accent)] px-5 py-2.5 text-sm font-semibold text-[var(--room-accent-fg)] shadow-2xl"
         />
       </div>
@@ -579,7 +606,7 @@ function AloneHint({ isHost, slug, onCopied }: { isHost: boolean; slug: string; 
  */
 function useJoinMedia(tracks: JoinTracks, blurredCamera: boolean): void {
   const room = useRoomContext()
-  const { notify } = useCall()
+  const { notify, setMediaStarting } = useCall()
   const started = useRef(false)
   useEffect(() => {
     if (!tracks.audio && !tracks.video && !blurredCamera) return
@@ -591,6 +618,8 @@ function useJoinMedia(tracks: JoinTracks, blurredCamera: boolean): void {
           console.error('[meeting] could not publish microphone:', error)
           tracks.audio.stop()
           notify("We couldn't turn on your microphone. Try the microphone button.", 'warn')
+        } finally {
+          setMediaStarting((cur) => ({ ...cur, audio: false }))
         }
       }
       try {
@@ -604,6 +633,8 @@ function useJoinMedia(tracks: JoinTracks, blurredCamera: boolean): void {
         console.error('[meeting] could not publish camera:', error)
         tracks.video?.stop()
         notify(CAMERA_FAILED_COPY, 'warn')
+      } finally {
+        setMediaStarting((cur) => ({ ...cur, video: false }))
       }
     }
     const start = (): void => {
@@ -616,14 +647,16 @@ function useJoinMedia(tracks: JoinTracks, blurredCamera: boolean): void {
     return () => {
       room.off(RoomEvent.Connected, start)
     }
-  }, [room, tracks, blurredCamera, notify])
+  }, [room, tracks, blurredCamera, notify, setMediaStarting])
 }
 
 /** ⌘/Ctrl+D mic, ⌘/Ctrl+E camera (Meet's convention). Ignored while typing. */
 function useShortcuts(): void {
   const room = useRoomContext()
-  const { notify } = useCall()
+  const { notify, mediaStarting } = useCall()
   const busy = useRef(false)
+  const starting = useRef(mediaStarting)
+  starting.current = mediaStarting
   useEffect(() => {
     const run = (fn: () => Promise<void>): void => {
       if (busy.current) return
@@ -642,6 +675,8 @@ function useShortcuts(): void {
       e.preventDefault()
       if (e.repeat) return
       const lp = room.localParticipant
+      // Still coming on as the call starts: a toggle now would open a second capture.
+      if ((key === 'd' && starting.current.audio) || (key === 'e' && starting.current.video)) return
       if (key === 'd') {
         run(async () => {
           userMicToggle.at = Date.now()
@@ -662,6 +697,101 @@ function useShortcuts(): void {
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [room, notify])
+}
+
+type NavigationLike = { currentEntry?: { key: string } | null }
+const navigationApi = (): NavigationLike | undefined =>
+  (window as unknown as { navigation?: NavigationLike }).navigation
+const isStandIn = (): boolean => (window.history.state as { lmsyCall?: boolean } | null)?.lmsyCall === true
+
+// The stand-in history entry (see useBackGuard) is shared across mounts, so a
+// call that remounts straight away (React dev mode, a quick rejoin) reuses it
+// rather than stacking another.
+let standInPushedHere = false
+let pendingStandInRemoval: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * Android's Back button (or back swipe) would leave the page and drop the call.
+ * Instead it closes whatever is open, top-most first (like Esc), and with
+ * nothing open asks before leaving. One extra history entry stands in for
+ * the call; each Back consumes it and it's put straight back.
+ */
+function useBackGuard(): void {
+  const room = useRoomContext()
+  const { panel, setPanel, settingsOpen, setSettingsOpen } = useCall()
+  const open = useRef({ panel, settingsOpen })
+  open.current = { panel, settingsOpen }
+  useEffect(() => {
+    if (pendingStandInRemoval) {
+      clearTimeout(pendingStandInRemoval)
+      pendingStandInRemoval = null
+    }
+    if (!isStandIn()) {
+      window.history.pushState({ lmsyCall: true }, '')
+      standInPushedHere = true
+    }
+    let key = navigationApi()?.currentEntry?.key
+    const onPop = (): void => {
+      window.history.pushState({ lmsyCall: true }, '')
+      standInPushedHere = true
+      key = navigationApi()?.currentEntry?.key
+      if (document.querySelector('[data-popover]')) {
+        document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      } else if (open.current.settingsOpen) {
+        setSettingsOpen(false)
+      } else if (document.querySelector('dialog[open]')) {
+        // e.g. the recording notice: it needs an answer first.
+      } else if (open.current.panel) {
+        setPanel(null)
+      } else if (window.confirm('Leave the call?')) {
+        void room.disconnect()
+      }
+    }
+    window.addEventListener('popstate', onPop)
+    return () => {
+      window.removeEventListener('popstate', onPop)
+      // A tick later (unless a new call picks it up), take the stand-in away so
+      // Back behaves normally again. Only one pushed by this page: going back
+      // past a reload would load the page afresh.
+      pendingStandInRemoval = setTimeout(() => {
+        pendingStandInRemoval = null
+        const current = navigationApi()?.currentEntry
+        const onIt = key && current ? current.key === key : isStandIn()
+        if (standInPushedHere && onIt) window.history.back()
+        else if (isStandIn()) window.history.replaceState({ lmsyCall: false }, '')
+        standInPushedHere = false
+      }, 0)
+    }
+  }, [room, setPanel, setSettingsOpen])
+}
+
+/**
+ * Leaving the page ends the call. LiveKit's own handler would disconnect on
+ * `beforeunload` even when the person then chooses to stay, so it's replaced
+ * (disconnectOnPageLeave: false) by this: disconnect when the page actually
+ * goes away, and on phones, where a stray Back or swipe is easy, have the
+ * browser ask first.
+ */
+function usePageLeave(): void {
+  const room = useRoomContext()
+  useEffect(() => {
+    const leave = (): void => {
+      void room.disconnect()
+    }
+    const warn = (e: BeforeUnloadEvent): void => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    const phone = window.matchMedia('(pointer: coarse)').matches
+    window.addEventListener('pagehide', leave)
+    window.addEventListener('freeze', leave)
+    if (phone) window.addEventListener('beforeunload', warn)
+    return () => {
+      window.removeEventListener('pagehide', leave)
+      window.removeEventListener('freeze', leave)
+      window.removeEventListener('beforeunload', warn)
+    }
+  }, [room])
 }
 
 /** A short toast for new chat messages while the chat panel is closed. */
@@ -716,7 +846,7 @@ function useTalkingWhileMuted(): void {
         if (loud >= 6 && Date.now() - lastShown > 30_000) {
           lastShown = Date.now()
           loud = 0
-          notify(`You're muted. Press ${shortcut('D')} to talk.`, 'info')
+          notify(`You're muted. ${unmuteHint('talk')}`, 'info')
         }
       }, 150)
     } catch {
@@ -748,7 +878,7 @@ function useHostMuteNotice(): void {
         })
         return
       }
-      notify(`You've been muted. Press ${shortcut('D')} to unmute.`, 'info')
+      notify(`You've been muted. ${unmuteHint('unmute')}`, 'info')
     }
     localParticipant.on(ParticipantEvent.TrackMuted, onMuted)
     return () => {

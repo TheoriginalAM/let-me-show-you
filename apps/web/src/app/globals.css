@@ -1,5 +1,14 @@
 @import 'tailwindcss';
 
+/*
+ * Meeting layout modes. A phone on its side is wide but short, so width alone
+ * would give it the desktop layout with no room left for the video.
+ *   panel-column: room for People/Chat as a side column (else a bottom sheet)
+ *   short:        a short screen (landscape phone): trim the strip, etc.
+ */
+@custom-variant panel-column (@media (min-width: 40rem) and (min-height: 31.25rem));
+@custom-variant short (@media (max-height: 31.25rem));
+
 /* ------------------------------------------------------------------ *
  * Let Me Show You — "dark & premium" design system
  * Deep near-black canvas, luminous violet accents, glass surfaces,
@@ -218,6 +227,16 @@ body {
 }
 
 /* ---- Meeting rooms ---- */
+
+/*
+ * Meeting pages never pull-to-refresh: on Android a downward swipe on the
+ * video or the chat sheet would reload the page and drop the call (or the
+ * guest's place in the lobby). It must be set on the root element.
+ */
+html:has([data-meeting-page]),
+html:has([data-meeting-call]) {
+  overscroll-behavior-y: none;
+}
 
 /* Keep the film grain and ambient glow off live video. */
 body:has([data-meeting-call]) .grain,

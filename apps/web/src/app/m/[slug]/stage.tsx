@@ -1,6 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type RefObject,
+  type SyntheticEvent,
+} from 'react'
 import {
   isTrackReference,
   useConnectionQualityIndicator,
@@ -13,7 +20,8 @@ import {
   VideoTrack,
   type TrackReferenceOrPlaceholder,
 } from '@livekit/components-react'
-import { ConnectionQuality, Track } from 'livekit-client'
+import { ConnectionQuality, Track, type LocalVideoTrack } from 'livekit-client'
+import { useIsRearCamera } from './_lib/devices'
 import { useMeetPrefs } from './_lib/prefs'
 import { useCall } from './call-context'
 import { HandIcon, MicOffIcon, PinIcon } from './icons'
@@ -42,6 +50,33 @@ function useIsNarrow(): boolean {
   return narrow
 }
 
+/** An element's rendered size, kept up to date. */
+function useSize(ref: RefObject<HTMLElement | null>): { w: number; h: number } {
+  const [size, setSize] = useState({ w: 0, h: 0 })
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0]?.contentRect
+      if (r) setSize({ w: r.width, h: r.height })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [ref])
+  return size
+}
+
+/**
+ * Whether filling a box (object-fit: cover) would cut a lot off the top and
+ * bottom of a video: e.g. a phone held upright, shown in a landscape tile,
+ * loses its head and chin. Trimming the sides is fine (people sit centred, and
+ * it's how phone calls show a desktop camera full screen), so only a video
+ * taller than its box that would lose over 30% gets the whole-picture view.
+ */
+function coverCutsTopAndBottom(videoRatio: number, boxRatio: number): boolean {
+  return videoRatio < boxRatio && videoRatio / boxRatio < 0.7
+}
+
 // ---------------------------------------------------------------------------
 // Tile
 // ---------------------------------------------------------------------------
@@ -49,9 +84,12 @@ function useIsNarrow(): boolean {
 export function Tile({
   trackRef,
   variant,
+  onAspect,
 }: {
   trackRef: TrackReferenceOrPlaceholder
   variant: 'grid' | 'focus' | 'strip' | 'self'
+  /** Called with the video's width/height ratio whenever it changes (e.g. a phone rotating). */
+  onAspect?: (ratio: number) => void
 }) {
   const p = trackRef.participant
   const isShare = trackRef.source === Track.Source.ScreenShare
@@ -67,7 +105,13 @@ export function Tile({
   const key = trackKey(trackRef)
   const isPinned = pinned === key
   const showVideo = isTrackReference(trackRef) && !videoMuted
-  const mirror = p.isLocal && !isShare && prefs.mirror
+  // Mirror your own front camera (like a mirror), never a phone's back camera.
+  const ownCamera =
+    p.isLocal && !isShare && isTrackReference(trackRef)
+      ? (trackRef.publication.track as LocalVideoTrack | undefined)
+      : undefined
+  const rear = useIsRearCamera(ownCamera)
+  const mirror = p.isLocal && !isShare && prefs.mirror && !rear
   const name = p.name || (p.isLocal ? 'You' : 'Guest')
   const label = `${name}${p.isLocal ? ' (you)' : ''}${isShare ? ', screen' : ''}${
     role === 'host' ? ', host' : ''
@@ -75,8 +119,29 @@ export function Tile({
   const poor = quality === ConnectionQuality.Poor || quality === ConnectionQuality.Lost
   const compact = variant === 'strip' || variant === 'self'
 
+  // Fill the tile unless that would cut off heads (see coverCutsTopAndBottom).
+  // The self-view is shaped to its own video, so it always fills.
+  const box = useRef<HTMLDivElement>(null)
+  const boxSize = useSize(box)
+  const [videoRatio, setVideoRatio] = useState<number | null>(null)
+  const onVideoSize = (e: SyntheticEvent<HTMLVideoElement>): void => {
+    const v = e.currentTarget
+    if (!v.videoWidth || !v.videoHeight) return
+    const r = v.videoWidth / v.videoHeight
+    setVideoRatio(r)
+    onAspect?.(r)
+  }
+  const contain =
+    isShare ||
+    (variant !== 'self' &&
+      videoRatio !== null &&
+      boxSize.w > 0 &&
+      boxSize.h > 0 &&
+      coverCutsTopAndBottom(videoRatio, boxSize.w / boxSize.h))
+
   return (
     <div
+      ref={box}
       role="group"
       aria-label={label}
       className={cx(
@@ -87,9 +152,11 @@ export function Tile({
       {showVideo && isTrackReference(trackRef) ? (
         <VideoTrack
           trackRef={trackRef}
+          onLoadedMetadata={onVideoSize}
+          onResize={onVideoSize}
           className={cx(
             'h-full w-full',
-            isShare ? 'bg-black object-contain' : 'object-cover',
+            contain ? 'bg-black object-contain' : 'object-cover',
             mirror && '-scale-x-100',
           )}
         />
@@ -182,6 +249,10 @@ export function Stage() {
   const [prefs] = useMeetPrefs()
   const narrow = useIsNarrow()
   const [activeId, setActiveId] = useState<string | null>(null)
+  // Your own floating video takes the shape of your camera (upright on a
+  // phone) and can be tapped to make it bigger.
+  const [selfRatio, setSelfRatio] = useState<number | null>(null)
+  const [bigSelf, setBigSelf] = useState(false)
 
   // Remember the last remote person who spoke (so Speaker view doesn't flicker).
   useEffect(() => {
@@ -210,20 +281,33 @@ export function Stage() {
 
   if (focus) {
     const focusIsSelf = focus === localCam
-    const rest = visible.filter((t) => t !== focus && t !== localCam)
-    const showSelf = !!localCam && !focusIsSelf && !prefs.hideSelf
+    // During a screen share you join the strip instead of floating over the
+    // shared screen (on a phone an upright self-view would cover part of it).
+    const selfInStrip = focus.source === Track.Source.ScreenShare
+    const rest = visible.filter(
+      (t) => t !== focus && (t !== localCam || (selfInStrip && !prefs.hideSelf)),
+    )
+    const showSelf = !!localCam && !focusIsSelf && !prefs.hideSelf && !selfInStrip
     return (
       <div className="flex h-full min-h-0 flex-col gap-3">
-        <div className="relative min-h-0 flex-1">
+        {/* A size container: the self-view is sized in units of this box. */}
+        <div className="relative min-h-0 flex-1" style={{ containerType: 'size' }}>
           <Tile trackRef={focus} variant="focus" />
           {showSelf && (
-            <div className="absolute bottom-3 right-3 z-10 aspect-video w-32 sm:w-52">
-              <Tile trackRef={localCam} variant="self" />
-            </div>
+            <button
+              type="button"
+              onClick={() => setBigSelf((b) => !b)}
+              aria-label={bigSelf ? 'Make your video smaller' : 'Make your video bigger'}
+              title={bigSelf ? 'Make smaller' : 'Make bigger'}
+              className="absolute bottom-3 right-3 z-10 block rounded-xl transition-[width] duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--room-accent-ring)] motion-reduce:transition-none"
+              style={selfViewSize(selfRatio ?? (narrow ? 3 / 4 : 16 / 9), narrow, bigSelf)}
+            >
+              <Tile trackRef={localCam} variant="self" onAspect={setSelfRatio} />
+            </button>
           )}
         </div>
         {rest.length > 0 && (
-          <div className="flex h-24 shrink-0 gap-3 overflow-x-auto pb-1 sm:h-28" aria-label="Other people">
+          <div className="flex h-24 shrink-0 gap-3 overflow-x-auto pb-1 sm:h-28 short:h-16" aria-label="Other people">
             {rest.map((t) => (
               <div key={trackKey(t)} className="aspect-video h-full shrink-0">
                 <Tile trackRef={t} variant="strip" />
@@ -238,6 +322,27 @@ export function Stage() {
   // Grid. "Hide self view" drops you only when someone else is there to see.
   const grid = prefs.hideSelf && visible.length > 1 ? visible.filter((t) => t !== localCam) : visible
   return <GridStage tracks={grid} narrow={narrow} />
+}
+
+/**
+ * Size of the floating self-view: shaped like your video, a comfortable size to
+ * see yourself (bigger when tapped), and never more than about half the space
+ * it floats in (container units of the focus box), so it can't cover the
+ * person you're talking to or spill out of a short landscape screen.
+ */
+function selfViewSize(ratio: number, narrow: boolean, big: boolean): CSSProperties {
+  const r = Math.min(16 / 9, Math.max(9 / 16, ratio))
+  const portrait = r < 1
+  const width = narrow
+    ? portrait
+      ? big ? '50cqw' : '34cqw'
+      : big ? '75cqw' : '48cqw'
+    : portrait
+      ? `${Math.round((big ? 360 : 220) * r)}px`
+      : big ? '400px' : '250px'
+  const maxH = big ? 62 : 45
+  const maxW = big ? 70 : 45
+  return { width: `min(${width}, calc(${maxH}cqh * ${r}), ${maxW}cqw)`, aspectRatio: String(r) }
 }
 
 const GAP = 12

@@ -20,9 +20,20 @@ export const viewport: Viewport = { viewportFit: 'cover', themeColor: '#08080c' 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
   const room = await getRoomBySlug(slug)
+  if (!room) {
+    return { title: { absolute: 'Meeting not found' }, robots: { index: false, follow: false } }
+  }
+  // White-labelled: a link pasted into WhatsApp, Slack or iMessage previews as
+  // this room and brand, not the Let Me Show You marketing card (these replace
+  // the site-wide Open Graph tags, image included).
+  const title = `Join ${room.name}`
+  const description = `Video call with ${room.brand.name || room.workspaceName}. Nothing to install.`
   return {
     // Absolute: rooms are white-labelled, so no site-name suffix.
-    title: { absolute: room ? `Join ${room.name}` : 'Meeting not found' },
+    title: { absolute: title },
+    description,
+    openGraph: { type: 'website', title, description, url: `/m/${room.slug}`, siteName: room.brand.name || room.workspaceName },
+    twitter: { card: 'summary', title, description },
     // Room links are private invitations: never index them.
     robots: { index: false, follow: false },
   }
