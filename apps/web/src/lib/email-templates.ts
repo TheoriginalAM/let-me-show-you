@@ -196,6 +196,25 @@ export function workspaceInviteEmail(opts: {
   }
 }
 
+export function meetingInviteEmail(opts: {
+  inviterName: string
+  roomName: string
+  workspaceName: string
+  url: string
+}) {
+  return {
+    subject: `${opts.inviterName} invited you to a video meeting`,
+    html: layout({
+      preview: `Join ${opts.roomName} with ${opts.inviterName}.`,
+      heading: `Join ${escapeHtml(opts.roomName)}`,
+      body: `<strong style="color:${INK};">${escapeHtml(opts.inviterName)}</strong> from <strong style="color:${INK};">${escapeHtml(opts.workspaceName)}</strong> invited you to a video meeting. It runs in your browser, so there's nothing to install.`,
+      cta: { label: 'Join meeting', url: opts.url },
+      footNote: 'Open the link at meeting time. The host may need to let you in.',
+    }),
+    text: `${opts.inviterName} from ${opts.workspaceName} invited you to a video meeting (${opts.roomName}).\n\nJoin: ${opts.url}`,
+  }
+}
+
 export function approvedEmail(opts: { name: string; loginUrl: string }) {
   return {
     subject: `You're approved. Welcome to ${APP_NAME}`,

@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: '*',
       allow: '/',
       // Keep private/authed and machine routes out of the index.
-      disallow: ['/dashboard', '/api/', '/device'],
+      disallow: ['/dashboard', '/api/', '/device', '/m/'],
     },
     sitemap: `${base}/sitemap.xml`,
     host: base,

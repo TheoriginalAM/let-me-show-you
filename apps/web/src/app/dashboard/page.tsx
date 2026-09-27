@@ -44,6 +44,9 @@ export default async function DashboardPage() {
         />
         <div className="flex items-center gap-2">
           <NotificationsBell userId={user.id} />
+          <Link href="/dashboard/rooms" className="btn-ghost px-3 py-1.5 text-sm">
+            Meetings
+          </Link>
           <Link href="/dashboard/settings" className="btn-ghost px-3 py-1.5 text-sm">
             Settings
           </Link>

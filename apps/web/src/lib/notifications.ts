@@ -9,6 +9,7 @@ import {
   approvalEmail,
   approvedEmail,
   commentReplyEmail,
+  meetingInviteEmail,
   newCommentEmail,
   workspaceInviteEmail,
 } from './email-templates'
@@ -86,6 +87,23 @@ export async function notifyApproval(opts: {
     url: opts.url,
   })
   return sendEmail({ to: opts.ownerEmail, subject, html, text })
+}
+
+/** Email someone an invite to a live meeting room. Returns whether it sent. */
+export async function notifyMeetingInvite(opts: {
+  email: string
+  inviterName: string
+  roomName: string
+  workspaceName: string
+  url: string
+}): Promise<boolean> {
+  const { subject, html, text } = meetingInviteEmail({
+    inviterName: opts.inviterName,
+    roomName: opts.roomName,
+    workspaceName: opts.workspaceName,
+    url: opts.url,
+  })
+  return sendEmail({ to: opts.email, subject, html, text })
 }
 
 /** Email a video owner that someone left a comment on their recording. Best-effort. */

@@ -12,11 +12,15 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@livekit/components-react": "^2.9.24",
+    "@livekit/components-styles": "^1.2.0",
     "@lmsy/shared": "workspace:*",
     "@mux/mux-node": "^14.1.1",
     "@mux/mux-player-react": "^3.13.0",
     "better-auth": "^1.6.23",
     "drizzle-orm": "^0.45.2",
+    "livekit-client": "^2.22.3",
+    "livekit-server-sdk": "^2.19.1",
     "nanoid": "^5.1.16",
     "next": "^15.1.4",
     "postgres": "^3.4.9",

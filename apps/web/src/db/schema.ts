@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import {
   type AnyPgColumn,
   boolean,
@@ -209,6 +210,99 @@ export const notifications = pgTable(
   ],
 )
 
+/**
+ * A live meeting room (LiveKit) belonging to a workspace. The public link is
+ * /m/<slug>; any workspace member can host. With the lobby on, guests wait until
+ * a host admits them.
+ */
+export const meetingRooms = pgTable(
+  'meeting_rooms',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    slug: text('slug').notNull().unique(),
+    lobbyEnabled: boolean('lobby_enabled').notNull().default(true),
+    createdByUserId: text('created_by_user_id').references(() => user.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index('meeting_rooms_workspace_id_idx').on(table.workspaceId)],
+)
+
+/**
+ * A guest's request to join a room (also logged, already admitted, for lobby-off
+ * rooms). `identity` is derived from a secret key only the guest's browser holds,
+ * so polling can't be spoofed.
+ * status: 'pending' | 'admitted' | 'denied' | 'cancelled' (guest left the lobby)
+ * | 'expired' (an old admission or abandoned request that no longer counts).
+ */
+export const meetingKnocks = pgTable(
+  'meeting_knocks',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    roomId: uuid('room_id')
+      .notNull()
+      .references(() => meetingRooms.id, { onDelete: 'cascade' }),
+    identity: text('identity').notNull(),
+    name: text('name').notNull(),
+    email: text('email').notNull(),
+    status: text('status').notNull().default('pending'),
+    ipHash: text('ip_hash'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    decidedAt: timestamp('decided_at', { withTimezone: true, mode: 'string' }),
+    // Bumped by the waiting guest's poll: hosts only see guests who are still there.
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('meeting_knocks_room_id_created_at_idx').on(table.roomId, table.createdAt),
+    index('meeting_knocks_room_identity_idx').on(table.roomId, table.identity),
+  ],
+)
+
+/**
+ * A meeting recording in progress or finished. LiveKit egress streams the call to
+ * a Mux live stream, whose recorded asset becomes an ordinary workspace video.
+ * status: 'recording' (egress live; holds the room's slot) | 'stopping' (egress
+ * stopped, waiting for Mux to finalize) | 'completed' | 'failed'.
+ * The row outlives its room (room_id set null) so a recording still finishes.
+ */
+export const meetingRecordings = pgTable(
+  'meeting_recordings',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    roomId: uuid('room_id').references(() => meetingRooms.id, { onDelete: 'set null' }),
+    videoId: uuid('video_id').references(() => videos.id, { onDelete: 'set null' }),
+    egressId: text('egress_id'),
+    muxLiveStreamId: text('mux_live_stream_id'),
+    startedByUserId: text('started_by_user_id').references(() => user.id, {
+      onDelete: 'set null',
+    }),
+    status: text('status').notNull().default('recording'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    endedAt: timestamp('ended_at', { withTimezone: true, mode: 'string' }),
+  },
+  (table) => [
+    index('meeting_recordings_room_id_idx').on(table.roomId),
+    index('meeting_recordings_video_id_idx').on(table.videoId),
+    // At most one live recording per room, so two hosts pressing Record at once
+    // can't start two egresses (the second insert fails and backs out). A
+    // 'stopping' row doesn't hold the slot, so you can record again right away.
+    uniqueIndex('meeting_recordings_one_active_idx')
+      .on(table.roomId)
+      .where(sql`${table.status} = 'recording'`),
+  ],
+)
+
 /** Long-lived bearer tokens for the desktop app — stored hashed, never plaintext. */
 export const apiTokens = pgTable(
   'api_tokens',
@@ -256,5 +350,8 @@ export type NewWorkspaceRow = typeof workspaces.$inferInsert
 export type WorkspaceMemberRow = typeof workspaceMembers.$inferSelect
 export type WorkspaceInviteRow = typeof workspaceInvites.$inferSelect
 export type WorkspaceRole = (typeof workspaceRole.enumValues)[number]
+export type MeetingRoomRow = typeof meetingRooms.$inferSelect
+export type MeetingKnockRow = typeof meetingKnocks.$inferSelect
+export type MeetingRecordingRow = typeof meetingRecordings.$inferSelect
 export type ApiTokenRow = typeof apiTokens.$inferSelect
 export type DeviceCodeRow = typeof deviceCodes.$inferSelect

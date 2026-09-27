@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getAuthedUserId } from '@/lib/api-auth'
+import { discardRecordingForVideo } from '@/lib/meeting-recording'
 import { getMux } from '@/lib/mux'
 import { deleteOwnedVideo, getManageableVideo } from '@/db/queries'
 
@@ -18,6 +19,13 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
   const video = await getManageableVideo(userId, id)
   if (!video) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  }
+
+  // A meeting still recording into this video: stop it and throw it away too, so
+  // no egress or live stream keeps running for a deleted video. If Mux cleanup
+  // failed, keep our row (same rule as below) so the client can retry.
+  if (!(await discardRecordingForVideo(id))) {
+    return NextResponse.json({ error: 'Could not delete the video' }, { status: 502 })
   }
 
   if (video.muxAssetId) {

@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { APP_DOMAIN } from '@lmsy/shared'
 import { getCurrentUser } from '@/lib/current-user'
+import { shutdownWorkspaceMeetings } from '@/lib/meeting-recording'
 import { notifyWorkspaceInvite } from '@/lib/notifications'
 import {
   createInvite,
@@ -91,7 +92,10 @@ export async function revokeInviteAction(inviteId: string): Promise<Result> {
 export async function deleteWorkspaceAction(): Promise<Result> {
   const ctx = await context()
   if (!ctx) return { ok: false, error: 'Not signed in.' }
-  const ok = await deleteWorkspace(ctx.userId, ctx.workspaceId)
+  const workspaceId = ctx.workspaceId
+  const ok = await deleteWorkspace(ctx.userId, workspaceId, () =>
+    shutdownWorkspaceMeetings(workspaceId),
+  )
   if (!ok) {
     return { ok: false, error: "Can't delete your only workspace (owners only)." }
   }

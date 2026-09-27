@@ -2,6 +2,7 @@ import 'server-only'
 
 import { and, count, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 import type { PublicVideo, Video } from '@lmsy/shared'
+import { pgErrorCode } from './errors'
 import { db } from './index'
 import { user, videos, videoViews, workspaceMembers, workspaces } from './schema'
 
@@ -361,18 +362,22 @@ export async function createVideoForUpload(
   workspaceId: string,
   title: string,
   makeSlug: () => string,
+  // Meeting recordings start as 'processing' (no upload step) and private (a
+  // recorded call is third-party content: the host chooses to share it).
+  options: { status?: 'uploading' | 'processing'; isPublic?: boolean } = {},
 ): Promise<Video> {
+  const { status = 'uploading', isPublic = true } = options
   let lastError: unknown
   for (let attempt = 0; attempt < 5; attempt++) {
     try {
       const rows = await db
         .insert(videos)
-        .values({ ownerId, workspaceId, title, shareSlug: makeSlug(), status: 'uploading' })
+        .values({ ownerId, workspaceId, title, shareSlug: makeSlug(), status, isPublic })
         .returning(ownerVideoColumns)
       return rows[0]!
     } catch (error) {
       // 23505 = unique_violation (slug clash) → retry; anything else is fatal.
-      if ((error as { code?: string })?.code !== '23505') throw error
+      if (pgErrorCode(error) !== '23505') throw error
       lastError = error
     }
   }
@@ -391,18 +396,31 @@ export async function deleteOwnedVideo(userId: string, videoId: string): Promise
  * Mux `passthrough`. These are intentionally NOT owner-scoped — never call them
  * from user-facing routes.
  */
-export async function markVideoProcessing(videoId: string, muxAssetId: string): Promise<void> {
-  await db.update(videos).set({ status: 'processing', muxAssetId }).where(eq(videos.id, videoId))
+/**
+ * Link a Mux asset to a video without ever downgrading a finished one: webhooks
+ * can arrive late or out of order, so a retried `asset.created` must not push a
+ * ready (or errored) video back to 'processing'.
+ */
+export async function linkVideoAsset(videoId: string, muxAssetId: string): Promise<void> {
+  await db
+    .update(videos)
+    .set({
+      muxAssetId,
+      status: sql`case when ${videos.status} in ('ready', 'errored') then ${videos.status} else 'processing' end`,
+    })
+    .where(eq(videos.id, videoId))
 }
 
 export async function markVideoReady(
   videoId: string,
   muxPlaybackId: string,
   durationSeconds: number | null,
+  // Also record the asset id, so the link doesn't depend on an earlier webhook.
+  muxAssetId?: string,
 ): Promise<void> {
   await db
     .update(videos)
-    .set({ status: 'ready', muxPlaybackId, durationSeconds })
+    .set({ status: 'ready', muxPlaybackId, durationSeconds, ...(muxAssetId ? { muxAssetId } : {}) })
     .where(eq(videos.id, videoId))
 }
 

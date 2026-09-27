@@ -153,10 +153,17 @@ export async function renameWorkspace(
  * refused if it's the user's only workspace (they must keep at least one).
  * Users whose active workspace was this one are re-pointed lazily.
  */
-export async function deleteWorkspace(userId: string, workspaceId: string): Promise<boolean> {
+export async function deleteWorkspace(
+  userId: string,
+  workspaceId: string,
+  // Runs once the delete is authorized, before anything is removed (e.g. ending
+  // the workspace's live calls and recordings).
+  beforeDelete?: () => Promise<void>,
+): Promise<boolean> {
   if ((await memberRole(userId, workspaceId)) !== 'owner') return false
   const mine = await listWorkspacesForUser(userId)
   if (mine.length <= 1) return false
+  if (beforeDelete) await beforeDelete()
   // Delete this workspace's Mux assets before the DB cascade removes the video
   // rows, otherwise the assets are orphaned upstream and keep billing.
   const assets = await db
