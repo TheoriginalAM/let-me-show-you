@@ -91,10 +91,45 @@ export function classifyMediaError(error: unknown): MediaProblem {
   return 'other'
 }
 
-export const MEDIA_PROBLEM_COPY: Record<MediaProblem, string> = {
-  denied:
-    'Your browser is blocking your camera and microphone. Click the camera icon in the address bar, choose Allow, then try again.',
-  busy: 'Your camera or microphone is being used by another app. Close it, then try again.',
-  notfound: "We couldn't find a camera or microphone. You can still join and listen.",
-  other: "We couldn't start your camera or microphone. You can still join with them turned off.",
+export type Platform = 'ios' | 'android' | 'desktop'
+
+/** Rough platform, for instructions only (never for feature checks). */
+export function platform(): Platform {
+  if (typeof navigator === 'undefined') return 'desktop'
+  const ua = navigator.userAgent
+  if (/iPhone|iPad|iPod/.test(ua)) return 'ios'
+  // iPadOS reports itself as a Mac; a touch screen gives it away.
+  if (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) return 'ios'
+  if (/Android/.test(ua)) return 'android'
+  return 'desktop'
+}
+
+const ALLOW_STEPS: Record<Platform, string> = {
+  ios: 'Tap Try again and choose Allow. If Safari doesn\u2019t ask, tap the page menu in the address bar, open Website Settings and allow them.',
+  android: 'Tap the icon at the left of the address bar, open Permissions, allow them, then tap Try again.',
+  desktop: 'Click the camera icon in the address bar, choose Allow, then try again.',
+}
+
+/**
+ * What to tell people when the camera and/or microphone couldn't start, naming
+ * only the device(s) that actually failed. Null when both are fine.
+ */
+export function mediaProblemCopy(video: MediaProblem | null, audio: MediaProblem | null): string | null {
+  const problem = video ?? audio
+  if (!problem) return null
+  const what = video && audio ? 'camera and microphone' : video ? 'camera' : 'microphone'
+  switch (problem) {
+    case 'denied':
+      return `Your browser is blocking your ${what}. ${ALLOW_STEPS[platform()]}`
+    case 'busy':
+      return `Your ${what} ${video && audio ? 'are' : 'is'} being used by another app. Close it, then try again.`
+    case 'notfound':
+      return video && audio
+        ? "We couldn't find a camera or microphone. You can still join and listen."
+        : `We couldn't find a ${what}. You can still join without it.`
+    default:
+      return video && audio
+        ? "We couldn't start your camera or microphone. You can still join with them turned off."
+        : `We couldn't start your ${what}. You can still join without it.`
+  }
 }

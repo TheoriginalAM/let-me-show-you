@@ -25,6 +25,7 @@ import {
   supportsAudioOutputSelection,
   Track,
   type LocalAudioTrack,
+  type LocalVideoTrack,
   type TrackPublication,
 } from 'livekit-client'
 import { brandVars, type MeetingBrand } from './_lib/brand'
@@ -32,12 +33,13 @@ import {
   BLUR_FAILED_COPY,
   enableCamera,
   isDeviceError,
+  publishCameraTrack,
   setCameraOn,
   useCallBlur,
   useCallNoise,
 } from './_lib/call-media'
 import { sourceTrack } from './_lib/devices'
-import { getPrefs } from './_lib/prefs'
+import { audioConstraints, getPrefs } from './_lib/prefs'
 import { QUALITY } from './_lib/quality'
 import { shortcut } from './_lib/shortcuts'
 import { BrandMark } from './brand-mark'
@@ -52,6 +54,12 @@ import { useLobby } from './use-lobby'
 
 export type EndReason = 'left' | 'removed' | 'ended' | 'ended-by-me' | 'duplicate' | 'lost'
 
+/** The pre-join preview's live tracks, taken over by the call. */
+export interface JoinTracks {
+  audio: LocalAudioTrack | null
+  video: LocalVideoTrack | null
+}
+
 const CAMERA_FAILED_COPY = "We couldn't start your camera. It may be in use by another app."
 
 /**
@@ -62,7 +70,6 @@ const CAMERA_FAILED_COPY = "We couldn't start your camera. It may be in use by a
 function createRoom(): Room {
   const prefs = getPrefs()
   const q = QUALITY[prefs.quality]
-  const raw = prefs.noise === 'off'
   let audioOutput: { deviceId: string } | undefined
   try {
     if (prefs.audioOutputId && supportsAudioOutputSelection()) audioOutput = { deviceId: prefs.audioOutputId }
@@ -78,9 +85,7 @@ function createRoom(): Room {
     },
     audioCaptureDefaults: {
       ...(prefs.audioInputId ? { deviceId: prefs.audioInputId } : {}),
-      echoCancellation: true,
-      noiseSuppression: !raw,
-      autoGainControl: !raw,
+      ...audioConstraints(prefs.noise),
     },
     publishDefaults: { videoSimulcastLayers: q.layers },
     audioOutput,
@@ -97,6 +102,7 @@ export function CallRoot({
   guestKey,
   audioEnabled,
   videoEnabled,
+  tracks,
   lobbyEnabled,
   onEnded,
 }: {
@@ -109,13 +115,15 @@ export function CallRoot({
   guestKey: string
   audioEnabled: boolean
   videoEnabled: boolean
+  /** Preview tracks to publish instead of capturing again (see useJoinMedia). */
+  tracks: JoinTracks
   lobbyEnabled: boolean
   onEnded: (reason: EndReason) => void
 }) {
   const [room] = useState(createRoom)
-  // With blur on, the camera is started by us once connected (see
-  // useJoinCamera) so the processor is attached before anything is published.
-  const [blurredJoin] = useState(() => videoEnabled && getPrefs().blur)
+  // No preview camera to take over but blur on: we start the camera ourselves
+  // once connected, so the processor is attached before anything is published.
+  const [blurredJoin] = useState(() => videoEnabled && !tracks.video && getPrefs().blur)
   const endedByMe = useRef(false)
   const deviceFailed = useRef(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -126,9 +134,13 @@ export function CallRoot({
     (reason: EndReason) => {
       if (ended.current) return
       ended.current = true
+      // Taken-over preview tracks that never got published would otherwise keep
+      // the camera light on (published ones are stopped by LiveKit already).
+      tracks.audio?.stop()
+      tracks.video?.stop()
       onEnded(reason)
     },
-    [onEnded],
+    [onEnded, tracks],
   )
 
   const onDisconnected = useCallback(
@@ -178,8 +190,8 @@ export function CallRoot({
       token={token}
       serverUrl={serverUrl}
       connect
-      audio={audioEnabled}
-      video={videoEnabled && !blurredJoin}
+      audio={audioEnabled && !tracks.audio}
+      video={videoEnabled && !tracks.video && !blurredJoin}
       onDisconnected={onDisconnected}
       onError={onError}
       onMediaDeviceFailure={onDeviceFailure}
@@ -199,6 +211,7 @@ export function CallRoot({
         <CallView
           deviceNotice={notice}
           clearDeviceNotice={() => setNotice(null)}
+          tracks={tracks}
           blurredJoin={blurredJoin}
         />
       </CallProvider>
@@ -230,10 +243,12 @@ function useNow(ms = 1000): number {
 function CallView({
   deviceNotice,
   clearDeviceNotice,
+  tracks,
   blurredJoin,
 }: {
   deviceNotice: string | null
   clearDeviceNotice: () => void
+  tracks: JoinTracks
   blurredJoin: boolean
 }) {
   const call = useCall()
@@ -250,7 +265,7 @@ function CallView({
   const reactions = useReactionFeed()
   const now = useNow()
 
-  useJoinCamera(blurredJoin)
+  useJoinMedia(tracks, blurredJoin)
   useCallBlur(() => notify("Background blur couldn't start on this device, so it's been turned off.", 'warn'))
   useCallNoise()
   useShortcuts()
@@ -556,29 +571,52 @@ function AloneHint({ isHost, slug, onCopied }: { isHost: boolean; slug: string; 
 // ---------------------------------------------------------------------------
 
 /**
- * With blur on, LiveKitRoom joins with the camera off and we turn it on here,
- * once connected, with the blur processor attached before publishing (nobody,
- * and no recording, sees an unblurred frame).
+ * Once connected, publish the mic and camera the pre-join preview was already
+ * using, rather than letting LiveKitRoom open them again: phones would ask for
+ * permission a second time, and the camera would blink off and on. Blur is on
+ * the preview's camera already (or attached before publishing). With no
+ * preview camera but blur on, the camera is started fresh with blur attached.
  */
-function useJoinCamera(wanted: boolean): void {
+function useJoinMedia(tracks: JoinTracks, blurredCamera: boolean): void {
   const room = useRoomContext()
   const { notify } = useCall()
   const started = useRef(false)
   useEffect(() => {
-    if (!wanted) return
+    if (!tracks.audio && !tracks.video && !blurredCamera) return
+    const publish = async (): Promise<void> => {
+      if (tracks.audio) {
+        try {
+          await room.localParticipant.publishTrack(tracks.audio, { source: Track.Source.Microphone })
+        } catch (error) {
+          console.error('[meeting] could not publish microphone:', error)
+          tracks.audio.stop()
+          notify("We couldn't turn on your microphone. Try the microphone button.", 'warn')
+        }
+      }
+      try {
+        const result = tracks.video
+          ? await publishCameraTrack(room, tracks.video)
+          : blurredCamera
+            ? await enableCamera(room)
+            : 'ok'
+        if (result === 'blur-failed') notify(BLUR_FAILED_COPY, 'warn')
+      } catch (error) {
+        console.error('[meeting] could not publish camera:', error)
+        tracks.video?.stop()
+        notify(CAMERA_FAILED_COPY, 'warn')
+      }
+    }
     const start = (): void => {
       if (started.current) return
       started.current = true
-      enableCamera(room)
-        .then((r) => r === 'blur-failed' && notify(BLUR_FAILED_COPY, 'warn'))
-        .catch(() => notify(CAMERA_FAILED_COPY, 'warn'))
+      void publish()
     }
     if (room.state === ConnectionState.Connected) start()
     room.on(RoomEvent.Connected, start)
     return () => {
       room.off(RoomEvent.Connected, start)
     }
-  }, [room, wanted, notify])
+  }, [room, tracks, blurredCamera, notify])
 }
 
 /** ⌘/Ctrl+D mic, ⌘/Ctrl+E camera (Meet's convention). Ignored while typing. */

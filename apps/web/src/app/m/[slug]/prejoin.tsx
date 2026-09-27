@@ -13,13 +13,19 @@ import { useBlurSupported, useTrackBlur } from './_lib/blur'
 import {
   classifyMediaError,
   deviceLabel,
-  MEDIA_PROBLEM_COPY,
+  mediaProblemCopy,
   sourceTrack,
   useDeviceList,
   useSpeakerSelectable,
   type MediaProblem,
 } from './_lib/devices'
-import { setPrefs as savePrefs, useMeetPrefs, type Quality } from './_lib/prefs'
+import {
+  audioConstraints,
+  setPrefs as savePrefs,
+  useMeetPrefs,
+  type NoiseMode,
+  type Quality,
+} from './_lib/prefs'
 import { maxCameraHeight, QUALITY, QUALITY_ORDER } from './_lib/quality'
 import { playTestTone } from './_lib/sounds'
 import { BrandMark } from './brand-mark'
@@ -47,6 +53,14 @@ export interface JoinDetails {
 
 export type PreJoinPhase = 'form' | 'waiting' | 'denied'
 
+/** The mic/camera someone would join with right now, and the preview's live tracks. */
+export interface PreviewMedia {
+  audioEnabled: boolean
+  videoEnabled: boolean
+  audioTrack: LocalAudioTrack | null
+  videoTrack: LocalVideoTrack | null
+}
+
 // ---------------------------------------------------------------------------
 // Preview media: separate mic and camera tracks, so switching one never
 // restarts the other, with device + quality changes applied in place.
@@ -59,6 +73,9 @@ function usePreviewMedia(opts: {
   videoId: string | null
   quality: Quality
   blur: boolean
+  noise: NoiseMode
+  /** Tracks the call has taken over: never stop those here. */
+  isHandedOver: (track: object) => boolean
 }) {
   const [audioTrack, setAudioTrack] = useState<LocalAudioTrack | null>(null)
   const [videoTrack, setVideoTrack] = useState<LocalVideoTrack | null>(null)
@@ -68,6 +85,9 @@ function usePreviewMedia(opts: {
   const latest = useRef(opts)
   latest.current = opts
   const appliedQuality = useRef<Quality>(opts.quality)
+  const release = (t: { stop: () => unknown } | null): void => {
+    if (t && !latest.current.isHandedOver(t)) t.stop()
+  }
 
   // The mic is reopened (not switched in place) when the device changes, so the
   // level meter follows the new microphone.
@@ -78,7 +98,12 @@ function usePreviewMedia(opts: {
     }
     let cancelled = false
     let made: LocalAudioTrack | null = null
-    createLocalAudioTrack(opts.audioId ? { deviceId: opts.audioId } : {})
+    // Captured exactly as the call would, so the call can take this track over
+    // (no second permission prompt on phones).
+    createLocalAudioTrack({
+      ...(opts.audioId ? { deviceId: opts.audioId } : {}),
+      ...audioConstraints(opts.noise),
+    })
       .then((t) => {
         if (cancelled) return t.stop()
         made = t
@@ -88,10 +113,10 @@ function usePreviewMedia(opts: {
       .catch((e) => !cancelled && setAudioError(classifyMediaError(e)))
     return () => {
       cancelled = true
-      made?.stop()
+      release(made)
       setAudioTrack(null)
     }
-  }, [opts.audioOn, opts.audioId, attempt])
+  }, [opts.audioOn, opts.audioId, opts.noise, attempt])
 
   useEffect(() => {
     if (!opts.videoOn) {
@@ -115,7 +140,7 @@ function usePreviewMedia(opts: {
       .catch((e) => !cancelled && setVideoError(classifyMediaError(e)))
     return () => {
       cancelled = true
-      made?.stop()
+      release(made)
       setVideoTrack(null)
     }
   }, [opts.videoOn, attempt])
@@ -240,6 +265,7 @@ export function PreJoinScreen({
   onCancelWaiting,
   onAskAgain,
   onMediaChange,
+  isHandedOver,
 }: {
   roomName: string
   brand: MeetingBrand
@@ -256,7 +282,9 @@ export function PreJoinScreen({
    * The mic/camera the person would join with right now. Reported live, so being
    * let in from the lobby uses what they have on *then*, not at "Ask to join".
    */
-  onMediaChange: (media: { audioEnabled: boolean; videoEnabled: boolean }) => void
+  onMediaChange: (media: PreviewMedia) => void
+  /** Whether the call has taken over a preview track (so leaving here keeps it running). */
+  isHandedOver: (track: object) => boolean
 }) {
   const [prefs, setPrefs] = useMeetPrefs()
   const [audioOn, setAudioOn] = useState(true)
@@ -289,6 +317,8 @@ export function PreJoinScreen({
     videoId: prefs.videoInputId,
     quality: prefs.quality,
     blur: prefs.blur,
+    noise: prefs.noise,
+    isHandedOver,
   })
 
   // Re-list once capture starts: labels and ids only appear after permission.
@@ -299,8 +329,13 @@ export function PreJoinScreen({
   const joinAudio = audioOn && !!media.audioTrack
   const joinVideo = videoOn && !!media.videoTrack
   useEffect(() => {
-    onMediaChange({ audioEnabled: joinAudio, videoEnabled: joinVideo })
-  }, [joinAudio, joinVideo, onMediaChange])
+    onMediaChange({
+      audioEnabled: joinAudio,
+      videoEnabled: joinVideo,
+      audioTrack: joinAudio ? media.audioTrack : null,
+      videoTrack: joinVideo ? media.videoTrack : null,
+    })
+  }, [joinAudio, joinVideo, media.audioTrack, media.videoTrack, onMediaChange])
 
   const activeMicId =
     prefs.audioInputId ?? (media.audioTrack && sourceTrack(media.audioTrack).getSettings().deviceId) ?? ''
@@ -319,7 +354,7 @@ export function PreJoinScreen({
   const maxHeight = media.videoTrack ? maxCameraHeight(sourceTrack(media.videoTrack)) : null
   const fhdSupported = maxHeight === null || maxHeight >= 1080
 
-  const problem = media.videoError ?? media.audioError
+  const problem = mediaProblemCopy(videoOn ? media.videoError : null, audioOn ? media.audioError : null)
   const nameOk = name.trim().length > 0
   const emailOk = isHost || EMAIL_RE.test(email.trim())
   const canSubmit = nameOk && emailOk && !busy
@@ -392,7 +427,7 @@ export function PreJoinScreen({
             {problem && (
               <div className="absolute inset-0 grid place-items-center bg-black/65 p-6 text-center backdrop-blur-sm">
                 <div className="max-w-sm">
-                  <p className="text-sm leading-relaxed text-ink">{MEDIA_PROBLEM_COPY[problem]}</p>
+                  <p className="text-sm leading-relaxed text-ink">{problem}</p>
                   <button
                     type="button"
                     onClick={media.retry}

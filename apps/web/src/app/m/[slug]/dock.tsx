@@ -80,6 +80,15 @@ function useCanShareScreen(): boolean {
 
 // The full bar needs about 800px (the 18px root font makes controls wide), so
 // below that secondary controls move into More. (Media queries use 16px rems.)
+/** Full screen for the whole page (iPhones only allow it for videos). */
+function useCanFullscreen(): boolean {
+  const [ok, setOk] = useState(false)
+  useEffect(() => {
+    setOk(typeof document !== 'undefined' && !!document.fullscreenEnabled)
+  }, [])
+  return ok
+}
+
 function Divider() {
   return <span className="mx-0.5 hidden h-6 w-px bg-white/10 min-[50rem]:block" aria-hidden />
 }
@@ -173,6 +182,7 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
   const isHost = role === 'host'
   const [prefs, setPrefs] = useMeetPrefs()
   const canShare = useCanShareScreen()
+  const canFullscreen = useCanFullscreen()
   const speakerSelectable = useSpeakerSelectable()
   const blurSupported = useBlurSupported()
 
@@ -549,9 +559,11 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
               <MenuItem icon={<LinkIcon size={16} />} onSelect={() => (void copyLink(), close())}>
                 Copy meeting link
               </MenuItem>
-              <MenuItem icon={<FullscreenIcon size={16} />} onSelect={() => (fullscreen(), close())}>
-                Full screen
-              </MenuItem>
+              {canFullscreen && (
+                <MenuItem icon={<FullscreenIcon size={16} />} onSelect={() => (fullscreen(), close())}>
+                  Full screen
+                </MenuItem>
+              )}
               {isHost && (
                 <>
                   <MenuDivider />

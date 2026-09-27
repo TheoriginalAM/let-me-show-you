@@ -15,7 +15,7 @@ import {
 } from 'livekit-client'
 import { blurCaptureOption, blurWanted, useTrackBlur } from './blur'
 import { sourceTrack } from './devices'
-import { getPrefs, setPrefs, useMeetPrefs, type NoiseMode, type Quality } from './prefs'
+import { audioConstraints, getPrefs, setPrefs, useMeetPrefs, type Quality } from './prefs'
 import { QUALITY } from './quality'
 
 /** A camera/mic problem (missing, blocked or busy), as opposed to anything else. */
@@ -110,6 +110,28 @@ export async function enableCamera(
   return 'ok'
 }
 
+/**
+ * Publish the camera track the pre-join preview was already using, so phones
+ * don't ask for the camera a second time. Blur is normally attached already;
+ * if it's wanted but missing, it's attached before anything is sent.
+ */
+export async function publishCameraTrack(room: Room, track: LocalVideoTrack): Promise<'ok' | 'blur-failed'> {
+  if (!track.getProcessor() && (await blurWanted())) {
+    const { processor } = await blurCaptureOption()
+    if (processor) {
+      try {
+        await track.setProcessor(processor)
+      } catch (error) {
+        console.error('[meeting] background blur failed to start:', error)
+        track.stop()
+        return 'blur-failed'
+      }
+    }
+  }
+  await room.localParticipant.publishTrack(track, { source: Track.Source.Camera })
+  return 'ok'
+}
+
 export const BLUR_FAILED_COPY = "Background blur couldn't start, so your camera stayed off."
 
 /**
@@ -191,10 +213,6 @@ export function useKrispSupported(): boolean {
   return ok
 }
 
-function audioConstraints(noise: NoiseMode) {
-  const raw = noise === 'off'
-  return { echoCancellation: true, noiseSuppression: !raw, autoGainControl: !raw }
-}
 
 /**
  * Applies the noise preference to the live microphone: 'standard' uses the

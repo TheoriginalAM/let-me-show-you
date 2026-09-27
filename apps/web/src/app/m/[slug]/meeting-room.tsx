@@ -4,8 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { brandVars, type MeetingBrand } from './_lib/brand'
 import { cancelKnock, checkJoin, requestJoin, type JoinResult } from './actions'
 import { BrandMark } from './brand-mark'
-import { CallRoot, type EndReason } from './call'
-import { PreJoinScreen, type JoinDetails, type PreJoinPhase } from './prejoin'
+import { CallRoot, type EndReason, type JoinTracks } from './call'
+import { PreJoinScreen, type JoinDetails, type PreJoinPhase, type PreviewMedia } from './prejoin'
 
 export type { MeetingBrand }
 
@@ -18,6 +18,7 @@ type Stage =
       role: 'host' | 'guest'
       audioEnabled: boolean
       videoEnabled: boolean
+      tracks: JoinTracks
       lobbyEnabled: boolean
     }
   | { kind: 'ended'; reason: EndReason }
@@ -87,10 +88,19 @@ export function MeetingRoom({
   const [busy, setBusy] = useState(false)
   // The mic/camera choice as it is *now*: people often flip these while they
   // wait in the lobby, after the join details were sent.
-  const media = useRef({ audioEnabled: true, videoEnabled: true })
-  const onMediaChange = useCallback((m: { audioEnabled: boolean; videoEnabled: boolean }) => {
+  const media = useRef<PreviewMedia>({
+    audioEnabled: true,
+    videoEnabled: true,
+    audioTrack: null,
+    videoTrack: null,
+  })
+  const onMediaChange = useCallback((m: PreviewMedia) => {
     media.current = m
   }, [])
+  // Preview tracks the call has taken over, so leaving the pre-join screen
+  // doesn't stop them (phones would otherwise ask for permission again).
+  const handedOver = useRef(new WeakSet<object>())
+  const isHandedOver = useCallback((track: object) => handedOver.current.has(track), [])
   const guestKey = useRef('')
 
   useEffect(() => {
@@ -100,18 +110,27 @@ export function MeetingRoom({
   const applyResult = useCallback(
     (res: JoinResult) => {
       switch (res.status) {
-        case 'joined':
+        case 'joined': {
+          const m = media.current
+          const tracks: JoinTracks = {
+            audio: m.audioEnabled ? m.audioTrack : null,
+            video: m.videoEnabled ? m.videoTrack : null,
+          }
+          if (tracks.audio) handedOver.current.add(tracks.audio)
+          if (tracks.video) handedOver.current.add(tracks.video)
           setError(null)
           setStage({
             kind: 'call',
             token: res.token,
             serverUrl: res.serverUrl,
             role: res.role,
-            audioEnabled: media.current.audioEnabled,
-            videoEnabled: media.current.videoEnabled,
+            audioEnabled: m.audioEnabled,
+            videoEnabled: m.videoEnabled,
+            tracks,
             lobbyEnabled: res.lobbyEnabled ?? lobbyEnabled,
           })
           break
+        }
         case 'waiting':
           setStage({ kind: 'prejoin', phase: 'waiting' })
           break
@@ -134,7 +153,12 @@ export function MeetingRoom({
   const join = useCallback(
     async (d: JoinDetails) => {
       // What they chose on pressing Join; later lobby changes update it.
-      media.current = { audioEnabled: d.audioEnabled, videoEnabled: d.videoEnabled }
+      media.current = {
+        audioEnabled: d.audioEnabled,
+        videoEnabled: d.videoEnabled,
+        audioTrack: d.audioEnabled ? media.current.audioTrack : null,
+        videoTrack: d.videoEnabled ? media.current.videoTrack : null,
+      }
       setError(null)
       setBusy(true)
       try {
@@ -200,6 +224,7 @@ export function MeetingRoom({
         guestKey={guestKey.current}
         audioEnabled={stage.audioEnabled}
         videoEnabled={stage.videoEnabled}
+        tracks={stage.tracks}
         lobbyEnabled={stage.lobbyEnabled}
         onEnded={onEnded}
       />
@@ -250,6 +275,7 @@ export function MeetingRoom({
       busy={busy}
       error={error}
       onMediaChange={onMediaChange}
+      isHandedOver={isHandedOver}
       onJoin={(d) => void join(d)}
       onCancelWaiting={() => {
         void cancelKnock(slug, guestKey.current)

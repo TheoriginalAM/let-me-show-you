@@ -8,6 +8,15 @@ export type Quality = 'sd' | 'hd' | 'fhd'
 export type NoiseMode = 'standard' | 'enhanced' | 'off'
 
 /**
+ * Microphone capture settings for a noise mode. 'off' sends raw sound (best for
+ * music); the others use the browser's processing (Krisp is added on top).
+ */
+export function audioConstraints(noise: NoiseMode) {
+  const raw = noise === 'off'
+  return { echoCancellation: true, noiseSuppression: !raw, autoGainControl: !raw }
+}
+
+/**
  * Meeting preferences, remembered on this device for every room. The single
  * source of truth for devices and call settings (LiveKit's own
  * `lk-user-choices` store is never used).
