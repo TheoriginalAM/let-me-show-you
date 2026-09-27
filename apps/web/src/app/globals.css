@@ -216,3 +216,43 @@ body {
   background: rgba(255, 255, 255, 0.18);
   background-clip: content-box;
 }
+
+/* ---- Meeting rooms ---- */
+
+/* Keep the film grain and ambient glow off live video. */
+body:has([data-meeting-call]) .grain,
+body:has([data-meeting-call]) .atmosphere {
+  display: none;
+}
+
+/* Reactions drift up and fade. */
+@keyframes reaction-float {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  12% {
+    transform: translateY(-10px) scale(1.05);
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-220px) scale(1);
+    opacity: 0;
+  }
+}
+.reaction-float {
+  animation: reaction-float 2.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reaction-float {
+    animation: none;
+    opacity: 1;
+  }
+  .rise {
+    animation: none;
+  }
+}

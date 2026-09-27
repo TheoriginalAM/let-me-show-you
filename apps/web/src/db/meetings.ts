@@ -210,12 +210,15 @@ export async function setRoomLobby(
  */
 export async function applyRoomLobby(roomId: string, enabled: boolean): Promise<void> {
   await db.update(meetingRooms).set({ lobbyEnabled: enabled }).where(eq(meetingRooms.id, roomId))
-  if (enabled) {
-    await db
-      .update(meetingKnocks)
-      .set({ status: 'expired' })
-      .where(and(eq(meetingKnocks.roomId, roomId), eq(meetingKnocks.status, 'admitted')))
-  }
+  if (enabled) await expireAdmissions(roomId)
+}
+
+/** Retire every standing admission, so guests must ask again next time. */
+export async function expireAdmissions(roomId: string): Promise<void> {
+  await db
+    .update(meetingKnocks)
+    .set({ status: 'expired' })
+    .where(and(eq(meetingKnocks.roomId, roomId), eq(meetingKnocks.status, 'admitted')))
 }
 
 export async function deleteRoom(userId: string, roomId: string): Promise<boolean> {

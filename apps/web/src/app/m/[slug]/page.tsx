@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { notFound } from 'next/navigation'
 import { getRoomBySlug } from '@/db/meetings'
 import { memberRole } from '@/db/workspaces'
@@ -14,11 +14,15 @@ const DEFAULT_ACCENT = '#8b8bf6' // luminous violet: the default brand accent
 
 type PageProps = { params: Promise<{ slug: string }> }
 
+// Let the call use the full screen on phones (safe-area insets are handled in CSS).
+export const viewport: Viewport = { viewportFit: 'cover', themeColor: '#08080c' }
+
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params
   const room = await getRoomBySlug(slug)
   return {
-    title: room ? `Join ${room.name}` : 'Meeting not found',
+    // Absolute: rooms are white-labelled, so no site-name suffix.
+    title: { absolute: room ? `Join ${room.name}` : 'Meeting not found' },
     // Room links are private invitations: never index them.
     robots: { index: false, follow: false },
   }

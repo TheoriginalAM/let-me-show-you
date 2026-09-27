@@ -1,5 +1,6 @@
 'use server'
 
+import { ServerError, TrackSource } from 'livekit-server-sdk'
 import { APP_DOMAIN } from '@lmsy/shared'
 import { createNotifications, ownerIdsForWorkspace } from '@/db/app-notifications'
 import {
@@ -9,6 +10,7 @@ import {
   createKnock,
   decideKnock,
   denyIdentity,
+  expireAdmissions,
   expireKnock,
   findLatestKnock,
   getRoomBySlug,
@@ -45,7 +47,14 @@ const RATE_MAX = 30
 const MAX_INVITES = 10
 
 export type JoinResult =
-  | { status: 'joined'; token: string; serverUrl: string; role: MeetingRole }
+  | {
+      status: 'joined'
+      token: string
+      serverUrl: string
+      role: MeetingRole
+      /** Hosts only: whether guests currently have to ask to join. */
+      lobbyEnabled?: boolean
+    }
   | { status: 'waiting' }
   | { status: 'denied' }
   | { status: 'none' }
@@ -177,6 +186,7 @@ export async function requestJoin(
     return {
       status: 'joined',
       role: 'host',
+      lobbyEnabled: room.lobbyEnabled,
       ...(await createJoinToken({
         roomId: room.id,
         identity: memberIdentity(host.id),
@@ -292,10 +302,14 @@ export async function cancelKnock(slug: string, guestKey: string): Promise<void>
 
 export async function listLobby(
   slug: string,
-): Promise<{ ok: true; guests: LobbyGuest[] } | { ok: false }> {
+): Promise<{ ok: true; guests: LobbyGuest[]; lobbyEnabled: boolean } | { ok: false }> {
   const ctx = await hostContext(slug)
   if (!ctx) return { ok: false }
-  return { ok: true, guests: await listPendingKnocks(ctx.room.id) }
+  return {
+    ok: true,
+    guests: await listPendingKnocks(ctx.room.id),
+    lobbyEnabled: ctx.room.lobbyEnabled,
+  }
 }
 
 export async function respondToKnock(slug: string, knockId: string, admit: boolean): Promise<Ok> {
@@ -355,25 +369,48 @@ export async function removeParticipant(
   } catch {
     // Already gone.
   }
+  // Other hosts' lobby switches catch up straight away.
+  if (lobbyTurnedOn) await signalRoom(ctx.room.id, 'lobby', { type: 'settings' })
   return { ok: true, lobbyTurnedOn }
 }
 
 /**
- * Called by a host's browser whenever a guest connects: if that guest was
- * removed earlier, take them out again. (A removed guest could otherwise
- * reconnect directly with a token they already hold, for its short lifetime.)
+ * Called by a host's browser whenever a guest connects: take out a guest who
+ * shouldn't be there. A token stays valid for a few minutes, so without this a
+ * guest could reconnect with one they already hold after being removed, or walk
+ * into the *next* meeting after the host ended the call for everyone.
  */
 export async function enforceGuestAccess(slug: string, identity: string): Promise<void> {
   const ctx = await hostContext(slug)
   const who = cleanIdentity(identity)
   if (!ctx || !who?.startsWith('g_')) return
   const knock = await findLatestKnock(ctx.room.id, who)
-  if (knock?.status !== 'denied') return
+  // No record in the lookback window (e.g. a very long call): can't tell, leave them.
+  if (!knock) return
+  if (!(await shouldRemoveGuest(ctx.room.id, knock))) return
   try {
     await roomService().removeParticipant(livekitRoomName(ctx.room.id), who)
   } catch {
     // Already gone.
   }
+}
+
+async function shouldRemoveGuest(
+  roomId: string,
+  knock: { status: string; decidedAt: string | null; createdAt: string },
+): Promise<boolean> {
+  if (knock.status === 'denied') return true
+  // Never let in (still waiting, or withdrew): they can only be here on a token
+  // from an earlier admission, which the latest request replaced.
+  if (knock.status === 'pending' || knock.status === 'cancelled') return true
+  // 'admitted', or 'expired' (the lobby was switched on mid-call, or the call was
+  // ended for everyone): fine for the meeting it was given in. An admission from
+  // well before this meeting started belongs to an earlier one. The grace covers
+  // a guest who is let in (lobby off) and then starts the room by joining first.
+  const started = await liveRoomStartedAt(roomId)
+  if (typeof started !== 'number') return false // unknown: never remove on a guess
+  const decided = new Date(knock.decidedAt ?? knock.createdAt).getTime()
+  return decided < started - ADMIT_GRACE_MS
 }
 
 export async function startRecording(slug: string, timeZone?: string): Promise<Ok> {
@@ -387,6 +424,139 @@ export async function stopRecording(slug: string): Promise<Ok> {
   const ctx = await hostContext(slug)
   if (!ctx) return { ok: false, error: 'Only hosts can stop recording.' }
   return stopMeetingRecording(ctx.room.id)
+}
+
+// ---------------------------------------------------------------------------
+// In-call participant state. Clients can't edit their own attributes (the token
+// has canUpdateOwnMetadata:false so the trusted `role` can't be faked), so hand
+// raises go through the server, which works out who is asking.
+// ---------------------------------------------------------------------------
+
+/** Per-identity throttle for hand toggles (each one is a LiveKit API call). */
+const lastHandToggle = new Map<string, number>()
+const HAND_THROTTLE_MS = 700
+
+/**
+ * Raise or lower your own hand. Hosts are identified by their session; guests by
+ * the secret key only their browser holds (so nobody can raise someone else's).
+ */
+export async function setHand(slug: string, raised: boolean, guestKey?: string): Promise<Ok> {
+  if (!meetingsConfigured()) return { ok: false, error: 'Meetings are not set up yet.' }
+  const room = await getRoomBySlug(String(slug))
+  if (!room) return { ok: false, error: 'This meeting link is not valid.' }
+
+  let identity: string | null = null
+  const host = await hostFor(room)
+  if (host) {
+    identity = memberIdentity(host.id)
+  } else {
+    identity = guestIdentity(room.id, String(guestKey ?? ''))
+    if (identity) {
+      // Only guests who were let in (this meeting, or an admission since retired
+      // by the lobby being switched on mid-call). Removed guests, and made-up
+      // keys, never reach LiveKit.
+      const knock = await findLatestKnock(room.id, identity)
+      if (knock?.status !== 'admitted' && knock?.status !== 'expired') identity = null
+    }
+  }
+  if (!identity) return { ok: false, error: 'You are not in this meeting.' }
+
+  const now = Date.now()
+  if (now - (lastHandToggle.get(identity) ?? 0) < HAND_THROTTLE_MS) {
+    return { ok: false, error: 'Slow down a little.' }
+  }
+  lastHandToggle.set(identity, now)
+  if (lastHandToggle.size > 5000) lastHandToggle.clear()
+
+  try {
+    // Only the `hand` key changes; '' removes it, so `role` is untouched.
+    await roomService().updateParticipant(livekitRoomName(room.id), identity, {
+      attributes: { hand: raised ? String(now) : '' },
+    })
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'Could not update your hand. Are you still in the call?' }
+  }
+}
+
+/** Host: lower someone's hand (e.g. once their question is answered). */
+export async function lowerHand(slug: string, identity: string): Promise<Ok> {
+  const ctx = await hostContext(slug)
+  if (!ctx) return { ok: false, error: 'Only hosts can do that.' }
+  const who = cleanIdentity(identity)
+  if (!who) return { ok: false, error: 'Unknown participant.' }
+  try {
+    await roomService().updateParticipant(livekitRoomName(ctx.room.id), who, {
+      attributes: { hand: '' },
+    })
+    return { ok: true }
+  } catch {
+    return { ok: false, error: 'They may have left.' }
+  }
+}
+
+/** Host: mute every microphone except your own. */
+export async function muteEveryone(slug: string): Promise<{ ok: true; muted: number } | { ok: false; error: string }> {
+  const ctx = await hostContext(slug)
+  if (!ctx) return { ok: false, error: 'Only hosts can do that.' }
+  const lkRoom = livekitRoomName(ctx.room.id)
+  const self = memberIdentity(ctx.me.id)
+  try {
+    const participants = await roomService().listParticipants(lkRoom)
+    let muted = 0
+    await Promise.all(
+      participants
+        .filter((p) => p.identity !== self)
+        .flatMap((p) =>
+          p.tracks
+            .filter((t) => t.source === TrackSource.MICROPHONE && !t.muted)
+            .map(async (t) => {
+              try {
+                await roomService().mutePublishedTrack(lkRoom, p.identity, t.sid, true)
+                muted++
+              } catch {
+                // they left or unpublished meanwhile
+              }
+            }),
+        ),
+    )
+    return { ok: true, muted }
+  } catch {
+    return { ok: false, error: 'Could not reach the meeting.' }
+  }
+}
+
+/**
+ * Host: end the call for everyone. Stops any recording first (so it still
+ * finishes and lands in the workspace), then closes the LiveKit room; everyone
+ * is disconnected with "the host ended the call".
+ */
+export async function endCallForEveryone(slug: string): Promise<Ok> {
+  const ctx = await hostContext(slug)
+  if (!ctx) return { ok: false, error: 'Only hosts can end the call.' }
+  await stopMeetingRecording(ctx.room.id).catch(() => undefined)
+  try {
+    await roomService().deleteRoom(livekitRoomName(ctx.room.id))
+  } catch (error) {
+    // Already closed is fine; anything else means everyone is still connected.
+    const notFound = error instanceof ServerError && (error.code === 'not_found' || error.status === 404)
+    if (!notFound) {
+      console.error('[meeting] end call failed:', error)
+      return { ok: false, error: 'Could not end the call. Please try again.' }
+    }
+  }
+  // Nobody walks back in on an old admission: next time guests ask again.
+  await expireAdmissions(ctx.room.id)
+  return { ok: true }
+}
+
+/** Host: turn the lobby on/off during the call ("Guests must ask to join"). */
+export async function setLobbyDuringCall(slug: string, enabled: boolean): Promise<Ok> {
+  const ctx = await hostContext(slug)
+  if (!ctx) return { ok: false, error: 'Only hosts can change this.' }
+  await applyRoomLobby(ctx.room.id, Boolean(enabled))
+  await signalRoom(ctx.room.id, 'lobby', { type: 'settings' })
+  return { ok: true }
 }
 
 /** Email invites to a room (comma/space/newline separated, up to 10 at once). */
