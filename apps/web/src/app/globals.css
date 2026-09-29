@@ -244,6 +244,13 @@ body:has([data-meeting-call]) .atmosphere {
   display: none;
 }
 
+/* Ink on a shared screen fades after it's been seen (see annotate.tsx). */
+@keyframes annotate-fade {
+  to {
+    opacity: 0;
+  }
+}
+
 /* Reactions drift up and fade. */
 @keyframes reaction-float {
   0% {

@@ -262,3 +262,32 @@ export const SwitchCameraIcon = (p: IconProps) => (
     <path d="m6 2 3 3-3 3" />
   </Svg>
 )
+
+export const PointerIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m4 4 7.07 17 2.51-7.39L21 11.07Z" />
+  </Svg>
+)
+
+export const PenIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M12 20h9" />
+    <path d="M16.38 3.62a1 1 0 0 1 3 3L7.37 18.64a2 2 0 0 1-.85.5l-2.87.84a.5.5 0 0 1-.62-.62l.84-2.87a2 2 0 0 1 .5-.85Z" />
+  </Svg>
+)
+
+export const EraserIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="m7 21-4.3-4.3a1 1 0 0 1 0-1.4l10-10a1 1 0 0 1 1.4 0l5.6 5.6a1 1 0 0 1 0 1.4L11 21" />
+    <path d="M22 21H7" />
+    <path d="m5 11 9 9" />
+  </Svg>
+)
+
+export const PopOutIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M15 3h6v6" />
+    <path d="M10 14 21 3" />
+    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+  </Svg>
+)

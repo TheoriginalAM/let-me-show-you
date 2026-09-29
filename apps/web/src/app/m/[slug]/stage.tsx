@@ -11,17 +11,24 @@ import {
 import {
   isTrackReference,
   useConnectionQualityIndicator,
-  useDataChannel,
   useIsMuted,
   useIsSpeaking,
   useParticipantAttribute,
+  useRoomContext,
   useSpeakingParticipants,
   useTracks,
   VideoTrack,
   type TrackReferenceOrPlaceholder,
 } from '@livekit/components-react'
-import { ConnectionQuality, Track, type LocalVideoTrack } from 'livekit-client'
+import {
+  ConnectionQuality,
+  RoomEvent,
+  Track,
+  type LocalVideoTrack,
+  type RemoteParticipant,
+} from 'livekit-client'
 import { useIsRearCamera } from './_lib/devices'
+import { AnnotateToolbar, AnnotationLayer, containRect, ownShareInfo, SharePlaceholder } from './annotate'
 import { useMeetPrefs } from './_lib/prefs'
 import { useCall } from './call-context'
 import { HandIcon, MicOffIcon, PinIcon } from './icons'
@@ -131,6 +138,16 @@ export function Tile({
     setVideoRatio(r)
     onAspect?.(r)
   }
+  // Your own whole-screen share isn't shown live to you (it would film
+  // itself): a placeholder of the same shape takes its place.
+  const ownShare =
+    isShare && p.isLocal && isTrackReference(trackRef)
+      ? ownShareInfo(trackRef.publication.track?.mediaStreamTrack)
+      : null
+  const placeholder = !!ownShare && !ownShare.live
+  const shareRatio = placeholder ? ownShare.ratio : videoRatio
+  const shareRect =
+    isShare && shareRatio !== null && boxSize.w > 0 && boxSize.h > 0 ? containRect(boxSize, shareRatio) : null
   const contain =
     isShare ||
     (variant !== 'self' &&
@@ -149,7 +166,9 @@ export function Tile({
         variant === 'self' ? 'rounded-xl shadow-2xl ring-1 ring-white/15' : 'rounded-2xl',
       )}
     >
-      {showVideo && isTrackReference(trackRef) ? (
+      {placeholder ? (
+        shareRect && <SharePlaceholder rect={shareRect} />
+      ) : showVideo && isTrackReference(trackRef) ? (
         <VideoTrack
           trackRef={trackRef}
           onLoadedMetadata={onVideoSize}
@@ -173,6 +192,12 @@ export function Tile({
         </div>
       )}
 
+      {/* Pointers and ink on a shared screen (and the tools, on the big one) */}
+      {shareRect && <AnnotationLayer share={p.identity} rect={shareRect} interactive={variant === 'focus'} />}
+      {isShare && variant === 'focus' && showVideo && (
+        <AnnotateToolbar share={p.identity} compact={boxSize.w < 520} />
+      )}
+
       {/* Speaking ring */}
       {speaking && !isShare && (
         <span
@@ -182,7 +207,7 @@ export function Tile({
       )}
 
       {/* Top-left: hand + connection */}
-      <div className="absolute left-2 top-2 flex items-center gap-1.5">
+      <div className="absolute left-2 top-2 z-10 flex items-center gap-1.5">
         {hand && (
           <span className="flex items-center gap-1 rounded-full bg-amber-400 px-2 py-1 text-xs font-semibold text-black shadow">
             <HandIcon size={14} />
@@ -206,7 +231,8 @@ export function Tile({
           aria-label={isPinned ? `Unpin ${name}` : `Pin ${name} for me`}
           aria-pressed={isPinned}
           className={cx(
-            'absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-black/50 text-ink backdrop-blur transition focus-visible:opacity-100',
+            // z-10: stays clickable above the marks layer while drawing.
+            'absolute right-2 top-2 z-10 grid h-8 w-8 place-items-center rounded-full bg-black/50 text-ink backdrop-blur transition focus-visible:opacity-100',
             isPinned ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100',
           )}
         >
@@ -260,11 +286,11 @@ export function Stage() {
     if (s) setActiveId(s.identity)
   }, [speakers])
 
-  // Never show your own screen share back to you (hall of mirrors).
-  const visible = tracks.filter(
-    (t) => !(t.source === Track.Source.ScreenShare && t.participant.isLocal),
-  )
-  const remoteShares = visible.filter((t) => t.source === Track.Source.ScreenShare)
+  // Your own screen share is shown to you too (after anyone else's): it's
+  // where you see what others point at and draw.
+  const visible = tracks
+  const remoteShares = visible.filter((t) => t.source === Track.Source.ScreenShare && !t.participant.isLocal)
+  const localShare = visible.find((t) => t.source === Track.Source.ScreenShare && t.participant.isLocal)
   const cams = visible.filter((t) => t.source === Track.Source.Camera)
   const localCam = cams.find((t) => t.participant.isLocal)
   const remoteCams = cams.filter((t) => !t.participant.isLocal)
@@ -273,7 +299,13 @@ export function Stage() {
     ? visible.find((t) => trackKey(t) === pinned)
     : undefined
   if (!focus && layout !== 'grid') {
-    focus = remoteShares[0]
+    // Your own share takes the stage only when it can be shown live (a tab or
+    // window); a whole screen sits in the strip as a placeholder with the marks.
+    focus =
+      remoteShares[0] ??
+      (localShare && isTrackReference(localShare) && ownShareInfo(localShare.publication.track?.mediaStreamTrack).live
+        ? localShare
+        : undefined)
     if (!focus && (layout === 'speaker' || (layout === 'auto' && remoteCams.length === 1))) {
       focus = remoteCams.find((t) => t.participant.identity === activeId) ?? remoteCams[0]
     }
@@ -292,7 +324,8 @@ export function Stage() {
       <div className="flex h-full min-h-0 flex-col gap-3">
         {/* A size container: the self-view is sized in units of this box. */}
         <div className="relative min-h-0 flex-1" style={{ containerType: 'size' }}>
-          <Tile trackRef={focus} variant="focus" />
+          {/* Keyed: a different person or share gets a fresh tile (and marks layer). */}
+          <Tile key={trackKey(focus)} trackRef={focus} variant="focus" />
           {showSelf && (
             <button
               type="button"
@@ -461,16 +494,27 @@ export function ReactionsLayer({
   items: Floating[]
   onRemote: (emoji: string, name: string) => void
 }) {
-  useDataChannel('reaction', (msg) => {
-    if (!msg.from) return
-    try {
-      const { i } = JSON.parse(new TextDecoder().decode(msg.payload)) as { i: number }
-      const emoji = REACTIONS[i]
-      if (emoji) onRemote(emoji, msg.from.name || 'Someone')
-    } catch {
-      // ignore malformed
+  // Straight from the room (useDataChannel would re-render the whole call for
+  // every packet anyone sends on the topic).
+  const room = useRoomContext()
+  const onRemoteRef = useRef(onRemote)
+  onRemoteRef.current = onRemote
+  useEffect(() => {
+    const onData = (payload: Uint8Array, from?: RemoteParticipant, _kind?: unknown, topic?: string): void => {
+      if (topic !== 'reaction' || !from) return
+      try {
+        const { i } = JSON.parse(new TextDecoder().decode(payload)) as { i: number }
+        const emoji = REACTIONS[i]
+        if (emoji) onRemoteRef.current(emoji, from.name || 'Someone')
+      } catch {
+        // ignore malformed
+      }
     }
-  })
+    room.on(RoomEvent.DataReceived, onData)
+    return () => {
+      room.off(RoomEvent.DataReceived, onData)
+    }
+  }, [room])
   return (
     <div className="pointer-events-none absolute inset-0 z-20 overflow-hidden" aria-live="polite">
       {items.map((r) => (

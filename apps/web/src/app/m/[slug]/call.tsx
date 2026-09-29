@@ -42,6 +42,8 @@ import { sourceTrack } from './_lib/devices'
 import { audioConstraints, getPrefs } from './_lib/prefs'
 import { QUALITY } from './_lib/quality'
 import { unmuteHint } from './_lib/shortcuts'
+import { annotationStore } from './_lib/annotations'
+import { PresenterPopOut, useAnnotationSync } from './annotate'
 import { BrandMark } from './brand-mark'
 import { CallProvider, useCall } from './call-context'
 import { Dock, userMicToggle } from './dock'
@@ -290,6 +292,7 @@ function CallView({
   useTalkingWhileMuted()
   useHostMuteNotice()
   useChatToasts()
+  useAnnotationSync()
 
   // Another host (or removing someone) can change the lobby setting.
   useEffect(() => {
@@ -375,8 +378,9 @@ function CallView({
 
       {/* Presenting bar */}
       {isScreenShareEnabled && (
-        <div className="mx-3 mb-2 flex items-center justify-center gap-3 rounded-xl bg-[var(--room-accent-soft)] px-4 py-2 text-sm sm:mx-5">
+        <div className="mx-3 mb-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 rounded-xl bg-[var(--room-accent-soft)] px-4 py-2 text-sm sm:mx-5">
           <span>You&apos;re presenting to everyone</span>
+          <PresenterPopOut />
           <button
             type="button"
             onClick={() => void localParticipant.setScreenShareEnabled(false)}
@@ -392,7 +396,13 @@ function CallView({
         <div className={cx('relative min-w-0 flex-1 transition-opacity', reconnecting && 'opacity-60')}>
           <Stage />
           {participants.length === 1 && (
-            <AloneHint isHost={isHost} slug={slug} onCopied={() => notify('Meeting link copied', 'success')} />
+            <AloneHint
+              isHost={isHost}
+              slug={slug}
+              onCopied={() => notify('Meeting link copied', 'success')}
+              // While presenting, the top of the stage holds the point/draw tools.
+              atBottom={isScreenShareEnabled}
+            />
           )}
           <ReactionsLayer items={reactions.items} onRemote={reactions.add} />
         </div>
@@ -567,9 +577,24 @@ function RecordingConsent({
   )
 }
 
-function AloneHint({ isHost, slug, onCopied }: { isHost: boolean; slug: string; onCopied: () => void }) {
+function AloneHint({
+  isHost,
+  slug,
+  onCopied,
+  atBottom,
+}: {
+  isHost: boolean
+  slug: string
+  onCopied: () => void
+  atBottom: boolean
+}) {
   return (
-    <div className="pointer-events-none absolute inset-x-0 top-4 z-10 flex justify-center px-4">
+    <div
+      className={cx(
+        'pointer-events-none absolute inset-x-0 z-10 flex justify-center px-4',
+        atBottom ? 'bottom-4' : 'top-4',
+      )}
+    >
       <div className="pointer-events-auto flex items-center gap-3 rounded-full border border-white/10 bg-[#15151f]/90 py-2 pl-4 pr-2 text-sm shadow-xl backdrop-blur-xl">
         <span className="text-muted">
           {isHost ? "You're the only one here." : 'Waiting for others to join…'}
@@ -735,8 +760,11 @@ function useBackGuard(): void {
       window.history.pushState({ lmsyCall: true }, '')
       standInPushedHere = true
       key = navigationApi()?.currentEntry?.key
+      const annotations = annotationStore(room)
       if (document.querySelector('[data-popover]')) {
         document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      } else if (annotations.tool !== 'none') {
+        annotations.setTool('none') // stop pointing/drawing
       } else if (open.current.settingsOpen) {
         setSettingsOpen(false)
       } else if (document.querySelector('dialog[open]')) {
