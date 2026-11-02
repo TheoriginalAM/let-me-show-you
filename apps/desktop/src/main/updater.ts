@@ -1,4 +1,12 @@
-import { app, dialog, Notification, type BrowserWindow } from 'electron'
+import { appendFileSync, mkdirSync, statSync, truncateSync } from 'node:fs'
+import { join } from 'node:path'
+import {
+  app,
+  autoUpdater as nativeUpdater,
+  dialog,
+  Notification,
+  type BrowserWindow,
+} from 'electron'
 import electronUpdater from 'electron-updater'
 import { IPC, type UpdateStatus } from '../shared/ipc'
 
@@ -15,6 +23,42 @@ let manualCheck = false
 // Called whenever the update status changes, so the tray can show/hide its
 // "Restart to Update" item.
 let onStatusChange: (() => void) | null = null
+// Lets the window's hide-on-close guard know a restart-to-install is quitting.
+let prepareQuit: (() => void) | null = null
+
+/**
+ * A small updater log at <userData>/logs/updater.log (capped at ~1 MB), so a
+ * failed update leaves a trail. electron-updater logs to it too.
+ */
+const fileLog = (() => {
+  let path: string | null = null
+  const write = (level: string, parts: unknown[]): void => {
+    try {
+      if (!path) {
+        const dir = join(app.getPath('userData'), 'logs')
+        mkdirSync(dir, { recursive: true })
+        path = join(dir, 'updater.log')
+      }
+      try {
+        if (statSync(path).size > 1_000_000) truncateSync(path, 0)
+      } catch {
+        // No file yet.
+      }
+      const text = parts
+        .map((x) => (x instanceof Error ? (x.stack ?? x.message) : String(x)))
+        .join(' ')
+      appendFileSync(path, `${new Date().toISOString()} ${level} ${text}\n`)
+    } catch {
+      // Logging must never break updating.
+    }
+  }
+  return {
+    info: (...a: unknown[]) => write('info', a),
+    warn: (...a: unknown[]) => write('warn', a),
+    error: (...a: unknown[]) => write('error', a),
+    debug: (...a: unknown[]) => write('debug', a),
+  }
+})()
 
 export function getUpdateStatus(): UpdateStatus {
   return status
@@ -44,11 +88,13 @@ function promptRestart(version: string | null): void {
  */
 export function initAutoUpdates(
   getWindow: () => BrowserWindow | null,
-  onChange?: () => void,
+  opts: { onChange?: () => void; prepareQuit?: () => void } = {},
 ): void {
-  onStatusChange = onChange ?? null
+  onStatusChange = opts.onChange ?? null
+  prepareQuit = opts.prepareQuit ?? null
   if (!app.isPackaged) return
 
+  autoUpdater.logger = fileLog
   autoUpdater.autoDownload = true
   autoUpdater.autoInstallOnAppQuit = true
 
@@ -67,7 +113,8 @@ export function initAutoUpdates(
         type: 'info',
         buttons: ['OK'],
         message: `Downloading v${info.version}`,
-        detail: "It's downloading in the background. You'll be notified when it's ready to install.",
+        detail:
+          "It's downloading in the background. You'll be notified when it's ready to install.",
       })
     }
   })
@@ -84,26 +131,47 @@ export function initAutoUpdates(
     }
   })
 
-  autoUpdater.on('update-downloaded', (info) => {
-    send({ phase: 'ready', version: info.version })
+  // Ready means installable. On macOS electron-updater reports "downloaded" as
+  // soon as it starts handing the file to Squirrel.Mac, which then needs a few
+  // seconds to copy it; quitting in that window loses the update. So on macOS
+  // wait for Squirrel's own update-downloaded before saying it's ready.
+  const markReady = (version: string | null): void => {
+    if (status.phase === 'ready') return
+    send({ phase: 'ready', version })
+    fileLog.info(`update ready to install: v${version ?? '?'}`)
     if (manualCheck) {
       manualCheck = false
-      promptRestart(info.version)
+      promptRestart(version)
       return
     }
     // Background download: a passive nudge that won't interrupt a recording.
     if (Notification.isSupported()) {
       const note = new Notification({
         title: 'Update ready',
-        body: `Let Me Show You v${info.version} is ready. Click to restart and install.`,
+        body: `Let Me Show You v${version} is ready. Click to restart and install.`,
       })
       note.on('click', () => restartToUpdate())
       note.show()
     }
+  }
+
+  let downloadedVersion: string | null = null
+  autoUpdater.on('update-downloaded', (info) => {
+    downloadedVersion = info.version
+    if (process.platform === 'darwin') {
+      send({ phase: 'downloading', version: info.version })
+      fileLog.info(`v${info.version} downloaded; waiting for Squirrel.Mac to stage it`)
+    } else {
+      markReady(info.version)
+    }
   })
+  if (process.platform === 'darwin') {
+    nativeUpdater.on('update-downloaded', () => markReady(downloadedVersion))
+  }
 
   autoUpdater.on('error', (error) => {
     console.error('[updater] error:', error)
+    fileLog.error('updater error:', error)
     if (manualCheck) {
       manualCheck = false
       void dialog.showMessageBox({
@@ -158,7 +226,13 @@ export async function checkForUpdatesManual(): Promise<void> {
   }
 }
 
-/** Install the downloaded update and relaunch (toast button / tray menu). */
+/**
+ * Install the downloaded update and relaunch (toast button / tray menu).
+ * quitAndInstall closes every window before the app's before-quit fires, so the
+ * window's hide-on-close guard must be told first or it cancels the restart.
+ */
 export function restartToUpdate(): void {
+  fileLog.info('restart to update requested')
+  prepareQuit?.()
   autoUpdater.quitAndInstall()
 }

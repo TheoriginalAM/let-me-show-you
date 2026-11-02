@@ -590,10 +590,13 @@ app.whenReady().then(() => {
   // Background auto-updates (no-op in dev): check on launch + every 4 hours.
   // The status-change callback lets the tray swap in "Restart to Update" once a
   // download finishes.
-  initAutoUpdates(
-    () => controlWindow,
-    () => tray.refresh(),
-  )
+  initAutoUpdates(() => controlWindow, {
+    onChange: () => tray.refresh(),
+    // Restart-to-install closes windows before before-quit fires: let them close.
+    prepareQuit: () => {
+      isQuitting = true
+    },
+  })
 
   app.on('activate', () => {
     showControlWindow()
