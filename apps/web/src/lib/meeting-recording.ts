@@ -69,6 +69,9 @@ function recordingTitle(roomName: string, timeZone?: string): string {
 /**
  * A Mux live stream that only exists to record: no live playback, and its
  * recorded asset carries our video id as passthrough (like uploads do).
+ *
+ * The stream's top-level passthrough is copied onto its assets. Mux rejects
+ * `new_asset_settings.passthrough` with a 400, so never set it there.
  */
 async function createRecordingStream(videoId: string) {
   const mux = getMux()
@@ -76,18 +79,15 @@ async function createRecordingStream(videoId: string) {
   try {
     return await mux.video.liveStreams.create({
       ...base,
-      new_asset_settings: {
-        playback_policies: ['public'],
-        mp4_support: 'capped-1080p',
-        passthrough: videoId,
-      },
+      new_asset_settings: { playback_policies: ['public'], mp4_support: 'capped-1080p' },
     })
   } catch (error) {
     // Some Mux plans reject MP4 renditions on live-recorded assets: record without.
     if ((error as { status?: number })?.status !== 400) throw error
+    console.warn('[meeting] Mux refused the MP4 rendition, recording without:', error)
     return mux.video.liveStreams.create({
       ...base,
-      new_asset_settings: { playback_policies: ['public'], passthrough: videoId },
+      new_asset_settings: { playback_policies: ['public'] },
     })
   }
 }

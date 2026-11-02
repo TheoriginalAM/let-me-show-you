@@ -228,9 +228,13 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
   }, [isRecording, recPending])
   useEffect(() => {
     if (!recPending) return
-    const t = setTimeout(() => setRecPending(null), 45_000)
+    const t = setTimeout(() => {
+      setRecPending(null)
+      // The server accepted it but LiveKit never reported the recorder live.
+      if (recPending === 'starting') notify('Recording did not start. Please try again.', 'error')
+    }, 45_000)
     return () => clearTimeout(t)
-  }, [recPending])
+  }, [recPending, notify])
 
   const camTrack = cameraTrack?.track as LocalVideoTrack | undefined
   const maxHeight = maxCameraHeight(camTrack ? sourceTrack(camTrack) : undefined)
@@ -557,7 +561,14 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
             onClick={() => void toggleRecording()}
             className="hidden min-[50rem]:grid"
           >
-            {isRecording ? <StopIcon /> : <RecordIcon className="text-red-400" />}
+            {recPending ? (
+              // The start can take a few seconds (Mux + LiveKit): show the press landed.
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-red-400 motion-reduce:animate-none" aria-hidden />
+            ) : isRecording ? (
+              <StopIcon />
+            ) : (
+              <RecordIcon className="text-red-400" />
+            )}
           </IconButton>
         )}
 
