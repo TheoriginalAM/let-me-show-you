@@ -47,6 +47,7 @@ import {
   bookings,
   meetingRooms,
   user,
+  workspaceMembers,
   workspaces,
 } from './schema'
 import { brandColumns, memberRole, toBrand, type WorkspaceBrand } from './workspaces'
@@ -1044,4 +1045,76 @@ export async function releaseReminderClaim(
     .update(bookings)
     .set(kind === 'day' ? { reminderDaySentAt: null } : { reminderHourSentAt: null })
     .where(and(eq(bookings.id, id), eq(sentAt, claimedAt)))
+}
+
+// ---------------------------------------------------------------------------
+// Desktop app
+// ---------------------------------------------------------------------------
+
+export interface UpcomingBookingForUser {
+  id: string
+  title: string
+  startsAt: string
+  endsAt: string
+  guestName: string
+  guestEmail: string
+  guestNotes: string | null
+  answers: BookingAnswer[]
+  hostUserId: string | null
+  hostName: string | null
+  businessName: string
+  roomSlug: string | null
+}
+
+/**
+ * Confirmed bookings in every business the user belongs to that haven't ended
+ * and start within `days`, soonest first (for the desktop app's calendar).
+ */
+export async function listUpcomingBookingsForUser(
+  userId: string,
+  days = 30,
+  limit = 200,
+): Promise<UpcomingBookingForUser[]> {
+  const now = new Date()
+  const rows = await db
+    .select({
+      id: bookings.id,
+      title: bookings.title,
+      startsAt: bookings.startsAt,
+      endsAt: bookings.endsAt,
+      guestName: bookings.guestName,
+      guestEmail: bookings.guestEmail,
+      guestNotes: bookings.guestNotes,
+      answers: bookings.answers,
+      hostUserId: bookings.hostUserId,
+      hostName: user.name,
+      workspaceName: workspaces.name,
+      brandName: workspaces.brandName,
+      roomSlug: meetingRooms.slug,
+    })
+    .from(bookings)
+    .innerJoin(workspaces, eq(bookings.workspaceId, workspaces.id))
+    .innerJoin(
+      workspaceMembers,
+      and(
+        eq(workspaceMembers.workspaceId, bookings.workspaceId),
+        eq(workspaceMembers.userId, userId),
+      ),
+    )
+    .leftJoin(meetingRooms, eq(bookings.meetingRoomId, meetingRooms.id))
+    .leftJoin(user, eq(bookings.hostUserId, user.id))
+    .where(
+      and(
+        eq(bookings.status, 'confirmed'),
+        gt(bookings.endsAt, now.toISOString()),
+        lt(bookings.startsAt, new Date(now.getTime() + days * DAY_MS).toISOString()),
+      ),
+    )
+    .orderBy(asc(bookings.startsAt))
+    .limit(limit)
+  return rows.map(({ workspaceName, brandName, answers, ...b }) => ({
+    ...b,
+    answers: answers ?? [],
+    businessName: brandName || workspaceName,
+  }))
 }

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import {
   IPC,
   type AuthState,
+  type BookingsStatus,
   type RecorderApi,
   type RecordingStatus,
   type SignInStatus,
@@ -91,6 +92,16 @@ const api: RecorderApi = {
   // Onboarding
   getOnboardingComplete: () => ipcRenderer.invoke(IPC.getOnboardingComplete),
   completeOnboarding: () => ipcRenderer.invoke(IPC.completeOnboarding),
+
+  // Meetings + calendar
+  listRooms: () => ipcRenderer.invoke(IPC.listRooms),
+  getBookings: () => ipcRenderer.invoke(IPC.getBookings),
+  refreshBookings: () => ipcRenderer.invoke(IPC.refreshBookings),
+  onBookings: (cb) => {
+    const listener = (_event: IpcRendererEvent, status: BookingsStatus): void => cb(status)
+    ipcRenderer.on(IPC.bookingsStatus, listener)
+    return () => ipcRenderer.removeListener(IPC.bookingsStatus, listener)
+  },
 
   // Auto-update
   restartToUpdate: () => ipcRenderer.invoke(IPC.restartToUpdate),

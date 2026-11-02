@@ -16,6 +16,8 @@ import {
   type WebcamShape,
   type WebcamSize,
   type WorkspacesResult,
+  type BookingsStatus,
+  type RoomsResult,
 } from '../shared/ipc'
 import type { RecordingSession } from './recording-session'
 import {
@@ -49,6 +51,10 @@ export interface IpcContext {
   retryUpload: () => Promise<void>
   getUploadStatus: () => UploadStatus
   listWorkspaces: () => Promise<WorkspacesResult | null>
+  // meetings + calendar
+  listRooms: () => Promise<RoomsResult | null>
+  getBookings: () => BookingsStatus
+  refreshBookings: () => Promise<BookingsStatus>
 }
 
 /** Confine an uploadable path to the app's own recordings directory. */
@@ -261,6 +267,11 @@ export function registerIpcHandlers(ctx: IpcContext): void {
   ipcMain.handle(IPC.retryUpload, () => ctx.retryUpload())
   ipcMain.handle(IPC.getUploadStatus, () => ctx.getUploadStatus())
   ipcMain.handle(IPC.listWorkspaces, () => ctx.listWorkspaces())
+
+  // ---- Meetings + calendar ----
+  ipcMain.handle(IPC.listRooms, () => ctx.listRooms())
+  ipcMain.handle(IPC.getBookings, () => ctx.getBookings())
+  ipcMain.handle(IPC.refreshBookings, () => ctx.refreshBookings())
 
   ipcMain.handle(IPC.openExternalUrl, (_event, url: unknown) => {
     if (typeof url !== 'string') throw new Error('Invalid url')

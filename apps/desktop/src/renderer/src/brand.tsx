@@ -27,7 +27,7 @@ export function LogoMark({ size = 24 }: { size?: number }) {
 }
 
 export type IconName =
-  'check' | 'lock' | 'camera' | 'warning' | 'film' | 'scissors' | 'gear' | 'play' | 'pause'
+  'check' | 'lock' | 'camera' | 'warning' | 'film' | 'scissors' | 'gear' | 'play' | 'pause' | 'copy'
 
 const PATHS: Record<IconName, ReactNode> = {
   check: <path d="m5 12.5 4.5 4.5L19 7.5" />,
@@ -70,6 +70,12 @@ const PATHS: Record<IconName, ReactNode> = {
   ),
   play: <path d="M8 5.5v13l10.5-6.5z" fill="currentColor" />,
   pause: <path d="M8 5.5v13M16 5.5v13" />,
+  copy: (
+    <>
+      <rect x="9" y="9" width="12" height="12" rx="2.5" />
+      <path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5" />
+    </>
+  ),
 }
 
 export function Icon({

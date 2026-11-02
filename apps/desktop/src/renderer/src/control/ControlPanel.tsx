@@ -16,6 +16,10 @@ import { Settings } from './Settings'
 import { Onboarding } from './Onboarding'
 import { UpdateToast } from './UpdateToast'
 import { Icon, LogoMark } from '../brand'
+import type { BookingsStatus } from '@shared/ipc'
+import { CalendarPanel, callsToday } from './CalendarPanel'
+import { MeetingsPanel } from './MeetingsPanel'
+import { SectionTabs, type Section } from './SectionTabs'
 
 async function enumerate(): Promise<{ mics: DeviceOption[]; cameras: DeviceOption[] }> {
   const devices = await navigator.mediaDevices.enumerateDevices()
@@ -48,6 +52,9 @@ export function ControlPanel() {
   const cameras = useRecorderStore((s) => s.cameras)
   const onboardingComplete = useRecorderStore((s) => s.onboardingComplete)
   const [showSettings, setShowSettings] = useState(false)
+  const [section, setSection] = useState<Section>('record')
+  const [signedIn, setSignedIn] = useState(false)
+  const [bookings, setBookings] = useState<BookingsStatus | null>(null)
   // Non-null while the pre-recording countdown is ticking down (guardrail).
   const [countdown, setCountdown] = useState<number | null>(null)
 
@@ -237,6 +244,19 @@ export function ControlPanel() {
 
   const { state } = status
 
+  // Signed-in state and upcoming bookings drive the Meetings and Calendar tabs.
+  useEffect(() => {
+    void window.recorder.getAuthState().then((a) => setSignedIn(a.signedIn))
+    return window.recorder.onAuthState((a) => setSignedIn(a.signedIn))
+  }, [])
+  useEffect(() => {
+    void window.recorder.getBookings().then(setBookings)
+    return window.recorder.onBookings(setBookings)
+  }, [])
+  const sectionTabs = (
+    <SectionTabs value={section} onChange={setSection} callsToday={callsToday(bookings)} />
+  )
+
   const canRecord =
     mode === 'camera'
       ? cameras.length > 0
@@ -305,12 +325,24 @@ export function ControlPanel() {
           <div className="pane">
             <ErrorScreen />
           </div>
+        ) : section !== 'record' ? (
+          <>
+            {sectionTabs}
+            <div className="source-scroll">
+              {section === 'meetings' ? (
+                <MeetingsPanel signedIn={signedIn} />
+              ) : (
+                <CalendarPanel status={bookings} />
+              )}
+            </div>
+          </>
         ) : !permissions ? (
           <div className="pane">
             <div className="picker-empty">Checking permissions…</div>
           </div>
         ) : (
           <>
+            {sectionTabs}
             <div className="mode-bar">
               <ModeTabs />
             </div>

@@ -52,6 +52,10 @@ export const IPC = {
   // recording guardrails
   getGuardrails: 'get-guardrails',
   setGuardrails: 'set-guardrails',
+  // meetings + calendar (from the web app)
+  listRooms: 'list-rooms',
+  getBookings: 'get-bookings',
+  refreshBookings: 'refresh-bookings',
   // main -> renderer (events)
   recordingStatus: 'recording-status',
   requestStop: 'request-stop',
@@ -60,6 +64,7 @@ export const IPC = {
   signInStatus: 'sign-in-status',
   uploadStatus: 'upload-status',
   updateStatus: 'update-status',
+  bookingsStatus: 'bookings-status',
 } as const
 
 export type SourceType = 'screen' | 'window'
@@ -235,6 +240,50 @@ export interface UpdateStatus {
   version: string | null
 }
 
+/** A meeting room in one of the user's businesses (calls open in the browser). */
+export interface DesktopRoom {
+  id: string
+  name: string
+  url: string
+  businessName: string
+  lobbyEnabled: boolean
+}
+
+export interface RoomsResult {
+  rooms: DesktopRoom[]
+  /** The website's Meeting rooms page, for managing them. */
+  manageUrl: string
+}
+
+/** A booked call coming up, in any of the user's businesses. */
+export interface UpcomingBooking {
+  id: string
+  title: string
+  startsAt: string
+  endsAt: string
+  guestName: string
+  guestEmail: string
+  notes: string | null
+  answers: { label: string; value: string }[]
+  hostName: string | null
+  /** The signed-in user hosts this call (only these get a heads-up). */
+  isMine: boolean
+  businessName: string
+  joinUrl: string | null
+}
+
+export interface BookingsStatus {
+  /** null until the first fetch (or when signed out). */
+  bookings: UpcomingBooking[] | null
+  manageUrl: string | null
+  signedIn: boolean
+  loading: boolean
+  /** A plain-words problem with the last fetch, if any. */
+  error: string | null
+  /** Epoch ms of the last successful fetch. */
+  updatedAt: number | null
+}
+
 /** The API the preload script exposes on `window.recorder`. */
 export interface RecorderApi {
   listSources: () => Promise<CaptureSource[]>
@@ -319,6 +368,16 @@ export interface RecorderApi {
   getGuardrails: () => Promise<GuardrailConfig>
   /** Persist the countdown + auto-stop settings. */
   setGuardrails: (config: GuardrailConfig) => Promise<GuardrailConfig>
+
+  // ---- Meetings + calendar ----
+  /** The user's meeting rooms in every business (null if signed out or unreachable). */
+  listRooms: () => Promise<RoomsResult | null>
+  /** Latest upcoming bookings (kept fresh in the background). */
+  getBookings: () => Promise<BookingsStatus>
+  /** Fetch bookings now. */
+  refreshBookings: () => Promise<BookingsStatus>
+  /** Subscribe to booking updates; returns an unsubscribe fn. */
+  onBookings: (cb: (status: BookingsStatus) => void) => () => void
 
   // ---- Auto-update ----
   /** Quit and install a downloaded update (from the "Update ready" toast). */

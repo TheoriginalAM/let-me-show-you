@@ -20,6 +20,7 @@ import type { AreaRect, WebcamSize } from '../shared/ipc'
 import { registerIpcHandlers } from './ipc'
 import { createTray } from './tray'
 import { clearToken, hasToken } from './token-store'
+import { createCalendar, fetchRooms } from './calendar'
 import { cancelSignIn, runSignIn } from './device-auth'
 import { fetchWorkspaces, runUpload } from './uploader'
 import { checkForUpdatesManual, getUpdateStatus, initAutoUpdates, restartToUpdate } from './updater'
@@ -332,8 +333,16 @@ function sendToControl(channel: string, payload?: unknown): void {
   }
 }
 
+// Upcoming bookings: kept fresh in the background, pushed to the panel and the tray.
+let refreshTray: (() => void) | null = null
+const calendar = createCalendar((status) => {
+  sendToControl(IPC.bookingsStatus, status)
+  refreshTray?.()
+})
+
 function broadcastAuthState(): void {
   sendToControl(IPC.authState, { signedIn: hasToken() })
+  void calendar.refresh()
 }
 
 async function signIn(): Promise<void> {
@@ -522,6 +531,9 @@ app.whenReady().then(() => {
     retryUpload,
     getUploadStatus: () => uploadStatus,
     listWorkspaces: () => fetchWorkspaces(),
+    listRooms: () => fetchRooms(),
+    getBookings: () => calendar.getStatus(),
+    refreshBookings: () => calendar.refresh(),
   })
 
   // Mirror recording status to the control panel renderer.
@@ -578,7 +590,11 @@ app.whenReady().then(() => {
     checkForUpdates: () => void checkForUpdatesManual(),
     getUpdateStatus,
     restartToUpdate,
+    getNextCall: () => calendar.nextCall(),
+    joinCall: (booking) => calendar.join(booking),
   })
+  refreshTray = () => tray.refresh()
+  calendar.start()
   controlWindow = createControlWindow()
 
   app.setAboutPanelOptions({
@@ -605,6 +621,7 @@ app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   isQuitting = true
+  calendar.stop()
   recordingSession.dispose() // kill any in-flight ffmpeg transcode
 })
 

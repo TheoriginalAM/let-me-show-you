@@ -1,4 +1,6 @@
 import { Menu, nativeImage, Tray, type NativeImage } from 'electron'
+import type { UpcomingBooking } from '../shared/ipc'
+import { callTimeLabel } from './calendar'
 import type { RecordingSession } from './recording-session'
 import type { UpdateStatus } from '../shared/ipc'
 
@@ -10,6 +12,9 @@ export interface TrayContext {
   checkForUpdates: () => void
   getUpdateStatus: () => UpdateStatus
   restartToUpdate: () => void
+  /** The next call the user hosts, if any (shown at the top of the menu). */
+  getNextCall: () => UpcomingBooking | null
+  joinCall: (booking: UpcomingBooking) => void
 }
 
 export interface TrayHandle {
@@ -111,8 +116,19 @@ export function createTray(ctx: TrayContext): TrayHandle {
     const active = ctx.session.isActive()
     const updateReady = ctx.getUpdateStatus().phase === 'ready'
     const updateVersion = ctx.getUpdateStatus().version
+    const next = ctx.getNextCall()
+    const startsIn = next ? new Date(next.startsAt).getTime() - Date.now() : Infinity
     tray.setContextMenu(
       Menu.buildFromTemplate([
+        ...(next
+          ? [
+              {
+                label: `${startsIn <= 0 ? 'Now' : 'Next call'}: ${callTimeLabel(next.startsAt)}, ${next.guestName}`,
+                click: () => ctx.joinCall(next),
+              },
+              { type: 'separator' as const },
+            ]
+          : []),
         {
           // Stopping asks the renderer (which owns the MediaRecorder) to stop;
           // starting surfaces the panel so a source is picked and validated.
