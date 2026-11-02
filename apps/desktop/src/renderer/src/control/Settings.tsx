@@ -37,7 +37,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
         <div className="settings-title">Account</div>
         <div className="settings-sub">
           {auth.signedIn
-            ? 'Signed in — you can upload & share recordings.'
+            ? 'Signed in. You can upload and share recordings.'
             : 'Sign in to upload recordings and get shareable links.'}
         </div>
       </div>

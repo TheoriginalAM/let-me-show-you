@@ -1,4 +1,5 @@
 import { useRecorderStore } from '../store'
+import { Icon } from '../brand'
 
 export function ErrorScreen() {
   const error = useRecorderStore((s) => s.status.error)
@@ -7,12 +8,14 @@ export function ErrorScreen() {
 
   return (
     <div className="error-screen">
-      <div className="error-icon">⚠️</div>
+      <div className="error-icon">
+        <Icon name="warning" size={26} />
+      </div>
       <h2 className="error-title">Recording failed</h2>
       <p className="error-message">{error.message}</p>
       {recoveredPath ? (
         <p className="error-recovery">
-          Your raw recording was preserved so it isn’t lost — you can recover it from the webm file.
+          Your raw recording was kept, so nothing is lost. You can recover it from the webm file.
         </p>
       ) : null}
 

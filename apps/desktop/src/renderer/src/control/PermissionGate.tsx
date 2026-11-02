@@ -1,4 +1,5 @@
 import type { MediaPermissions, PermissionState, PermissionTarget } from '@shared/ipc'
+import { Icon } from '../brand'
 
 const LABELS: Record<PermissionTarget, string> = {
   screen: 'Screen Recording',
@@ -32,7 +33,9 @@ export function PermissionGate({
 }) {
   return (
     <div className="gate">
-      <div className="gate-icon">🎥</div>
+      <div className="gate-icon">
+        <Icon name="camera" size={26} />
+      </div>
       <h2 className="gate-title">Screen recording access needed</h2>
       <p className="gate-body">
         To capture your screen, allow <strong>Let Me Show You</strong> under Screen Recording in

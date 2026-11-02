@@ -22,12 +22,7 @@ import { createTray } from './tray'
 import { clearToken, hasToken } from './token-store'
 import { cancelSignIn, runSignIn } from './device-auth'
 import { fetchWorkspaces, runUpload } from './uploader'
-import {
-  checkForUpdatesManual,
-  getUpdateStatus,
-  initAutoUpdates,
-  restartToUpdate,
-} from './updater'
+import { checkForUpdatesManual, getUpdateStatus, initAutoUpdates, restartToUpdate } from './updater'
 import { initSentryMain } from './sentry'
 
 // Crash reporting first (env-gated + off in dev), so it can capture early errors.
@@ -114,7 +109,6 @@ function hardenWindow(win: BrowserWindow): void {
 }
 
 function createControlWindow(): BrowserWindow {
-  const isMac = process.platform === 'darwin'
   const win = new BrowserWindow({
     width: 408,
     height: 668,
@@ -125,10 +119,8 @@ function createControlWindow(): BrowserWindow {
     frame: false,
     titleBarStyle: 'hidden',
     alwaysOnTop: true,
-    // macOS: a translucent blur material (Supercut-style). The renderer keeps a
-    // dark tint over it for contrast. Elsewhere: opaque.
-    backgroundColor: isMac ? '#00000000' : '#0a0a0f',
-    ...(isMac ? { vibrancy: 'under-window' as const, visualEffectState: 'active' as const } : {}),
+    // The brand's light canvas (matches the renderer), so there's no flash on open.
+    backgroundColor: '#f4f3fb',
     title: APP_NAME,
     webPreferences: baseWebPreferences,
   })
@@ -598,7 +590,10 @@ app.whenReady().then(() => {
   // Background auto-updates (no-op in dev): check on launch + every 4 hours.
   // The status-change callback lets the tray swap in "Restart to Update" once a
   // download finishes.
-  initAutoUpdates(() => controlWindow, () => tray.refresh())
+  initAutoUpdates(
+    () => controlWindow,
+    () => tray.refresh(),
+  )
 
   app.on('activate', () => {
     showControlWindow()

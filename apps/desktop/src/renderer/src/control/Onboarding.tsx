@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { PermissionTarget } from '@shared/ipc'
 import { useRecorderStore } from '../store'
+import { Icon, LogoMark } from '../brand'
 
 const PERMISSION_LABELS: Record<PermissionTarget, string> = {
   screen: 'Screen Recording',
@@ -46,14 +47,18 @@ export function Onboarding({ onRecheck }: { onRecheck: () => void }) {
 
       {step === 0 ? (
         <div className="onboard-step">
-          <div className="onboard-logo">▶</div>
+          <div className="onboard-logo mark">
+            <LogoMark size={60} />
+          </div>
           <h2 className="onboard-title">Welcome to Let Me Show You</h2>
           <p className="onboard-body">
             Record your screen with voiceover and share it with a single link.
           </p>
           {auth.signedIn ? (
             <>
-              <p className="onboard-ok">Signed in ✓</p>
+              <p className="onboard-ok">
+                <Icon name="check" size={15} strokeWidth={2.8} /> Signed in
+              </p>
               <button className="btn-record no-drag" onClick={() => setStep(1)}>
                 Next
               </button>
@@ -88,11 +93,13 @@ export function Onboarding({ onRecheck }: { onRecheck: () => void }) {
         </div>
       ) : step === 1 ? (
         <div className="onboard-step">
-          <div className="onboard-logo">🔒</div>
+          <div className="onboard-logo lock">
+            <Icon name="lock" size={26} />
+          </div>
           <h2 className="onboard-title">Grant permissions</h2>
           <p className="onboard-body">
-            Screen Recording is required. Microphone and Camera are optional — for voiceover and a
-            webcam bubble.
+            Screen Recording is needed to record. Microphone and Camera are optional, for talking
+            over your screen and showing your face.
           </p>
           <ul className="perm-list">
             {PERMISSION_TARGETS.map((target) => {
@@ -148,7 +155,9 @@ export function Onboarding({ onRecheck }: { onRecheck: () => void }) {
         </div>
       ) : (
         <div className="onboard-step">
-          <div className="onboard-logo">🎬</div>
+          <div className="onboard-logo film">
+            <Icon name="film" size={26} />
+          </div>
           <h2 className="onboard-title">You’re all set</h2>
           <p className="onboard-body">
             Pick a screen or window, add your mic, and hit record. Signed-in recordings get a

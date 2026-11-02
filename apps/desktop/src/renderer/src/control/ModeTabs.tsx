@@ -74,6 +74,7 @@ export function ModeTabs() {
         <button
           key={t.mode}
           className={`mode-tab ${mode === t.mode ? 'on' : ''}`}
+          data-mode={t.mode}
           onClick={() => setMode(t.mode)}
         >
           <span className="mode-tab-ico">{t.icon}</span>

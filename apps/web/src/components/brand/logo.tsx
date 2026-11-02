@@ -15,7 +15,7 @@ export function LogoMark({ className = 'h-8 w-8', title }: { className?: string;
       {title && <title>{title}</title>}
       <rect width="40" height="40" rx="11" fill="#4f3cff" />
       <path
-        d="M10.4 15.6C6.6 11.2 13 5.6 20.6 6.2c6.6.5 9.4 5.6 5.4 9.2-3.6 3.2-12.4 3.4-16.2-.6-1.4-1.6-.8-3.6.8-4.6"
+        d="M8.6 13.4A8.6 5.6 -10 1 1 25.6 10.4A8.6 5.6 -10 1 1 8.6 13.4Z"
         fill="none"
         stroke="#ffe14a"
         strokeWidth="3"

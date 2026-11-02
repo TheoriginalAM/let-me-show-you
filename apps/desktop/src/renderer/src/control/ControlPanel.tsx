@@ -15,6 +15,7 @@ import { ErrorScreen } from './ErrorScreen'
 import { Settings } from './Settings'
 import { Onboarding } from './Onboarding'
 import { UpdateToast } from './UpdateToast'
+import { Icon, LogoMark } from '../brand'
 
 async function enumerate(): Promise<{ mics: DeviceOption[]; cameras: DeviceOption[] }> {
   const devices = await navigator.mediaDevices.enumerateDevices()
@@ -109,9 +110,7 @@ export function ControlPanel() {
     )
     void window.recorder.getAuthState().then(store.setAuth)
     void window.recorder.getUploadStatus().then(store.setUpload)
-    void window.recorder
-      .getGuardrails()
-      .then((g) => useRecorderStore.getState().setGuardrails(g))
+    void window.recorder.getGuardrails().then((g) => useRecorderStore.getState().setGuardrails(g))
     void window.recorder
       .getOnboardingComplete()
       .then((done) => useRecorderStore.getState().setOnboardingComplete(done))
@@ -243,7 +242,8 @@ export function ControlPanel() {
       ? cameras.length > 0
       : mode === 'area'
         ? screenGranted && Boolean(areaRect)
-        : screenGranted && Boolean(sources.find((x) => x.id === selectedSourceId && x.type === mode))
+        : screenGranted &&
+          Boolean(sources.find((x) => x.id === selectedSourceId && x.type === mode))
   const recordLabel =
     mode === 'camera'
       ? 'Record camera'
@@ -256,7 +256,7 @@ export function ControlPanel() {
   return (
     <div className="panel">
       <header className="titlebar">
-        <span className="title-dot" />
+        <LogoMark size={24} />
         <span className="title-text">Let Me Show You</span>
         <div className="titlebar-actions">
           {onboardingComplete === true && (
@@ -265,7 +265,7 @@ export function ControlPanel() {
               title="Settings"
               onClick={() => setShowSettings((value) => !value)}
             >
-              ⚙
+              <Icon name="gear" size={17} strokeWidth={1.9} />
             </button>
           )}
           <button

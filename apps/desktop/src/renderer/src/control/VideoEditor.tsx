@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { formatDuration } from '@lmsy/shared'
 import type { EditSegment, RecordingResult } from '@shared/ipc'
+import { Icon } from '../brand'
 
 /** Stream the finished recording from main over the Range-capable media scheme. */
 function mediaUrl(filePath: string): string {
@@ -56,13 +57,7 @@ export function computeKeep(
 
 type Drag = 'start' | 'end' | 'seek' | null
 
-export function VideoEditor({
-  result,
-  onClose,
-}: {
-  result: RecordingResult
-  onClose: () => void
-}) {
+export function VideoEditor({ result, onClose }: { result: RecordingResult; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const trackRef = useRef<HTMLDivElement | null>(null)
   const dragRef = useRef<Drag>(null)
@@ -219,7 +214,12 @@ export function VideoEditor({
     <div className="editor">
       <div className="editor-head">
         <span className="editor-title">Trim &amp; cut</span>
-        <button className="editor-x no-drag" onClick={onClose} disabled={applying} aria-label="Close">
+        <button
+          className="editor-x no-drag"
+          onClick={onClose}
+          disabled={applying}
+          aria-label="Close"
+        >
           ✕
         </button>
       </div>
@@ -236,7 +236,7 @@ export function VideoEditor({
             playsInline
           />
           <button className="editor-play no-drag" onClick={togglePlay} aria-label="Play/pause">
-            {playing ? '❚❚' : '▶'}
+            <Icon name={playing ? 'pause' : 'play'} size={18} strokeWidth={2.6} />
           </button>
         </div>
 

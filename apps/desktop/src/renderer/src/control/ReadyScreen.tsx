@@ -3,6 +3,7 @@ import { formatDuration } from '@lmsy/shared'
 import type { Workspace } from '@shared/ipc'
 import { useRecorderStore } from '../store'
 import { VideoEditor } from './VideoEditor'
+import { Icon } from '../brand'
 
 const MIN_PASSWORD_LENGTH = 4
 
@@ -61,7 +62,9 @@ export function ReadyScreen() {
   return (
     <div className="ready">
       <div className="ready-scroll">
-        <div className="ready-check">✓</div>
+        <div className="ready-check">
+          <Icon name="check" size={24} strokeWidth={2.8} />
+        </div>
         <h2 className="ready-title">Recording ready</h2>
 
         {result.thumbnailDataUrl ? (
@@ -72,13 +75,15 @@ export function ReadyScreen() {
 
         {upload.phase === 'idle' && (
           <button className="btn-secondary no-drag ready-edit" onClick={() => setEditing(true)}>
-            ✂ Trim &amp; cut
+            <Icon name="scissors" size={15} /> Trim &amp; cut
           </button>
         )}
 
         {upload.phase === 'done' ? (
           <div className="upload-done">
-            <div className="upload-done-label">✓ Link copied!</div>
+            <div className="upload-done-label">
+              <Icon name="check" size={16} strokeWidth={2.8} /> Link copied
+            </div>
             <div className="upload-url" title={upload.shareUrl ?? ''}>
               {upload.shareUrl}
             </div>
@@ -168,7 +173,7 @@ export function ReadyScreen() {
           </div>
         ) : (
           <p className="ready-sub">
-            Sign in to upload &amp; share — your recording is saved locally.
+            Sign in to upload and share. Your recording is saved on this computer.
           </p>
         )}
       </div>
@@ -208,7 +213,10 @@ export function ReadyScreen() {
           >
             Reveal in Finder
           </button>
-          <button className="btn-ghost no-drag" onClick={() => void window.recorder.dismissResult()}>
+          <button
+            className="btn-ghost no-drag"
+            onClick={() => void window.recorder.dismissResult()}
+          >
             Done
           </button>
         </div>
