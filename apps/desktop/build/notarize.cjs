@@ -95,7 +95,19 @@ exports.default = async function notarizing(context) {
 
   // Staple the ticket so Gatekeeper passes offline. Done here (before the dmg/zip
   // are built) so both artifacts carry the stapled app.
+  // Stapling fetches the ticket from Apple's CloudKit, which can drop the
+  // connection (-1005, "The staple and validate action failed! Error 68"), so
+  // retry it too. No secrets in this argv, so the error is safe to log.
   console.log('[notarize] Notarized; stapling ticket…')
-  execFileSync('xcrun', ['stapler', 'staple', appPath], { stdio: 'inherit' })
+  for (let attempt = 1; ; attempt++) {
+    try {
+      execFileSync('xcrun', ['stapler', 'staple', appPath], { stdio: 'inherit' })
+      break
+    } catch (err) {
+      if (attempt >= MAX_ATTEMPTS) throw err
+      console.warn(`[notarize] Stapling attempt ${attempt} failed; retrying in ${BACKOFF_SECONDS * attempt}s…`)
+      await delay(BACKOFF_SECONDS * attempt)
+    }
+  }
   console.log('[notarize] Stapled.')
 }
