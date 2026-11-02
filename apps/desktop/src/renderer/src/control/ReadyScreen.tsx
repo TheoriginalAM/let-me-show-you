@@ -109,8 +109,11 @@ export function ReadyScreen() {
         ) : auth.signedIn ? (
           <div className="upload-fields">
             <div>
-              <label className="ufield-label">Title</label>
+              <label className="ufield-label" htmlFor="upload-title">
+                Title
+              </label>
               <input
+                id="upload-title"
                 className="uinput no-drag"
                 placeholder={defaultTitle}
                 value={title}
@@ -119,8 +122,11 @@ export function ReadyScreen() {
               />
             </div>
             <div>
-              <label className="ufield-label">Description (optional)</label>
+              <label className="ufield-label" htmlFor="upload-description">
+                Description (optional)
+              </label>
               <textarea
+                id="upload-description"
                 className="uinput no-drag"
                 placeholder="Shown under the video on its share page"
                 value={description}
@@ -132,8 +138,11 @@ export function ReadyScreen() {
             </div>
             {workspaces.length > 1 && (
               <div>
-                <label className="ufield-label">Workspace</label>
+                <label className="ufield-label" htmlFor="upload-workspace">
+                  Workspace
+                </label>
                 <select
+                  id="upload-workspace"
                   className="uinput no-drag"
                   value={workspaceId ?? ''}
                   onChange={(e) => setWorkspaceId(e.target.value)}
@@ -160,13 +169,20 @@ export function ReadyScreen() {
                   className="uinput no-drag"
                   type="password"
                   placeholder="Password"
+                  aria-label="Password"
+                  aria-describedby="upload-password-hint"
+                  aria-invalid={pwTooShort}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                 />
-                <div className="pw-hint">
-                  {pwTooShort
-                    ? `Use at least ${MIN_PASSWORD_LENGTH} characters`
-                    : '🔒 Viewers must enter this to watch'}
+                <div className="pw-hint" id="upload-password-hint">
+                  {pwTooShort ? (
+                    `Use at least ${MIN_PASSWORD_LENGTH} characters`
+                  ) : (
+                    <>
+                      <span aria-hidden>🔒</span> Viewers must enter this to watch
+                    </>
+                  )}
                 </div>
               </div>
             ) : null}

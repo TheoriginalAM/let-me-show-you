@@ -283,6 +283,7 @@ export function ControlPanel() {
             <button
               className={`win-icon no-drag ${showSettings ? 'active' : ''}`}
               title="Settings"
+              aria-pressed={showSettings}
               onClick={() => setShowSettings((value) => !value)}
             >
               <Icon name="gear" size={17} strokeWidth={1.9} />
@@ -291,6 +292,7 @@ export function ControlPanel() {
           <button
             className="win-close no-drag"
             title="Hide to tray"
+            aria-label="Hide to tray"
             onClick={() => void window.recorder.hideControlWindow()}
           >
             ×

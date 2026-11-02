@@ -43,10 +43,7 @@ const UNLOCK_MAX_AGE = 60 * 60 * 24 * 7
  * viewable; protected ones require a valid unlock cookie for this exact
  * password hash. Keeps view-counting and status-polling honest for locked shares.
  */
-async function isUnlocked(video: {
-  id: string
-  passwordHash: string | null
-}): Promise<boolean> {
+async function isUnlocked(video: { id: string; passwordHash: string | null }): Promise<boolean> {
   if (!video.passwordHash) return true
   const token = (await cookies()).get(unlockCookieName(video.id))?.value
   return Boolean(token && verifyUnlockToken(token, video.id, video.passwordHash))
@@ -149,7 +146,9 @@ export async function postComment(
     .trim()
     .toLowerCase()
     .slice(0, 200)
-  const body = String(input.body ?? '').trim().slice(0, MAX_BODY)
+  const body = String(input.body ?? '')
+    .trim()
+    .slice(0, MAX_BODY)
   const parentId = typeof input.parentId === 'string' && input.parentId ? input.parentId : null
   if (!name) return { ok: false, error: 'Please add your name.' }
   if (!EMAIL_RE.test(email)) return { ok: false, error: 'Please add a valid email.' }
@@ -244,15 +243,22 @@ export async function postApproval(
   slug: string,
   input: { name: string; email: string; status: 'approved' | 'changes'; note?: string },
 ): Promise<{ ok: boolean; error?: string }> {
-  const name = String(input.name ?? '').trim().slice(0, MAX_NAME)
-  const email = String(input.email ?? '').trim().toLowerCase().slice(0, 200)
+  const name = String(input.name ?? '')
+    .trim()
+    .slice(0, MAX_NAME)
+  const email = String(input.email ?? '')
+    .trim()
+    .toLowerCase()
+    .slice(0, 200)
   const status = input.status === 'approved' ? 'approved' : 'changes'
-  const note = input.note && String(input.note).trim() ? String(input.note).trim().slice(0, 1000) : null
+  const note =
+    input.note && String(input.note).trim() ? String(input.note).trim().slice(0, 1000) : null
   if (!name) return { ok: false, error: 'Please add your name.' }
   if (!EMAIL_RE.test(email)) return { ok: false, error: 'Please add a valid email.' }
 
   const video = await getShareableVideoBySlug(slug)
-  if (!video || !video.approvalEnabled) return { ok: false, error: 'Approvals are not enabled here.' }
+  if (!video || !video.approvalEnabled)
+    return { ok: false, error: 'Approvals are not enabled here.' }
   if (!(await isUnlocked(video))) return { ok: false, error: 'Unlock the recording first.' }
 
   const ipHash = await clientIpHash()

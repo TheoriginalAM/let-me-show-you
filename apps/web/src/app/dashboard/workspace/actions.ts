@@ -18,7 +18,11 @@ import {
 type Result = { ok: boolean; error?: string }
 
 /** Resolve the caller + their active workspace id, or null if not signed in. */
-async function context(): Promise<{ userId: string; userName: string; workspaceId: string } | null> {
+async function context(): Promise<{
+  userId: string
+  userName: string
+  workspaceId: string
+} | null> {
   const me = await getCurrentUser()
   if (!me) return null
   const workspaceId = await getActiveWorkspaceId(me.id)
@@ -30,7 +34,7 @@ export async function renameWorkspaceAction(name: string): Promise<Result> {
   const ctx = await context()
   if (!ctx) return { ok: false, error: 'Not signed in.' }
   const ok = await renameWorkspace(ctx.userId, ctx.workspaceId, name)
-  if (!ok) return { ok: false, error: 'Could not rename (owners only).' }
+  if (!ok) return { ok: false, error: 'Only owners can rename the business.' }
   revalidatePath('/dashboard/workspace')
   revalidatePath('/dashboard')
   return { ok: true }
@@ -59,7 +63,7 @@ export async function inviteMemberAction(
   try {
     emailed = await notifyWorkspaceInvite({
       email: email.trim().toLowerCase(),
-      workspaceName: ws?.name ?? 'a workspace',
+      workspaceName: ws?.name ?? 'a business',
       inviterName: ctx.userName,
       url,
     })
@@ -75,7 +79,12 @@ export async function removeMemberAction(memberUserId: string): Promise<Result> 
   const ctx = await context()
   if (!ctx) return { ok: false, error: 'Not signed in.' }
   const ok = await removeMember(ctx.userId, ctx.workspaceId, memberUserId)
-  if (!ok) return { ok: false, error: 'Could not remove this member.' }
+  if (!ok)
+    return {
+      ok: false,
+      error:
+        "Couldn't remove them. Only owners can remove people, and a business needs at least one owner.",
+    }
   revalidatePath('/dashboard/workspace')
   return { ok: true }
 }
@@ -84,7 +93,7 @@ export async function revokeInviteAction(inviteId: string): Promise<Result> {
   const ctx = await context()
   if (!ctx) return { ok: false, error: 'Not signed in.' }
   const ok = await revokeInvite(ctx.userId, ctx.workspaceId, inviteId)
-  if (!ok) return { ok: false, error: 'Could not revoke.' }
+  if (!ok) return { ok: false, error: 'Only owners can revoke invites.' }
   revalidatePath('/dashboard/workspace')
   return { ok: true }
 }
@@ -97,7 +106,11 @@ export async function deleteWorkspaceAction(): Promise<Result> {
     shutdownWorkspaceMeetings(workspaceId),
   )
   if (!ok) {
-    return { ok: false, error: "Can't delete your only workspace (owners only)." }
+    return {
+      ok: false,
+      error:
+        "Couldn't delete the business. Only owners can delete one, and you need to keep at least one business.",
+    }
   }
   revalidatePath('/dashboard')
   return { ok: true }

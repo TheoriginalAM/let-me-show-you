@@ -13,6 +13,7 @@ function SourceCard({
   return (
     <button
       className={`source-card no-drag ${selected ? 'selected' : ''}`}
+      aria-pressed={selected}
       onClick={() => onSelect(source.id)}
       title={source.name}
     >

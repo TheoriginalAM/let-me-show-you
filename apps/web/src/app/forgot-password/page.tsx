@@ -35,7 +35,10 @@ export default function ForgotPasswordPage() {
         <h1 className="mt-6 font-display text-3xl font-extrabold tracking-tight">Reset password</h1>
 
         {sent ? (
-          <p className="mt-4 rounded-lg bg-success/10 px-3 py-2.5 text-sm text-success ring-1 ring-inset ring-success/25">
+          <p
+            role="status"
+            className="mt-4 rounded-lg bg-success/10 px-3 py-2.5 text-sm text-success ring-1 ring-inset ring-success/25"
+          >
             If an account exists for {email}, a reset link is on its way. Check your inbox.
           </p>
         ) : (
@@ -44,7 +47,10 @@ export default function ForgotPasswordPage() {
               Enter your email and we&rsquo;ll send you a link to set a new password.
             </p>
             {error && (
-              <p className="mt-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger ring-1 ring-inset ring-danger/25">
+              <p
+                role="alert"
+                className="mt-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger ring-1 ring-inset ring-danger/25"
+              >
                 {error}
               </p>
             )}
@@ -54,9 +60,11 @@ export default function ForgotPasswordPage() {
                 required
                 autoFocus
                 placeholder="you@example.com"
+                aria-label="Email"
+                autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+                className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-ink focus:outline-none"
               />
               <button
                 type="submit"

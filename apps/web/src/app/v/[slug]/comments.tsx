@@ -26,14 +26,12 @@ export function Comments({
   slug,
   initialComments,
   isOwner,
-  accent,
   defaultName = '',
   defaultEmail = '',
 }: {
   slug: string
   initialComments: ThreadComment[]
   isOwner: boolean
-  accent: string
   defaultName?: string
   defaultEmail?: string
 }) {
@@ -45,6 +43,9 @@ export function Comments({
   const [pending, startTransition] = useTransition()
   const [replyingTo, setReplyingTo] = useState<string | null>(null)
   const [replyBody, setReplyBody] = useState('')
+  // Deleting also removes the replies, so it takes a second click.
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
+  const [deleteError, setDeleteError] = useState<string | null>(null)
   const honeypot = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -98,9 +99,19 @@ export function Comments({
   }
 
   function remove(id: string): void {
+    if (confirmDelete !== id) {
+      setConfirmDelete(id)
+      setDeleteError(null)
+      return
+    }
     startTransition(async () => {
-      const res = await deleteComment(slug, id)
-      if (res.ok) setComments((prev) => prev.filter((c) => c.id !== id && c.parentId !== id))
+      const res = await deleteComment(slug, id).catch(() => ({ ok: false }))
+      if (res.ok) {
+        setComments((prev) => prev.filter((c) => c.id !== id && c.parentId !== id))
+        setConfirmDelete(null)
+      } else {
+        setDeleteError("Couldn't delete the comment. Check your connection and try again.")
+      }
     })
   }
 
@@ -109,14 +120,13 @@ export function Comments({
     comments.filter((c) => c.parentId === id).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 
   const inputCls =
-    'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none'
+    'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-ink focus:outline-none'
 
   function CommentRow({ c, isReply }: { c: ThreadComment; isReply: boolean }) {
     return (
       <div className="flex gap-3">
         <span
-          className={`mt-0.5 grid ${isReply ? 'h-7 w-7 text-[0.65rem]' : 'h-8 w-8 text-xs'} shrink-0 place-items-center rounded-full font-bold text-white`}
-          style={{ background: accent }}
+          className={`mt-0.5 grid ${isReply ? 'h-7 w-7 text-[0.65rem]' : 'h-8 w-8 text-xs'} shrink-0 place-items-center rounded-full bg-accent font-bold text-on-accent`}
           aria-hidden
         >
           {initial(c.authorName)}
@@ -144,14 +154,27 @@ export function Comments({
                 <button
                   onClick={() => remove(c.id)}
                   disabled={pending}
-                  className="text-xs text-faint transition hover:text-danger disabled:opacity-50"
+                  className={`text-xs transition disabled:opacity-50 ${
+                    confirmDelete === c.id
+                      ? 'rounded bg-danger px-1.5 py-0.5 font-semibold text-on-danger'
+                      : 'text-faint hover:text-danger'
+                  }`}
                 >
-                  Delete
+                  {confirmDelete === c.id
+                    ? isReply || repliesOf(c.id).length === 0
+                      ? 'Delete for good?'
+                      : 'Delete with replies?'
+                    : 'Delete'}
                 </button>
               )}
             </span>
           </div>
           <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted">{c.body}</p>
+          {deleteError && confirmDelete === c.id && (
+            <p role="alert" className="mt-1 text-xs text-danger">
+              {deleteError}
+            </p>
+          )}
         </div>
       </div>
     )
@@ -177,6 +200,7 @@ export function Comments({
             maxLength={MAX_NAME}
             placeholder="Your name"
             aria-label="Your name"
+            autoComplete="name"
             className={inputCls}
           />
           <input
@@ -186,6 +210,7 @@ export function Comments({
             maxLength={200}
             placeholder="you@email.com"
             aria-label="Your email"
+            autoComplete="email"
             className={inputCls}
           />
         </div>
@@ -207,7 +232,11 @@ export function Comments({
           aria-hidden="true"
           className="hidden"
         />
-        {error && <p className="text-xs text-danger">{error}</p>}
+        {error && (
+          <p role="alert" className="text-xs text-danger">
+            {error}
+          </p>
+        )}
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-faint">
             Your name is shown publicly. Your email is private and used for reply notifications.
@@ -215,8 +244,7 @@ export function Comments({
           <button
             type="submit"
             disabled={pending}
-            className="rounded-lg px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-            style={{ background: accent }}
+            className="rounded-lg px-4 py-2 text-sm font-semibold bg-accent text-on-accent transition hover:opacity-90 disabled:opacity-50"
           >
             {pending ? 'Posting…' : 'Post comment'}
           </button>
@@ -246,14 +274,14 @@ export function Comments({
                     rows={2}
                     autoFocus
                     placeholder={`Reply to ${c.authorName}…`}
+                    aria-label={`Reply to ${c.authorName}`}
                     className={`${inputCls} resize-y`}
                   />
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => post(c.id, replyBody, () => setReplyingTo(null))}
                       disabled={pending}
-                      className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-                      style={{ background: accent }}
+                      className="rounded-lg px-3 py-1.5 text-sm font-semibold bg-accent text-on-accent transition hover:opacity-90 disabled:opacity-50"
                     >
                       Reply
                     </button>

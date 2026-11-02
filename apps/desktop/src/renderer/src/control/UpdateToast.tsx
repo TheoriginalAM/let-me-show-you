@@ -29,6 +29,7 @@ export function UpdateToast() {
         <button
           className="update-toast-close no-drag"
           title="Dismiss"
+          aria-label="Dismiss"
           onClick={() => setDismissedVersion(update.version)}
         >
           ×

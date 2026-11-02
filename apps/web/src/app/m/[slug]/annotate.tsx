@@ -61,7 +61,10 @@ export function containRect(
  * itself (a tunnel that also blurs the share for everyone), so it gets a plain
  * placeholder the pointers are drawn on. Unknown counts as a whole screen.
  */
-export function ownShareInfo(track: MediaStreamTrack | undefined): { live: boolean; ratio: number } {
+export function ownShareInfo(track: MediaStreamTrack | undefined): {
+  live: boolean
+  ratio: number
+} {
   let settings: MediaTrackSettings & { displaySurface?: string } = {}
   try {
     settings = track?.getSettings() ?? {}
@@ -234,7 +237,12 @@ export function useAnnotationSync(): void {
         ? !!lp.getTrackPublication(Track.Source.ScreenShare)?.track
         : !!room.getParticipantByIdentity(identity)?.getTrackPublication(Track.Source.ScreenShare)
 
-    const onData = (payload: Uint8Array, from?: RemoteParticipant, _kind?: unknown, topic?: string): void => {
+    const onData = (
+      payload: Uint8Array,
+      from?: RemoteParticipant,
+      _kind?: unknown,
+      topic?: string,
+    ): void => {
       if (topic !== ANNOTATE_TOPIC || !from) return
       const now = Date.now()
       const b = budget.get(from.identity)
@@ -271,7 +279,10 @@ export function useAnnotationSync(): void {
               run: () => store.openPopOut?.(),
             })
           } else {
-            notifyRef.current(`${name} is pointing at your screen. Come back to this tab to see where.`, 'info')
+            notifyRef.current(
+              `${name} is pointing at your screen. Come back to this tab to see where.`,
+              'info',
+            )
           }
         }
       }
@@ -322,7 +333,11 @@ const InkStroke = memo(function InkStroke({ stroke }: { stroke: Stroke }) {
       strokeLinejoin="round"
       vectorEffect="non-scaling-stroke"
       className="drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]"
-      style={delay === null ? undefined : { animation: `annotate-fade ${INK_FADE_MS}ms ease ${delay}ms forwards` }}
+      style={
+        delay === null
+          ? undefined
+          : { animation: `annotate-fade ${INK_FADE_MS}ms ease ${delay}ms forwards` }
+      }
     />
   )
 })
@@ -436,12 +451,19 @@ export function AnnotationLayer({
   return (
     <div
       ref={layer}
-      className={cx('absolute z-[5] select-none', active ? 'pointer-events-auto' : 'pointer-events-none')}
+      className={cx(
+        'absolute z-[5] select-none',
+        active ? 'pointer-events-auto' : 'pointer-events-none',
+      )}
       style={style}
       aria-hidden
       {...handlers}
     >
-      <svg className="absolute inset-0 h-full w-full overflow-visible" viewBox="0 0 1 1" preserveAspectRatio="none">
+      <svg
+        className="absolute inset-0 h-full w-full overflow-visible"
+        viewBox="0 0 1 1"
+        preserveAspectRatio="none"
+      >
         {marks.strokes.map((s) => (
           <InkStroke key={s.key} stroke={s} />
         ))}
@@ -457,7 +479,7 @@ export function AnnotationLayer({
             style={{ background: l.color, boxShadow: `0 0 14px 5px ${l.color}99` }}
           />
           <span
-            className="absolute left-3 top-2 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[11px] font-semibold text-black shadow"
+            className="absolute left-3 top-2 whitespace-nowrap rounded-md px-1.5 py-0.5 text-xs font-semibold text-black shadow"
             style={{ background: l.color }}
           >
             {l.name}
@@ -538,11 +560,23 @@ export function AnnotateToolbar({ share, compact }: { share: string; compact: bo
         <PenIcon size={16} />
         <span className={label}>Draw</span>
       </button>
-      <button type="button" onClick={sender.clearMine} className={btn(false)} title="Clear my marks" aria-label="Clear my marks">
+      <button
+        type="button"
+        onClick={sender.clearMine}
+        className={btn(false)}
+        title="Clear my marks"
+        aria-label="Clear my marks"
+      >
         <EraserIcon size={16} />
       </button>
       {tool !== 'none' && (
-        <button type="button" onClick={done} className={btn(false)} aria-label="Stop pointing and drawing" title="Done (Esc)">
+        <button
+          type="button"
+          onClick={done}
+          className={btn(false)}
+          aria-label="Stop pointing and drawing"
+          title="Done (Esc)"
+        >
           <CloseIcon size={16} />
         </button>
       )}
@@ -563,7 +597,10 @@ interface DocumentPip {
 
 function documentPip(): DocumentPip | null {
   if (typeof window === 'undefined') return null
-  return (window as unknown as { documentPictureInPicture?: DocumentPip }).documentPictureInPicture ?? null
+  return (
+    (window as unknown as { documentPictureInPicture?: DocumentPip }).documentPictureInPicture ??
+    null
+  )
 }
 
 /** Only one pop-out at a time, and the sync hook needs to know if it's open. */
@@ -617,7 +654,10 @@ export function PresenterPopOut() {
       setPipBody(win.document.body)
     } catch (error) {
       console.error('[meeting] pop-out failed:', error)
-      notify("Your browser couldn't open the pointer window. Switch back to this tab to see where people point.", 'warn')
+      notify(
+        "Your browser couldn't open the pointer window. Switch back to this tab to see where people point.",
+        'warn',
+      )
     }
   }, [notify])
 
@@ -666,7 +706,9 @@ function PopOutView({ brandStyle }: { brandStyle: CSSProperties }) {
     const el = box.current
     if (!el) return
     // The pop-out is its own window: observe with that window's ResizeObserver.
-    const RO = (el.ownerDocument.defaultView as (Window & typeof globalThis) | null)?.ResizeObserver ?? ResizeObserver
+    const RO =
+      (el.ownerDocument.defaultView as (Window & typeof globalThis) | null)?.ResizeObserver ??
+      ResizeObserver
     const ro = new RO((entries) => {
       const r = entries[0]?.contentRect
       if (r) setSize({ w: r.width, h: r.height })
@@ -685,10 +727,16 @@ function PopOutView({ brandStyle }: { brandStyle: CSSProperties }) {
     <div className="flex h-screen flex-col bg-canvas text-ink" style={brandStyle}>
       <div ref={box} className="relative min-h-0 flex-1">
         {!pub?.track ? (
-          <div className="grid h-full place-items-center text-sm text-muted">Your screen isn&apos;t being shared</div>
+          <div className="grid h-full place-items-center text-sm text-muted">
+            Your screen isn&apos;t being shared
+          </div>
         ) : own.live ? (
           <VideoTrack
-            trackRef={{ participant: localParticipant, source: Track.Source.ScreenShare, publication: pub }}
+            trackRef={{
+              participant: localParticipant,
+              source: Track.Source.ScreenShare,
+              publication: pub,
+            }}
             onLoadedMetadata={onVideoSize}
             onResize={onVideoSize}
             className="h-full w-full bg-black object-contain"
@@ -705,13 +753,18 @@ function PopOutView({ brandStyle }: { brandStyle: CSSProperties }) {
 }
 
 /** Stands in for your own whole-screen share (see ownShareInfo): pointers land on it. */
-export function SharePlaceholder({ rect }: { rect: { left: number; top: number; width: number; height: number } }) {
+export function SharePlaceholder({
+  rect,
+}: {
+  rect: { left: number; top: number; width: number; height: number }
+}) {
   return (
     <div
       className="absolute grid place-items-center rounded-lg border border-dashed border-white/20 bg-white/[0.03] p-3 text-center text-xs text-muted"
       style={rect}
     >
-      Your screen is being shared. Pointers from others show here, in the same spot as on your screen.
+      Your screen is being shared. Pointers from others show here, in the same spot as on your
+      screen.
     </div>
   )
 }

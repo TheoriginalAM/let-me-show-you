@@ -12,7 +12,8 @@ type Load =
 /** The user's meeting rooms. Calls open in the browser (already signed in there). */
 export function MeetingsPanel({ signedIn }: { signedIn: boolean }) {
   const [load, setLoad] = useState<Load>({ phase: 'loading' })
-  const [copied, setCopied] = useState<string | null>(null)
+  // The last copy attempt, so its button can say whether it worked.
+  const [copied, setCopied] = useState<{ id: string; ok: boolean } | null>(null)
 
   const fetchRooms = useCallback(() => {
     if (!signedIn) {
@@ -29,13 +30,13 @@ export function MeetingsPanel({ signedIn }: { signedIn: boolean }) {
   useEffect(fetchRooms, [fetchRooms])
 
   async function copy(room: DesktopRoom): Promise<void> {
-    try {
-      await navigator.clipboard.writeText(room.url)
-      setCopied(room.id)
-      setTimeout(() => setCopied((c) => (c === room.id ? null : c)), 1800)
-    } catch {
-      // Clipboard blocked: nothing else to do from here.
-    }
+    const ok = await navigator.clipboard.writeText(room.url).then(
+      () => true,
+      () => false,
+    )
+    const attempt = { id: room.id, ok }
+    setCopied(attempt)
+    setTimeout(() => setCopied((c) => (c === attempt ? null : c)), ok ? 1800 : 3000)
   }
 
   if (load.phase === 'signed-out') return <SignedOutNote what="meeting rooms" />
@@ -66,32 +67,45 @@ export function MeetingsPanel({ signedIn }: { signedIn: boolean }) {
             {businesses.length > 1 && <h3 className="group-title">{biz}</h3>}
             {load.rooms
               .filter((r) => r.businessName === biz)
-              .map((room) => (
-                <article key={room.id} className="room-card">
-                  <div className="room-card-text">
-                    <span className="room-name">{room.name}</span>
-                    <span className="room-url" title={room.url}>
-                      {room.url.replace(/^https?:\/\//, '')}
-                    </span>
-                  </div>
-                  <div className="room-actions">
-                    <button className="btn-mini no-drag" onClick={() => void copy(room)}>
-                      <Icon
-                        name={copied === room.id ? 'check' : 'copy'}
-                        size={13}
-                        strokeWidth={2.2}
-                      />
-                      {copied === room.id ? 'Copied' : 'Copy link'}
-                    </button>
-                    <button
-                      className="btn-go no-drag"
-                      onClick={() => void window.recorder.openExternalUrl(room.url)}
-                    >
-                      Start
-                    </button>
-                  </div>
-                </article>
-              ))}
+              .map((room) => {
+                const copyState = copied?.id === room.id ? copied : null
+                const copyLabel = !copyState
+                  ? 'Copy link'
+                  : copyState.ok
+                    ? 'Copied'
+                    : 'Couldn’t copy'
+                return (
+                  <article key={room.id} className="room-card">
+                    <div className="room-card-text">
+                      <span className="room-name">{room.name}</span>
+                      <span className="room-url" title={room.url}>
+                        {room.url.replace(/^https?:\/\//, '')}
+                      </span>
+                    </div>
+                    <div className="room-actions">
+                      <button
+                        className={`btn-mini no-drag ${copyState && !copyState.ok ? 'failed' : ''}`}
+                        aria-label={`${copyLabel}: ${room.name}`}
+                        onClick={() => void copy(room)}
+                      >
+                        <Icon
+                          name={!copyState ? 'copy' : copyState.ok ? 'check' : 'warning'}
+                          size={13}
+                          strokeWidth={2.2}
+                        />
+                        {copyLabel}
+                      </button>
+                      <button
+                        className="btn-go no-drag"
+                        aria-label={`Start ${room.name}`}
+                        onClick={() => void window.recorder.openExternalUrl(room.url)}
+                      >
+                        Start
+                      </button>
+                    </div>
+                  </article>
+                )
+              })}
           </section>
         ))
       )}

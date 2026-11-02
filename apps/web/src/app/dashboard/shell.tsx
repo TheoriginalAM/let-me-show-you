@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from 'reac
 import { Icon, type IconName } from '@/components/brand/icons'
 import { Logo, LogoMark } from '@/components/brand/logo'
 import { authClient } from '@/lib/auth-client'
+import { onColor } from '@/lib/brand-theme'
 import { SECTIONS, type SectionId } from './sections'
 import { createWorkspaceAction, switchWorkspaceAction } from './workspace-actions'
 
@@ -101,21 +102,28 @@ function BusinessPicker({
   const [name, setName] = useState('')
   const [pending, startTransition] = useTransition()
   const box = useRef<HTMLDivElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
   const active = workspaces.find((w) => w.id === activeId) ?? workspaces[0] ?? null
+  const activeBg = activeColor ?? (active ? swatch(active.id) : '#ffe14a')
 
   useEffect(() => {
     if (!open) return
     function onDown(e: PointerEvent): void {
       if (box.current && !box.current.contains(e.target as Node)) setOpen(false)
     }
+    // Capture phase, and stop it there: Escape closes this list only, not the
+    // phone menu it may sit in.
     function onKey(e: KeyboardEvent): void {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key !== 'Escape') return
+      e.stopPropagation()
+      setOpen(false)
+      if (box.current?.contains(document.activeElement)) trigger.current?.focus()
     }
     document.addEventListener('pointerdown', onDown)
-    document.addEventListener('keydown', onKey)
+    document.addEventListener('keydown', onKey, true)
     return () => {
       document.removeEventListener('pointerdown', onDown)
-      document.removeEventListener('keydown', onKey)
+      document.removeEventListener('keydown', onKey, true)
     }
   }, [open])
 
@@ -144,10 +152,10 @@ function BusinessPicker({
   return (
     <div ref={box} className="relative">
       <button
+        ref={trigger}
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        aria-haspopup="listbox"
         className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface p-2 text-left transition hover:border-line-strong"
       >
         {activeLogo ? (
@@ -159,8 +167,8 @@ function BusinessPicker({
           />
         ) : (
           <span
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl font-display text-base font-extrabold text-[#17132b]"
-            style={{ background: activeColor ?? (active ? swatch(active.id) : '#ffe14a') }}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl font-display text-base font-extrabold"
+            style={{ background: activeBg, color: onColor(activeBg) }}
             aria-hidden
           >
             {initial(active?.name)}
@@ -183,23 +191,20 @@ function BusinessPicker({
       {open && (
         <div className="absolute inset-x-0 top-full z-50 mt-2 rounded-2xl border border-line bg-surface p-1.5 shadow-[0_18px_40px_-16px_rgb(23_19_43/0.35)]">
           <p className="px-2.5 pb-1 pt-1.5 text-xs font-semibold text-faint">Your businesses</p>
-          <ul
-            role="listbox"
-            aria-label="Your businesses"
-            className="flex max-h-72 flex-col overflow-y-auto"
-          >
+          {/* Plain buttons in a list: Tab moves through them, aria-current marks the active one. */}
+          <ul aria-label="Your businesses" className="flex max-h-72 flex-col overflow-y-auto">
             {workspaces.map((w) => (
               <li key={w.id}>
                 <button
                   type="button"
-                  role="option"
-                  aria-selected={w.id === active?.id}
+                  aria-current={w.id === active?.id ? 'true' : undefined}
                   onClick={() => switchTo(w.id)}
                   className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm transition hover:bg-canvas"
                 >
                   <span
-                    className="grid h-7 w-7 shrink-0 place-items-center rounded-lg font-display text-xs font-extrabold text-[#17132b]"
-                    style={{ background: swatch(w.id) }}
+                    className="grid h-7 w-7 shrink-0 place-items-center rounded-lg font-display text-xs font-extrabold"
+                    style={{ background: swatch(w.id), color: onColor(swatch(w.id)) }}
+                    aria-hidden
                   >
                     {initial(w.name)}
                   </span>
@@ -265,8 +270,35 @@ export function DashboardShell(props: ShellProps) {
   const router = useRouter()
   const [menuOpen, setMenuOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
+  const menuButton = useRef<HTMLButtonElement>(null)
+  const menu = useRef<HTMLDivElement>(null)
+  const main = useRef<HTMLElement>(null)
   const isOwner = (workspaces.find((w) => w.id === activeId) ?? workspaces[0])?.role === 'owner'
   const close = () => setMenuOpen(false)
+
+  // Phone menu: move focus in, keep the page behind out of reach (inert is set
+  // on the DOM node, as React 18 has no inert prop), and Escape closes it.
+  useEffect(() => {
+    if (main.current) main.current.inert = menuOpen
+    if (!menuOpen) return
+    menu.current?.querySelector<HTMLElement>('a[href], button:not([disabled])')?.focus()
+    function onKey(e: KeyboardEvent): void {
+      if (e.key !== 'Escape') return
+      setMenuOpen(false)
+      menuButton.current?.focus()
+    }
+    // Widening to the desktop layout hides the menu, so close it (and un-inert the page).
+    const wide = window.matchMedia('(min-width: 64rem)')
+    function onWide(): void {
+      if (wide.matches) setMenuOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    wide.addEventListener('change', onWide)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      wide.removeEventListener('change', onWide)
+    }
+  }, [menuOpen])
 
   async function signOut(): Promise<void> {
     setSigningOut(true)
@@ -340,7 +372,7 @@ export function DashboardShell(props: ShellProps) {
     <div className="lg:grid lg:min-h-screen lg:grid-cols-[15.5rem_minmax(0,1fr)]">
       {/* Desktop sidebar */}
       <aside className="sticky top-0 z-30 hidden h-screen flex-col gap-6 overflow-y-auto border-r border-line bg-surface px-4 py-5 lg:flex">
-        <Link href="/dashboard" className="px-1.5" aria-label="Recordings">
+        <Link href="/dashboard" className="px-1.5" aria-label="Let Me Show You, Recordings">
           <Logo className="text-[0.95rem]" markClass="h-8 w-8" />
         </Link>
         {nav}
@@ -348,25 +380,31 @@ export function DashboardShell(props: ShellProps) {
 
       {/* Phone / tablet top bar */}
       <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-surface/95 px-4 py-3 backdrop-blur lg:hidden">
-        <Link href="/dashboard" aria-label="Recordings">
+        <Link href="/dashboard" aria-label="Let Me Show You, Recordings">
           <LogoMark className="h-8 w-8" />
         </Link>
         <button
+          ref={menuButton}
           type="button"
           onClick={() => setMenuOpen((o) => !o)}
           aria-expanded={menuOpen}
           aria-controls="dashboard-menu"
+          aria-label={unread > 0 ? `Menu, ${unread} unread` : undefined}
           className="btn-ghost relative gap-2 px-3 py-1.5 text-sm"
         >
           <Icon name={menuOpen ? 'close' : 'menu'} className="h-4 w-4" strokeWidth={2.2} />
           Menu
           {unread > 0 && !menuOpen && (
-            <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-hl-pink ring-2 ring-surface" />
+            <span
+              className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-hl-pink ring-2 ring-surface"
+              aria-hidden
+            />
           )}
         </button>
       </div>
       {menuOpen && (
         <div
+          ref={menu}
           id="dashboard-menu"
           className="fixed inset-x-0 bottom-0 top-[3.6rem] z-30 overflow-y-auto bg-surface px-4 py-5 lg:hidden"
         >
@@ -374,7 +412,9 @@ export function DashboardShell(props: ShellProps) {
         </div>
       )}
 
-      <main className="min-w-0 px-4 py-8 sm:px-8 lg:px-12 lg:py-11">{children}</main>
+      <main ref={main} className="min-w-0 px-4 py-8 sm:px-8 lg:px-12 lg:py-11">
+        {children}
+      </main>
     </div>
   )
 }

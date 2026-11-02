@@ -83,7 +83,10 @@ export function SettingsDialog() {
             aria-label="Settings sections"
             className="flex gap-1 border-b border-white/[0.07] p-3 sm:w-44 sm:flex-col sm:border-b-0 sm:border-r"
           >
-            <h2 id="settings-title" className="hidden px-3 pb-2 pt-1 font-display text-lg font-semibold sm:block">
+            <h2
+              id="settings-title"
+              className="hidden px-3 pb-2 pt-1 font-display text-lg font-semibold sm:block"
+            >
               Settings
             </h2>
             {(['audio', 'video', 'general'] as Tab[]).map((t) => (
@@ -157,7 +160,13 @@ function AudioTab() {
   const noiseOptions: { id: NoiseMode; label: string; hint: string }[] = [
     { id: 'standard', label: 'Standard', hint: 'Filters steady background noise' },
     ...(krisp
-      ? [{ id: 'enhanced' as NoiseMode, label: 'Enhanced', hint: 'Removes voices and noise around you' }]
+      ? [
+          {
+            id: 'enhanced' as NoiseMode,
+            label: 'Enhanced',
+            hint: 'Removes voices and noise around you',
+          },
+        ]
       : []),
     { id: 'off', label: 'Off', hint: 'Best for music' },
   ]
@@ -169,7 +178,10 @@ function AudioTab() {
         <Select
           label="Microphone"
           value={activeMic ?? ''}
-          options={mics.map((d, i) => ({ value: d.deviceId, label: deviceLabel(d, i, 'Microphone') }))}
+          options={mics.map((d, i) => ({
+            value: d.deviceId,
+            label: deviceLabel(d, i, 'Microphone'),
+          }))}
           onChange={(id) => void pick(room, 'audioinput', id, notify)}
         />
         <div className="mt-3 flex items-center gap-3">
@@ -191,7 +203,10 @@ function AudioTab() {
               <Select
                 label="Speaker"
                 value={activeSpeaker ?? 'default'}
-                options={speakers.map((d, i) => ({ value: d.deviceId, label: deviceLabel(d, i, 'Speaker') }))}
+                options={speakers.map((d, i) => ({
+                  value: d.deviceId,
+                  label: deviceLabel(d, i, 'Speaker'),
+                }))}
                 onChange={(id) => void pick(room, 'audiooutput', id, notify)}
               />
             </div>
@@ -206,16 +221,17 @@ function AudioTab() {
           </div>
         ) : (
           <>
-            <span className="mb-1.5 block text-xs font-medium text-faint">Speaker</span>
+            <span className="mb-1.5 block text-xs font-medium text-muted">Speaker</span>
             <p className="text-sm text-muted">
-              Sound plays through your device&apos;s current output. You can change it in your system settings.
+              Sound plays through your device&apos;s current output. You can change it in your
+              system settings.
             </p>
           </>
         )}
       </div>
 
       <div>
-        <span className="mb-2 block text-xs font-medium text-faint">Noise reduction</span>
+        <span className="mb-2 block text-xs font-medium text-muted">Noise reduction</span>
         <div role="radiogroup" aria-label="Noise reduction" className="grid gap-2 sm:grid-cols-3">
           {noiseOptions.map((o) => (
             <button
@@ -275,22 +291,31 @@ function VideoTab() {
       <Select
         label="Camera"
         value={activeCam ?? ''}
-        options={cams.map((d, i) => ({ value: d.deviceId, label: deviceLabel(d, i, 'Camera', cams) }))}
+        options={cams.map((d, i) => ({
+          value: d.deviceId,
+          label: deviceLabel(d, i, 'Camera', cams),
+        }))}
         onChange={(id) => void pick(room, 'videoinput', id, notify)}
       />
       <div className="aspect-video overflow-hidden rounded-2xl bg-[#101019] ring-1 ring-white/10">
         {showPreview ? (
           <VideoTrack
-            trackRef={{ participant: localParticipant, source: Track.Source.Camera, publication: cameraTrack }}
+            trackRef={{
+              participant: localParticipant,
+              source: Track.Source.Camera,
+              publication: cameraTrack,
+            }}
             className={cx('h-full w-full object-cover', prefs.mirror && !rear && '-scale-x-100')}
           />
         ) : (
-          <div className="grid h-full place-items-center text-sm text-faint">Your camera is off</div>
+          <div className="grid h-full place-items-center text-sm text-faint">
+            Your camera is off
+          </div>
         )}
       </div>
 
       <div>
-        <span className="mb-2 block text-xs font-medium text-faint">Quality</span>
+        <span className="mb-2 block text-xs font-medium text-muted">Quality</span>
         <div role="radiogroup" aria-label="Video quality" className="grid gap-2 sm:grid-cols-3">
           {QUALITY_ORDER.map((q) => {
             const disabled = q === 'fhd' && !fhdSupported
@@ -311,7 +336,9 @@ function VideoTab() {
               >
                 <span className="block text-sm font-medium text-ink">{QUALITY[q].label}</span>
                 <span className="block text-xs text-faint">
-                  {q === 'fhd' && !fhdSupported ? `Your camera supports up to ${maxHeight}p` : QUALITY[q].detail}
+                  {q === 'fhd' && !fhdSupported
+                    ? `Your camera supports up to ${maxHeight}p`
+                    : QUALITY[q].detail}
                 </span>
               </button>
             )
@@ -321,9 +348,19 @@ function VideoTab() {
 
       <div className="divide-y divide-white/[0.06]">
         {blurSupported && (
-          <Switch checked={prefs.blur} onChange={(v) => setPrefs({ blur: v })} label="Blur my background" hint="Uses a little more battery" />
+          <Switch
+            checked={prefs.blur}
+            onChange={(v) => setPrefs({ blur: v })}
+            label="Blur my background"
+            hint="Uses a little more battery"
+          />
         )}
-        <Switch checked={prefs.mirror} onChange={(v) => setPrefs({ mirror: v })} label="Mirror my video" hint="Only you see it mirrored" />
+        <Switch
+          checked={prefs.mirror}
+          onChange={(v) => setPrefs({ mirror: v })}
+          label="Mirror my video"
+          hint="Only you see it mirrored"
+        />
       </div>
     </div>
   )
@@ -335,12 +372,22 @@ function GeneralTab() {
     <div className="space-y-6">
       <h3 className="font-display text-lg font-semibold">General</h3>
       <div className="divide-y divide-white/[0.06]">
-        <Switch checked={prefs.hideSelf} onChange={(v) => setPrefs({ hideSelf: v })} label="Hide my own video" hint="Others still see you" />
-        <Switch checked={prefs.sounds} onChange={(v) => setPrefs({ sounds: v })} label="Play sounds" hint="When someone asks to join" />
+        <Switch
+          checked={prefs.hideSelf}
+          onChange={(v) => setPrefs({ hideSelf: v })}
+          label="Hide my own video"
+          hint="Others still see you"
+        />
+        <Switch
+          checked={prefs.sounds}
+          onChange={(v) => setPrefs({ sounds: v })}
+          label="Play sounds"
+          hint="When someone asks to join"
+        />
       </div>
       {hasKeyboard() && (
         <div>
-          <span className="mb-2 block text-xs font-medium text-faint">Keyboard shortcuts</span>
+          <span className="mb-2 block text-xs font-medium text-muted">Keyboard shortcuts</span>
           <dl className="divide-y divide-white/[0.06] rounded-xl border border-white/10">
             {shortcuts().map(([what, keys]) => (
               <div key={what} className="flex items-center justify-between px-3 py-2.5 text-sm">

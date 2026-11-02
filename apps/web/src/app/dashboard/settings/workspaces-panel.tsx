@@ -52,18 +52,19 @@ export function WorkspacesPanel({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="font-display text-xl font-extrabold tracking-tight text-ink">
-            Workspaces
+            Your businesses
           </h2>
           <p className="mt-1 text-sm text-muted">
-            Each workspace has its own recordings, branding, and members. Switch the active one or
-            create another.
+            Each business has its own recordings, branding and team. Switch to another one or add a
+            new one.
           </p>
         </div>
         <button
           onClick={() => setCreating((v) => !v)}
+          aria-expanded={creating}
           className="btn-ghost shrink-0 px-3.5 py-2 text-sm"
         >
-          + New workspace
+          + Add a business
         </button>
       </div>
 
@@ -74,8 +75,9 @@ export function WorkspacesPanel({
             onChange={(e) => setName(e.target.value)}
             maxLength={80}
             autoFocus
-            placeholder="Workspace name"
-            className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+            placeholder="Business name"
+            aria-label="Business name"
+            className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-ink focus:outline-none"
           />
           <button
             type="submit"
@@ -119,6 +121,7 @@ export function WorkspacesPanel({
                 <button
                   onClick={() => switchTo(w.id)}
                   disabled={pending}
+                  aria-label={`Switch to ${w.name}`}
                   className="btn-ghost px-3.5 py-1.5 text-sm disabled:opacity-50"
                 >
                   Switch to

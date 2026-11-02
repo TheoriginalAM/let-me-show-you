@@ -37,10 +37,11 @@ export async function setBookingSlugAction(slug: string): Promise<Result> {
   const user = await me()
   if (!user) return { ok: false, error: 'Not signed in.' }
   const workspaceId = await getActiveWorkspaceId(user.id)
-  if (!workspaceId) return { ok: false, error: 'No workspace.' }
+  if (!workspaceId)
+    return { ok: false, error: 'No business selected. Pick one from the menu and try again.' }
   const res = await setBookingSlug(user.id, workspaceId, String(slug ?? ''))
   if (res === 'forbidden')
-    return { ok: false, error: 'Only workspace owners can change the address.' }
+    return { ok: false, error: 'Only business owners can change the booking link.' }
   if (res === 'invalid') {
     return { ok: false, error: 'Use lowercase letters, numbers and dashes (up to 48).' }
   }
@@ -73,7 +74,8 @@ export async function saveEventTypeAction(
     return done()
   }
   const workspaceId = await getActiveWorkspaceId(user.id)
-  if (!workspaceId) return { ok: false, error: 'No workspace.' }
+  if (!workspaceId)
+    return { ok: false, error: 'No business selected. Pick one from the menu and try again.' }
   const res = await createEventType(user.id, workspaceId, input.value, slug)
   if (!res.ok)
     return res.reason === 'taken' ? takenError : { ok: false, error: 'Could not create it.' }
@@ -156,7 +158,7 @@ export async function removeTimeOffAction(id: string): Promise<Result> {
   const user = await me()
   if (!user) return { ok: false, error: 'Not signed in.' }
   if (!UUID_RE.test(String(id)) || !(await removeTimeOff(user.id, String(id)))) {
-    return { ok: false, error: 'Not found.' }
+    return { ok: false, error: "Couldn't find that time off. Refresh the page and try again." }
   }
   return done()
 }

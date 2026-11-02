@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { APP_DOMAIN } from '@lmsy/shared'
 import {
@@ -10,6 +11,8 @@ import { getActiveWorkspaceId, getWorkspaceForMember } from '@/db/workspaces'
 import { getCurrentUser } from '@/lib/current-user'
 import { BookingManager } from './booking-manager'
 import { PageHeader } from '../page-header'
+
+export const metadata: Metadata = { title: 'Booking' }
 
 export const dynamic = 'force-dynamic'
 

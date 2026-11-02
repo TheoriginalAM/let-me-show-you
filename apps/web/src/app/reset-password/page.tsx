@@ -56,7 +56,10 @@ function ResetForm() {
         ) : (
           <>
             {error && (
-              <p className="mt-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger ring-1 ring-inset ring-danger/25">
+              <p
+                role="alert"
+                className="mt-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger ring-1 ring-inset ring-danger/25"
+              >
                 {error}
               </p>
             )}
@@ -66,17 +69,21 @@ function ResetForm() {
                 required
                 autoFocus
                 placeholder="New password (min 8 characters)"
+                aria-label="New password"
+                autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+                className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-ink focus:outline-none"
               />
               <input
                 type="password"
                 required
                 placeholder="Confirm new password"
+                aria-label="Confirm new password"
+                autoComplete="new-password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+                className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-ink focus:outline-none"
               />
               <button
                 type="submit"

@@ -38,7 +38,7 @@ export default async function DownloadPage() {
         </p>
 
         {!user.approved && (
-          <p className="mx-auto mt-6 max-w-sm rounded-lg bg-amber-500/10 px-3 py-2.5 text-sm text-[#8a4b00] ring-1 ring-inset ring-hl-orange/60">
+          <p className="mx-auto mt-6 max-w-sm rounded-lg bg-amber-500/10 px-3 py-2.5 text-sm text-warning ring-1 ring-inset ring-hl-orange/60">
             Your account is pending approval. You can install the app now and sign in to it once
             you&rsquo;re approved.
           </p>

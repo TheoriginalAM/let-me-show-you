@@ -57,7 +57,7 @@ export async function runSignIn(emit: Emit): Promise<boolean> {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ deviceCode: start.deviceCode }),
       })
-      if (pollRes.status === 410) throw new Error('The sign-in code expired — please try again.')
+      if (pollRes.status === 410) throw new Error('The sign-in code expired. Try again.')
       if (!pollRes.ok) continue
 
       const poll = (await pollRes.json()) as DevicePollResponse
@@ -68,7 +68,7 @@ export async function runSignIn(emit: Emit): Promise<boolean> {
       }
       // still pending → keep polling
     }
-    throw new Error('Sign-in timed out — please try again.')
+    throw new Error('Sign-in timed out. Try again.')
   } catch (error) {
     emit(status('error', { message: error instanceof Error ? error.message : String(error) }))
     return false

@@ -46,8 +46,7 @@ export function PasswordGate({ slug, accent }: { slug: string; accent: string })
             strokeWidth="1.6"
             strokeLinecap="round"
             strokeLinejoin="round"
-            className="h-7 w-7"
-            style={{ color: accent }}
+            className="h-7 w-7 text-accent-ink"
           >
             <rect x="4" y="11" width="16" height="10" rx="2" />
             <path d="M8 11V7a4 4 0 0 1 8 0v4" />
@@ -71,14 +70,13 @@ export function PasswordGate({ slug, accent }: { slug: string; accent: string })
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
             aria-label="Password"
-            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-center text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-center text-sm text-ink placeholder:text-faint focus:border-ink focus:outline-none"
           />
           {error && <p className="text-xs text-danger">{error}</p>}
           <button
             type="submit"
             disabled={pending || !password}
-            className="rounded-lg px-5 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
-            style={{ background: accent }}
+            className="rounded-lg px-5 py-2.5 text-sm font-semibold bg-accent text-on-accent transition hover:opacity-90 disabled:opacity-50"
           >
             {pending ? 'Unlocking…' : 'Unlock'}
           </button>

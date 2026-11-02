@@ -28,7 +28,13 @@ import {
   type RemoteParticipant,
 } from 'livekit-client'
 import { useIsRearCamera } from './_lib/devices'
-import { AnnotateToolbar, AnnotationLayer, containRect, ownShareInfo, SharePlaceholder } from './annotate'
+import {
+  AnnotateToolbar,
+  AnnotationLayer,
+  containRect,
+  ownShareInfo,
+  SharePlaceholder,
+} from './annotate'
 import { useMeetPrefs } from './_lib/prefs'
 import { useCall } from './call-context'
 import { HandIcon, MicOffIcon, PinIcon } from './icons'
@@ -42,7 +48,9 @@ export function trackKey(t: TrackReferenceOrPlaceholder): string {
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
-  return ((parts[0]?.[0] ?? '?') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
+  return (
+    (parts[0]?.[0] ?? '?') + (parts.length > 1 ? parts[parts.length - 1][0] : '')
+  ).toUpperCase()
 }
 
 function useIsNarrow(): boolean {
@@ -147,7 +155,9 @@ export function Tile({
   const placeholder = !!ownShare && !ownShare.live
   const shareRatio = placeholder ? ownShare.ratio : videoRatio
   const shareRect =
-    isShare && shareRatio !== null && boxSize.w > 0 && boxSize.h > 0 ? containRect(boxSize, shareRatio) : null
+    isShare && shareRatio !== null && boxSize.w > 0 && boxSize.h > 0
+      ? containRect(boxSize, shareRatio)
+      : null
   const contain =
     isShare ||
     (variant !== 'self' &&
@@ -193,7 +203,9 @@ export function Tile({
       )}
 
       {/* Pointers and ink on a shared screen (and the tools, on the big one) */}
-      {shareRect && <AnnotationLayer share={p.identity} rect={shareRect} interactive={variant === 'focus'} />}
+      {shareRect && (
+        <AnnotationLayer share={p.identity} rect={shareRect} interactive={variant === 'focus'} />
+      )}
       {isShare && variant === 'focus' && showVideo && (
         <AnnotateToolbar share={p.identity} compact={boxSize.w < 520} />
       )}
@@ -216,6 +228,7 @@ export function Tile({
         )}
         {poor && (
           <span
+            role="img"
             className="h-2.5 w-2.5 rounded-full bg-red-400 ring-2 ring-black/40"
             title="Poor connection"
             aria-label="Poor connection"
@@ -233,7 +246,9 @@ export function Tile({
           className={cx(
             // z-10: stays clickable above the marks layer while drawing.
             'absolute right-2 top-2 z-10 grid h-8 w-8 place-items-center rounded-full bg-black/50 text-ink backdrop-blur transition focus-visible:opacity-100',
-            isPinned ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100',
+            isPinned
+              ? 'opacity-100'
+              : 'opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100',
           )}
         >
           <PinIcon size={15} />
@@ -249,7 +264,7 @@ export function Tile({
           {isShare && ' · screen'}
         </span>
         {role === 'host' && !compact && (
-          <span className="shrink-0 rounded bg-[var(--room-accent)] px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-[var(--room-accent-fg)]">
+          <span className="shrink-0 rounded bg-[var(--room-accent)] px-1.5 py-px text-[12px] font-semibold text-[var(--room-accent-fg)]">
             Host
           </span>
         )}
@@ -289,8 +304,12 @@ export function Stage() {
   // Your own screen share is shown to you too (after anyone else's): it's
   // where you see what others point at and draw.
   const visible = tracks
-  const remoteShares = visible.filter((t) => t.source === Track.Source.ScreenShare && !t.participant.isLocal)
-  const localShare = visible.find((t) => t.source === Track.Source.ScreenShare && t.participant.isLocal)
+  const remoteShares = visible.filter(
+    (t) => t.source === Track.Source.ScreenShare && !t.participant.isLocal,
+  )
+  const localShare = visible.find(
+    (t) => t.source === Track.Source.ScreenShare && t.participant.isLocal,
+  )
   const cams = visible.filter((t) => t.source === Track.Source.Camera)
   const localCam = cams.find((t) => t.participant.isLocal)
   const remoteCams = cams.filter((t) => !t.participant.isLocal)
@@ -303,7 +322,9 @@ export function Stage() {
     // window); a whole screen sits in the strip as a placeholder with the marks.
     focus =
       remoteShares[0] ??
-      (localShare && isTrackReference(localShare) && ownShareInfo(localShare.publication.track?.mediaStreamTrack).live
+      (localShare &&
+      isTrackReference(localShare) &&
+      ownShareInfo(localShare.publication.track?.mediaStreamTrack).live
         ? localShare
         : undefined)
     if (!focus && (layout === 'speaker' || (layout === 'auto' && remoteCams.length === 1))) {
@@ -340,7 +361,10 @@ export function Stage() {
           )}
         </div>
         {rest.length > 0 && (
-          <div className="flex h-24 shrink-0 gap-3 overflow-x-auto pb-1 sm:h-28 short:h-16" aria-label="Other people">
+          <div
+            className="flex h-24 shrink-0 gap-3 overflow-x-auto pb-1 sm:h-28 short:h-16"
+            aria-label="Other people"
+          >
             {rest.map((t) => (
               <div key={trackKey(t)} className="aspect-video h-full shrink-0">
                 <Tile trackRef={t} variant="strip" />
@@ -353,7 +377,8 @@ export function Stage() {
   }
 
   // Grid. "Hide self view" drops you only when someone else is there to see.
-  const grid = prefs.hideSelf && visible.length > 1 ? visible.filter((t) => t !== localCam) : visible
+  const grid =
+    prefs.hideSelf && visible.length > 1 ? visible.filter((t) => t !== localCam) : visible
   return <GridStage tracks={grid} narrow={narrow} />
 }
 
@@ -368,11 +393,17 @@ function selfViewSize(ratio: number, narrow: boolean, big: boolean): CSSProperti
   const portrait = r < 1
   const width = narrow
     ? portrait
-      ? big ? '50cqw' : '34cqw'
-      : big ? '75cqw' : '48cqw'
+      ? big
+        ? '50cqw'
+        : '34cqw'
+      : big
+        ? '75cqw'
+        : '48cqw'
     : portrait
       ? `${Math.round((big ? 360 : 220) * r)}px`
-      : big ? '400px' : '250px'
+      : big
+        ? '400px'
+        : '250px'
   const maxH = big ? 62 : 45
   const maxW = big ? 70 : 45
   return { width: `min(${width}, calc(${maxH}cqh * ${r}), ${maxW}cqw)`, aspectRatio: String(r) }
@@ -500,7 +531,12 @@ export function ReactionsLayer({
   const onRemoteRef = useRef(onRemote)
   onRemoteRef.current = onRemote
   useEffect(() => {
-    const onData = (payload: Uint8Array, from?: RemoteParticipant, _kind?: unknown, topic?: string): void => {
+    const onData = (
+      payload: Uint8Array,
+      from?: RemoteParticipant,
+      _kind?: unknown,
+      topic?: string,
+    ): void => {
       if (topic !== 'reaction' || !from) return
       try {
         const { i } = JSON.parse(new TextDecoder().decode(payload)) as { i: number }
@@ -524,7 +560,9 @@ export function ReactionsLayer({
           style={{ left: `${r.left}%` }}
         >
           <span className="text-4xl drop-shadow-lg">{r.emoji}</span>
-          <span className="mt-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] text-ink">{r.name}</span>
+          <span className="mt-1 rounded-full bg-black/60 px-2 py-0.5 text-xs text-ink">
+            {r.name}
+          </span>
         </div>
       ))}
     </div>

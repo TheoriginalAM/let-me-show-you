@@ -25,7 +25,7 @@ export default async function BookingPage({ params }: PageProps) {
   const end = new Date(b.endsAt).getTime()
 
   return (
-    <BrandedPage brand={b.business.brand}>
+    <BrandedPage brand={b.business.brand} accent={b.eventColor}>
       <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
         <BrandHeader brand={b.business.brand} fallbackName={b.business.workspaceName} />
         <ManageBooking

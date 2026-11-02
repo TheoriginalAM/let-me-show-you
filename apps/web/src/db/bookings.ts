@@ -750,6 +750,8 @@ export interface BookingDetail {
   eventTypeId: string | null
   eventSlug: string | null
   eventTimeZone: string | null
+  /** The calendar's own colour, which its booking pages use instead of the business accent. */
+  eventColor: string | null
   answers: BookingAnswer[]
   confirmationMessage: string | null
   business: PublicBusiness
@@ -780,6 +782,7 @@ async function bookingDetail(where: ReturnType<typeof eq>): Promise<BookingDetai
       eventTypeId: bookings.eventTypeId,
       eventSlug: bookingEventTypes.slug,
       eventTimeZone: bookingEventTypes.timeZone,
+      eventColor: bookingEventTypes.color,
       answers: bookings.answers,
       confirmationMessage: bookingEventTypes.confirmationMessage,
       workspaceName: workspaces.name,
@@ -818,6 +821,7 @@ async function bookingDetail(where: ReturnType<typeof eq>): Promise<BookingDetai
     eventTypeId: r.eventTypeId,
     eventSlug: r.eventSlug,
     eventTimeZone: r.eventTimeZone,
+    eventColor: r.eventColor,
     answers: r.answers ?? [],
     confirmationMessage: r.confirmationMessage,
     business: {

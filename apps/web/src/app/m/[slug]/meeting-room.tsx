@@ -52,7 +52,7 @@ const END_COPY: Record<EndReason, { title: string; body: string; rejoin: boolean
   ended: { title: 'The host ended the call', body: 'Thanks for joining.', rejoin: false },
   'ended-by-me': {
     title: 'Call ended',
-    body: 'Everyone has been disconnected. Any recording will appear in your workspace in a few minutes.',
+    body: 'Everyone has been disconnected. Any recording will appear in your dashboard in a few minutes.',
     rejoin: false,
   },
   duplicate: {
@@ -209,8 +209,7 @@ export function MeetingRoom({
       <Shell brand={brand}>
         <Card title="Meetings aren't switched on yet">
           <p className="text-sm text-muted">
-            This workspace&apos;s meeting rooms aren&apos;t available right now. Please check back
-            soon.
+            Video calls with {brand.name} aren&apos;t available right now. Please check back soon.
           </p>
         </Card>
       </Shell>
@@ -261,7 +260,7 @@ export function MeetingRoom({
               href="/dashboard"
               className="mt-5 inline-block rounded-xl bg-white/[0.06] px-5 py-2.5 text-sm font-semibold text-ink transition hover:bg-white/[0.1]"
             >
-              Open workspace
+              Open your dashboard
             </a>
           )}
         </Card>
@@ -301,7 +300,9 @@ function Shell({ brand, children }: { brand: MeetingBrand; children: React.React
       className="mx-auto flex min-h-dvh w-full max-w-4xl flex-col px-4 py-6 sm:px-6 sm:py-10"
       style={brandVars(brand.accent)}
     >
-      <BrandMark brand={brand} />
+      <span className="room-sheet self-start rounded-full py-1.5 pl-1.5 pr-4">
+        <BrandMark brand={brand} />
+      </span>
       <div className="flex flex-1 items-center justify-center py-8">{children}</div>
     </main>
   )
@@ -309,7 +310,7 @@ function Shell({ brand, children }: { brand: MeetingBrand; children: React.React
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rise glass w-full max-w-md rounded-3xl p-7">
+    <div className="rise room-sheet w-full max-w-md rounded-3xl p-7">
       <h1 className="font-display text-xl font-extrabold tracking-tight text-ink">{title}</h1>
       <div className="mt-3">{children}</div>
     </div>

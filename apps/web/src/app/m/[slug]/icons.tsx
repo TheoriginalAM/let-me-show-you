@@ -6,6 +6,8 @@ import type { ReactNode, SVGProps } from 'react'
 type IconProps = SVGProps<SVGSVGElement> & { size?: number }
 
 function Svg({ size = 20, children, ...rest }: IconProps & { children: ReactNode }) {
+  // Decorative, unless given an aria-label: then it's announced as an image.
+  const labelled = Boolean(rest['aria-label'])
   return (
     <svg
       width={size}
@@ -16,7 +18,8 @@ function Svg({ size = 20, children, ...rest }: IconProps & { children: ReactNode
       strokeWidth={2}
       strokeLinecap="round"
       strokeLinejoin="round"
-      aria-hidden
+      aria-hidden={labelled ? undefined : true}
+      role={labelled ? 'img' : undefined}
       focusable="false"
       {...rest}
     >

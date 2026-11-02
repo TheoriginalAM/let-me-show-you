@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { buildShareUrl, formatRelativeDate, muxThumbnailUrl } from '@lmsy/shared'
@@ -10,6 +11,8 @@ import { Icon } from '@/components/brand/icons'
 import { Scribble } from '@/components/brand/scribble'
 import { VideoCard } from '@/components/video-card'
 import { PageHeader } from './page-header'
+
+export const metadata: Metadata = { title: 'Recordings' }
 
 // The session lookup reads request headers, so this route is always dynamic.
 export const dynamic = 'force-dynamic'

@@ -36,6 +36,7 @@ function BookingCard({ b, now }: { b: UpcomingBooking; now: number }) {
   const live = start <= now
   const soon = !live && start - now <= SOON_MS
   const extras = [...(b.notes ? [{ label: 'Notes', value: b.notes }] : []), ...b.answers]
+  const joinLabel = live || soon ? 'Join now' : 'Join'
   return (
     <article
       className={`booking-card ${b.isMine ? '' : 'not-mine'}`}
@@ -75,9 +76,10 @@ function BookingCard({ b, now }: { b: UpcomingBooking; now: number }) {
       {b.joinUrl && (
         <button
           className={`${live || soon ? 'btn-go' : 'btn-mini'} booking-join no-drag`}
+          aria-label={`${joinLabel}: ${b.title} with ${b.guestName}`}
           onClick={() => void window.recorder.openExternalUrl(b.joinUrl as string)}
         >
-          {live || soon ? 'Join now' : 'Join'}
+          {joinLabel}
         </button>
       )}
     </article>

@@ -167,12 +167,21 @@ function MenuButton({
         {icon}
         {dot && (
           <span
-            className={cx('absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-[var(--room-accent-ring)] ring-2 ring-[#0e0e16]', dot)}
+            className={cx(
+              'absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-[var(--room-accent-ring)] ring-2 ring-[#0e0e16]',
+              dot,
+            )}
             aria-hidden
           />
         )}
       </IconButton>
-      <Popover open={open} onClose={() => setOpen(false)} anchorRef={ref} align={align} label={label}>
+      <Popover
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={ref}
+        align={align}
+        label={label}
+      >
         {menu(() => setOpen(false))}
       </Popover>
     </div>
@@ -181,13 +190,29 @@ function MenuButton({
 
 export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
   const room = useRoomContext()
-  const { localParticipant, isMicrophoneEnabled, isCameraEnabled, isScreenShareEnabled, cameraTrack } =
-    useLocalParticipant()
+  const {
+    localParticipant,
+    isMicrophoneEnabled,
+    isCameraEnabled,
+    isScreenShareEnabled,
+    cameraTrack,
+  } = useLocalParticipant()
   const participants = useParticipants()
   const isRecording = useIsRecording()
   const hand = useParticipantAttribute('hand', { participant: localParticipant })
   const call = useCall()
-  const { role, slug, guestKey, notify, panel, togglePanel, chat, layout, setLayout, mediaStarting } = call
+  const {
+    role,
+    slug,
+    guestKey,
+    notify,
+    panel,
+    togglePanel,
+    chat,
+    layout,
+    setLayout,
+    mediaStarting,
+  } = call
   // While the call is still switching the mic/camera on, show them as on.
   const micOn = isMicrophoneEnabled || mediaStarting.audio
   const camOn = isCameraEnabled || mediaStarting.video
@@ -256,7 +281,8 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
     once('cam', async () => {
       if (mediaStarting.video) return // coming on: a toggle now would open a second camera
       try {
-        if ((await setCameraOn(room, !isCameraEnabled)) === 'blur-failed') notify(BLUR_FAILED_COPY, 'warn')
+        if ((await setCameraOn(room, !isCameraEnabled)) === 'blur-failed')
+          notify(BLUR_FAILED_COPY, 'warn')
       } catch {
         notify("We couldn't start your camera. It may be in use by another app.", 'error')
       }
@@ -299,7 +325,9 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
       if (mediaStarting.video) return
       const current = cams.find((d) => d.deviceId === activeCam)
       const side = (current && cameraSide(current)) ?? (isRearCamera(camTrack) ? 'back' : 'front')
-      const others = cams.filter((d) => d.deviceId !== activeCam && cameraSide(d) !== side && cameraSide(d) !== null)
+      const others = cams.filter(
+        (d) => d.deviceId !== activeCam && cameraSide(d) !== side && cameraSide(d) !== null,
+      )
       const next =
         others.find((d) => /^(front|back) camera$/i.test(d.label)) ??
         others[0] ??
@@ -323,7 +351,10 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
     lastReaction.current = now
     onReaction(REACTIONS[i])
     localParticipant
-      .publishData(new TextEncoder().encode(JSON.stringify({ i })), { reliable: true, topic: 'reaction' })
+      .publishData(new TextEncoder().encode(JSON.stringify({ i })), {
+        reliable: true,
+        topic: 'reaction',
+      })
       .catch(() => undefined)
   }
 
@@ -331,17 +362,22 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
     if (recPending) return
     if (isRecording) {
       setRecPending('stopping')
-      const res = await stopRecording(slug).catch(() => ({ ok: false as const, error: 'Try again.' }))
-      if (res.ok) notify('Recording stopped. It will appear in your workspace in a minute or two.', 'success')
+      const res = await stopRecording(slug).catch(() => ({
+        ok: false as const,
+        error: 'Try again.',
+      }))
+      if (res.ok)
+        notify('Recording stopped. It will appear in your dashboard in a minute or two.', 'success')
       else {
         setRecPending(null)
         notify(res.error, 'error')
       }
     } else {
       setRecPending('starting')
-      const res = await startRecording(slug, Intl.DateTimeFormat().resolvedOptions().timeZone).catch(
-        () => ({ ok: false as const, error: 'Could not start recording.' }),
-      )
+      const res = await startRecording(
+        slug,
+        Intl.DateTimeFormat().resolvedOptions().timeZone,
+      ).catch(() => ({ ok: false as const, error: 'Could not start recording.' }))
       if (!res.ok) {
         setRecPending(null)
         notify(res.error, 'error')
@@ -360,7 +396,13 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
 
   async function muteAll(): Promise<void> {
     const res = await muteEveryone(slug).catch(() => null)
-    if (res?.ok) notify(res.muted ? `Muted ${res.muted} ${res.muted === 1 ? 'person' : 'people'}` : 'Everyone is already muted', 'success')
+    if (res?.ok)
+      notify(
+        res.muted
+          ? `Muted ${res.muted} ${res.muted === 1 ? 'person' : 'people'}`
+          : 'Everyone is already muted',
+        'success',
+      )
     else notify(res?.error ?? 'Could not mute everyone.', 'error')
   }
 
@@ -392,13 +434,27 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
   const layoutMenu = (close: () => void) => (
     <>
       <MenuLabel>Layout</MenuLabel>
-      <MenuItem icon={<SparklesIcon size={16} />} selected={layout === 'auto'} onSelect={() => (setLayout('auto'), close())} hint="Big view for 1:1 calls and screen shares">
+      <MenuItem
+        icon={<SparklesIcon size={16} />}
+        selected={layout === 'auto'}
+        onSelect={() => (setLayout('auto'), close())}
+        hint="Big view for 1:1 calls and screen shares"
+      >
         Auto
       </MenuItem>
-      <MenuItem icon={<GridIcon size={16} />} selected={layout === 'grid'} onSelect={() => (setLayout('grid'), close())}>
+      <MenuItem
+        icon={<GridIcon size={16} />}
+        selected={layout === 'grid'}
+        onSelect={() => (setLayout('grid'), close())}
+      >
         Grid
       </MenuItem>
-      <MenuItem icon={<SpotlightIcon size={16} />} selected={layout === 'speaker'} onSelect={() => (setLayout('speaker'), close())} hint="Whoever is talking, big">
+      <MenuItem
+        icon={<SpotlightIcon size={16} />}
+        selected={layout === 'speaker'}
+        onSelect={() => (setLayout('speaker'), close())}
+        hint="Whoever is talking, big"
+      >
         Speaker
       </MenuItem>
     </>
@@ -419,9 +475,15 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
           menu={(close) => (
             <>
               <MenuLabel>Microphone</MenuLabel>
-              {mics.length === 0 && <p className="px-3 py-2 text-faint">No microphones available</p>}
+              {mics.length === 0 && (
+                <p className="px-3 py-2 text-faint">No microphones available</p>
+              )}
               {mics.map((d, i) => (
-                <MenuItem key={d.deviceId} selected={d.deviceId === activeMic} onSelect={() => (void pickDevice('audioinput', d.deviceId), close())}>
+                <MenuItem
+                  key={d.deviceId}
+                  selected={d.deviceId === activeMic}
+                  onSelect={() => (void pickDevice('audioinput', d.deviceId), close())}
+                >
                   {deviceLabel(d, i, 'Microphone')}
                 </MenuItem>
               ))}
@@ -430,14 +492,21 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
                   <MenuDivider />
                   <MenuLabel>Speaker</MenuLabel>
                   {speakers.map((d, i) => (
-                    <MenuItem key={d.deviceId} selected={d.deviceId === (activeSpeaker ?? 'default')} onSelect={() => (void pickDevice('audiooutput', d.deviceId), close())}>
+                    <MenuItem
+                      key={d.deviceId}
+                      selected={d.deviceId === (activeSpeaker ?? 'default')}
+                      onSelect={() => (void pickDevice('audiooutput', d.deviceId), close())}
+                    >
                       {deviceLabel(d, i, 'Speaker')}
                     </MenuItem>
                   ))}
                 </>
               )}
               <MenuDivider />
-              <MenuItem icon={<SettingsIcon size={16} />} onSelect={() => (call.setSettingsOpen(true), close())}>
+              <MenuItem
+                icon={<SettingsIcon size={16} />}
+                onSelect={() => (call.setSettingsOpen(true), close())}
+              >
                 Audio settings…
               </MenuItem>
             </>
@@ -466,7 +535,11 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
               <MenuLabel>Camera</MenuLabel>
               {cams.length === 0 && <p className="px-3 py-2 text-faint">No cameras available</p>}
               {cams.map((d, i) => (
-                <MenuItem key={d.deviceId} selected={d.deviceId === activeCam} onSelect={() => (void pickDevice('videoinput', d.deviceId), close())}>
+                <MenuItem
+                  key={d.deviceId}
+                  selected={d.deviceId === activeCam}
+                  onSelect={() => (void pickDevice('videoinput', d.deviceId), close())}
+                >
                   {deviceLabel(d, i, 'Camera', cams)}
                 </MenuItem>
               ))}
@@ -477,7 +550,11 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
                   key={q}
                   selected={prefs.quality === q}
                   disabled={q === 'fhd' && !fhdSupported}
-                  hint={q === 'fhd' && !fhdSupported ? `Your camera supports up to ${maxHeight}p` : QUALITY[q].detail}
+                  hint={
+                    q === 'fhd' && !fhdSupported
+                      ? `Your camera supports up to ${maxHeight}p`
+                      : QUALITY[q].detail
+                  }
                   onSelect={() => (void setQuality(q), close())}
                 >
                   {QUALITY[q].label}
@@ -485,11 +562,18 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
               ))}
               <MenuDivider />
               {blurSupported && (
-                <MenuItem icon={<SparklesIcon size={16} />} selected={prefs.blur} onSelect={() => setPrefs({ blur: !prefs.blur })}>
+                <MenuItem
+                  icon={<SparklesIcon size={16} />}
+                  selected={prefs.blur}
+                  onSelect={() => setPrefs({ blur: !prefs.blur })}
+                >
                   Blur background
                 </MenuItem>
               )}
-              <MenuItem icon={<SettingsIcon size={16} />} onSelect={() => (call.setSettingsOpen(true), close())}>
+              <MenuItem
+                icon={<SettingsIcon size={16} />}
+                onSelect={() => (call.setSettingsOpen(true), close())}
+              >
                 Video settings…
               </MenuItem>
             </>
@@ -563,7 +647,10 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
           >
             {recPending ? (
               // The start can take a few seconds (Mux + LiveKit): show the press landed.
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-red-400 motion-reduce:animate-none" aria-hidden />
+              <span
+                className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-red-400 motion-reduce:animate-none"
+                aria-hidden
+              />
             ) : isRecording ? (
               <StopIcon />
             ) : (
@@ -584,32 +671,56 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
               <div className="min-[50rem]:hidden">
                 {camOn && cams.length > 1 && (
                   // One tap between the front and back camera (the 'let me show you' move).
-                  <MenuItem icon={<SwitchCameraIcon size={16} />} onSelect={() => (void switchCamera(), close())}>
+                  <MenuItem
+                    icon={<SwitchCameraIcon size={16} />}
+                    onSelect={() => (void switchCamera(), close())}
+                  >
                     Switch camera
                   </MenuItem>
                 )}
                 {canShare && (
-                  <MenuItem icon={<ShareIcon size={16} />} onSelect={() => (void toggleShare(), close())}>
+                  <MenuItem
+                    icon={<ShareIcon size={16} />}
+                    onSelect={() => (void toggleShare(), close())}
+                  >
                     {isScreenShareEnabled ? 'Stop presenting' : 'Share your screen'}
                   </MenuItem>
                 )}
-                <MenuItem icon={<HandIcon size={16} />} onSelect={() => (void toggleHand(), close())}>
+                <MenuItem
+                  icon={<HandIcon size={16} />}
+                  onSelect={() => (void toggleHand(), close())}
+                >
                   {hand ? 'Lower your hand' : 'Raise your hand'}
                 </MenuItem>
-                <MenuItem icon={<UsersIcon size={16} />} onSelect={() => (togglePanel('people'), close())}>
+                <MenuItem
+                  icon={<UsersIcon size={16} />}
+                  onSelect={() => (togglePanel('people'), close())}
+                >
                   People ({participants.length})
                 </MenuItem>
-                <MenuItem icon={<ChatIcon size={16} />} onSelect={() => (togglePanel('chat'), close())}>
+                <MenuItem
+                  icon={<ChatIcon size={16} />}
+                  onSelect={() => (togglePanel('chat'), close())}
+                >
                   Chat{chat.unread ? ` (${chat.unread} new)` : ''}
                 </MenuItem>
                 {isHost && (
-                  <MenuItem icon={<RecordIcon size={16} />} onSelect={() => (void toggleRecording(), close())}>
+                  <MenuItem
+                    icon={<RecordIcon size={16} />}
+                    onSelect={() => (void toggleRecording(), close())}
+                  >
                     {recLabel}
                   </MenuItem>
                 )}
                 <div className="flex gap-1 px-1 py-1">
                   {REACTIONS.map((e, i) => (
-                    <button key={e} type="button" aria-label={`React ${e}`} onClick={() => (react(i), close())} className="grid h-10 flex-1 place-items-center rounded-lg text-xl hover:bg-white/[0.08]">
+                    <button
+                      key={e}
+                      type="button"
+                      aria-label={`React ${e}`}
+                      onClick={() => (react(i), close())}
+                      className="grid h-10 flex-1 place-items-center rounded-lg text-xl hover:bg-white/[0.08]"
+                    >
                       {e}
                     </button>
                   ))}
@@ -618,14 +729,20 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
               </div>
               {layoutMenu(close)}
               <MenuDivider />
-              <MenuItem icon={<SettingsIcon size={16} />} onSelect={() => (call.setSettingsOpen(true), close())}>
+              <MenuItem
+                icon={<SettingsIcon size={16} />}
+                onSelect={() => (call.setSettingsOpen(true), close())}
+              >
                 Settings
               </MenuItem>
               <MenuItem icon={<LinkIcon size={16} />} onSelect={() => (void copyLink(), close())}>
                 Copy meeting link
               </MenuItem>
               {canFullscreen && (
-                <MenuItem icon={<FullscreenIcon size={16} />} onSelect={() => (fullscreen(), close())}>
+                <MenuItem
+                  icon={<FullscreenIcon size={16} />}
+                  onSelect={() => (fullscreen(), close())}
+                >
                   Full screen
                 </MenuItem>
               )}
@@ -633,7 +750,10 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
                 <>
                   <MenuDivider />
                   <MenuLabel>Host controls</MenuLabel>
-                  <MenuItem icon={<MicOffIcon size={16} />} onSelect={() => (void muteAll(), close())}>
+                  <MenuItem
+                    icon={<MicOffIcon size={16} />}
+                    onSelect={() => (void muteAll(), close())}
+                  >
                     Mute everyone
                   </MenuItem>
                   <div className="px-3">
@@ -657,10 +777,20 @@ export function Dock({ onReaction }: { onReaction: (emoji: string) => void }) {
 
       {/* Panels */}
       <div className="hidden items-center gap-1.5 rounded-full border border-white/10 bg-[#0e0e16]/90 p-1.5 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.9)] backdrop-blur-xl min-[50rem]:flex min-[50rem]:p-2">
-        <PanelButton label={`People (${participants.length})`} active={panel === 'people'} onClick={() => togglePanel('people')} badge={participants.length}>
+        <PanelButton
+          label={`People (${participants.length})`}
+          active={panel === 'people'}
+          onClick={() => togglePanel('people')}
+          badge={participants.length}
+        >
           <UsersIcon />
         </PanelButton>
-        <PanelButton label={chat.unread ? `Chat (${chat.unread} new)` : 'Chat'} active={panel === 'chat'} onClick={() => togglePanel('chat')} dot={chat.unread > 0}>
+        <PanelButton
+          label={chat.unread ? `Chat (${chat.unread} new)` : 'Chat'}
+          active={panel === 'chat'}
+          onClick={() => togglePanel('chat')}
+          dot={chat.unread > 0}
+        >
           <ChatIcon />
         </PanelButton>
       </div>
@@ -687,11 +817,13 @@ function PanelButton({
     <IconButton label={label} active={active} aria-expanded={active} onClick={onClick}>
       {children}
       {badge !== undefined && badge > 0 && (
-        <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-white/15 px-1 text-[11px] font-semibold text-ink">
+        <span className="absolute -right-0.5 -top-0.5 grid h-5 min-w-5 place-items-center rounded-full bg-white/15 px-1 text-xs font-semibold text-ink">
           {badge}
         </span>
       )}
-      {dot && <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-[var(--room-accent-ring)] ring-2 ring-[#0e0e16]" />}
+      {dot && (
+        <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-[var(--room-accent-ring)] ring-2 ring-[#0e0e16]" />
+      )}
     </IconButton>
   )
 }
@@ -738,14 +870,28 @@ function LeaveButton() {
   return (
     <div ref={ref} className="relative">
       {leaveBtn}
-      <Popover open={open} onClose={() => setOpen(false)} anchorRef={ref} align="end" label="Leave options">
-        <MenuItem icon={<LeaveIcon size={16} />} hint="Others can keep talking" onSelect={() => void room.disconnect()}>
+      <Popover
+        open={open}
+        onClose={() => setOpen(false)}
+        anchorRef={ref}
+        align="end"
+        label="Leave options"
+      >
+        <MenuItem
+          icon={<LeaveIcon size={16} />}
+          hint="Others can keep talking"
+          onSelect={() => void room.disconnect()}
+        >
           Leave call
         </MenuItem>
         <MenuItem
           tone="danger"
           icon={<LockIcon size={16} />}
-          hint={isRecording ? 'Everyone is disconnected and the recording stops' : 'Everyone will be disconnected'}
+          hint={
+            isRecording
+              ? 'Everyone is disconnected and the recording stops'
+              : 'Everyone will be disconnected'
+          }
           onSelect={() => void endForAll()}
         >
           {ending ? 'Ending…' : 'End call for everyone'}

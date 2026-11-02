@@ -88,7 +88,7 @@ export async function runUpload(payload: StartUploadPayload, emit: Emit): Promis
         workspaceId: payload.workspaceId ?? null,
       }),
     })
-    if (res.status === 401) throw new Error('Your session expired — sign in again.')
+    if (res.status === 401) throw new Error('Your session expired. Sign in again.')
     if (!res.ok) throw new Error(`Could not create upload (${res.status})`)
     const { uploadUrl, shareUrl } = (await res.json()) as CreateUploadResponse
 

@@ -1,7 +1,10 @@
+import type { Metadata } from 'next'
 import { headers } from 'next/headers'
 import Link from 'next/link'
 import { auth } from '@/lib/auth'
 import { ApproveDevice } from './approve-device'
+
+export const metadata: Metadata = { title: 'Connect your desktop app' }
 
 export const dynamic = 'force-dynamic'
 

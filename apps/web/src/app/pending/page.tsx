@@ -32,7 +32,7 @@ export default async function PendingPage() {
         Your account is pending approval
       </h1>
       <p className="rise max-w-md leading-relaxed text-muted" style={{ animationDelay: '210ms' }}>
-        Thanks for signing up, {user.name}. {APP_NAME} is invite-only right now — an admin reviews
+        Thanks for signing up, {user.name}. {APP_NAME} is invite-only right now. An admin reviews
         new accounts before they get access. You’ll be able to record and share as soon as you’re
         approved.
       </p>

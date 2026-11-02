@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useTrackVolume } from '@livekit/components-react'
 import {
   createLocalAudioTrack,
@@ -390,6 +390,9 @@ export function PreJoinScreen({
   )
   const nameOk = name.trim().length > 0
   const emailOk = isHost || EMAIL_RE.test(email.trim())
+  const emailInvalid = !emailOk && email.trim().length > 0
+  const emailHintId = useId()
+  const emailErrorId = useId()
   const canSubmit = nameOk && emailOk && !busy
 
   function submit(withCamera = true): void {
@@ -442,353 +445,383 @@ export function PreJoinScreen({
       className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col px-4 pb-6 pt-5 sm:px-6 sm:pt-8"
       style={brandVars(brand.accent)}
     >
-      <BrandMark brand={brand} />
+      <span className="room-sheet self-start rounded-full py-1.5 pl-1.5 pr-4">
+        <BrandMark brand={brand} />
+      </span>
 
-      <div className="grid flex-1 items-center gap-8 py-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-12">
-        {/* Preview */}
-        <section aria-label="Camera and microphone check" className="rise min-w-0">
-          <div
-            className="relative mx-auto aspect-[4/3] overflow-hidden rounded-3xl bg-[#101019] ring-1 ring-white/10 sm:aspect-video"
-            // A phone held upright films portrait: show all of it, in its own
-            // shape (at most half the screen tall), not a landscape slice.
-            style={
-              portraitPreview && previewRatio
-                ? {
-                    aspectRatio: String(Math.max(9 / 16, previewRatio)),
-                    width: `min(100%, calc(50dvh * ${Math.max(9 / 16, previewRatio)}))`,
-                  }
-                : undefined
-            }
-          >
-            {videoOn && media.videoTrack ? (
-              <PreviewVideo
-                track={media.videoTrack}
-                mirror={prefs.mirror}
-                onRatio={setPreviewRatio}
-              />
-            ) : (
-              <div className="grid h-full place-items-center">
-                <span className="grid h-20 w-20 place-items-center rounded-full bg-[var(--room-accent-soft)] font-display text-3xl font-semibold text-ink">
-                  {(name.trim() || '?').charAt(0).toUpperCase()}
-                </span>
-              </div>
-            )}
-
-            {problem && (
-              // Bottom padding keeps "Try again" clear of the toggles on small phones.
-              <div className="absolute inset-0 grid place-items-center bg-black/65 p-6 pb-20 text-center backdrop-blur-sm">
-                <div className="max-w-sm">
-                  <p className="text-sm leading-relaxed text-ink">{problem}</p>
-                  <button
-                    type="button"
-                    onClick={media.retry}
-                    className="mt-4 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-ink transition hover:bg-white/15"
-                  >
-                    Try again
-                  </button>
+      <div className="flex flex-1 items-center py-6">
+        <div className="room-sheet grid w-full items-center gap-8 rounded-[2rem] p-4 sm:p-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)] lg:gap-12 lg:p-10">
+          {/* Preview */}
+          <section aria-label="Camera and microphone check" className="rise min-w-0">
+            <div
+              className="relative mx-auto aspect-[4/3] overflow-hidden rounded-3xl bg-[#101019] ring-1 ring-white/10 sm:aspect-video"
+              // A phone held upright films portrait: show all of it, in its own
+              // shape (at most half the screen tall), not a landscape slice.
+              style={
+                portraitPreview && previewRatio
+                  ? {
+                      aspectRatio: String(Math.max(9 / 16, previewRatio)),
+                      width: `min(100%, calc(50dvh * ${Math.max(9 / 16, previewRatio)}))`,
+                    }
+                  : undefined
+              }
+            >
+              {videoOn && media.videoTrack ? (
+                <PreviewVideo
+                  track={media.videoTrack}
+                  mirror={prefs.mirror}
+                  onRatio={setPreviewRatio}
+                />
+              ) : (
+                <div className="grid h-full place-items-center">
+                  <span className="grid h-20 w-20 place-items-center rounded-full bg-[var(--room-accent-soft)] font-display text-3xl font-semibold text-ink">
+                    {(name.trim() || '?').charAt(0).toUpperCase()}
+                  </span>
                 </div>
-              </div>
-            )}
+              )}
 
-            {audioOn && media.audioTrack && (
-              <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/45 px-3 py-1.5 backdrop-blur">
-                <MicIcon size={14} className="text-ink" />
-                <MicMeter track={media.audioTrack} />
-              </div>
-            )}
+              {problem && (
+                // Bottom padding keeps "Try again" clear of the toggles on small phones.
+                <div className="absolute inset-0 grid place-items-center bg-black/65 p-6 pb-20 text-center backdrop-blur-sm">
+                  <div className="max-w-sm">
+                    <p role="alert" className="text-sm leading-relaxed text-ink">
+                      {problem}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={media.retry}
+                      className="mt-4 rounded-full bg-white/10 px-4 py-2 text-sm font-medium text-ink transition hover:bg-white/15"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                </div>
+              )}
 
-            <div className="absolute inset-x-0 bottom-4 flex justify-center gap-3">
-              <IconButton
-                label={audioOn ? 'Turn off microphone' : 'Turn on microphone'}
-                tone={audioOn ? 'default' : 'off'}
-                aria-pressed={!audioOn}
-                onClick={() => setAudioOn((v) => !v)}
-                className="backdrop-blur"
-              >
-                {audioOn ? <MicIcon /> : <MicOffIcon />}
-              </IconButton>
-              <IconButton
-                label={videoOn ? 'Turn off camera' : 'Turn on camera'}
-                tone={videoOn ? 'default' : 'off'}
-                aria-pressed={!videoOn}
-                onClick={() => setVideoOn((v) => !v)}
-                className="backdrop-blur"
-              >
-                {videoOn ? <VideoIcon /> : <VideoOffIcon />}
-              </IconButton>
-              {blurSupported && (
+              {audioOn && media.audioTrack && (
+                <div className="absolute left-3 top-3 flex items-center gap-2 rounded-full bg-black/45 px-3 py-1.5 backdrop-blur">
+                  <MicIcon size={14} className="text-ink" />
+                  <MicMeter track={media.audioTrack} />
+                </div>
+              )}
+
+              <div className="absolute inset-x-0 bottom-4 flex justify-center gap-3">
                 <IconButton
-                  label={prefs.blur ? 'Turn off background blur' : 'Blur my background'}
-                  active={prefs.blur}
-                  aria-pressed={prefs.blur}
-                  onClick={() => setPrefs({ blur: !prefs.blur })}
+                  label={audioOn ? 'Turn off microphone' : 'Turn on microphone'}
+                  tone={audioOn ? 'default' : 'off'}
+                  aria-pressed={!audioOn}
+                  onClick={() => setAudioOn((v) => !v)}
                   className="backdrop-blur"
                 >
-                  <SparklesIcon />
+                  {audioOn ? <MicIcon /> : <MicOffIcon />}
                 </IconButton>
-              )}
-            </div>
-          </div>
-
-          {/* Device pickers */}
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Chip
-              icon={<MicIcon size={16} />}
-              label={
-                mics.length ? deviceLabel(mics[micIndex], micIndex, 'Microphone') : 'Microphone'
-              }
-              menuLabel="Choose a microphone"
-            >
-              {(close) => (
-                <>
-                  <MenuLabel>Microphone</MenuLabel>
-                  {mics.length === 0 && (
-                    <p className="px-3 py-2 text-faint">No microphones found</p>
-                  )}
-                  {mics.map((d, i) => (
-                    <MenuItem
-                      key={d.deviceId}
-                      selected={i === micIndex}
-                      onSelect={() => {
-                        setPrefs({ audioInputId: d.deviceId })
-                        close()
-                      }}
-                    >
-                      {deviceLabel(d, i, 'Microphone')}
-                    </MenuItem>
-                  ))}
-                </>
-              )}
-            </Chip>
-
-            {speakerSelectable && speakers.length > 0 && (
-              <Chip
-                icon={<SpeakerIcon size={16} />}
-                label={deviceLabel(speakers[speakerIndex], speakerIndex, 'Speaker')}
-                menuLabel="Choose a speaker"
-                trailing={
-                  <button
-                    type="button"
-                    onClick={() => void testSpeaker()}
-                    disabled={testing}
-                    className="ml-1 flex items-center gap-1.5 rounded-full px-3 py-2 text-sm text-muted transition hover:bg-white/[0.06] hover:text-ink disabled:opacity-60"
+                <IconButton
+                  label={videoOn ? 'Turn off camera' : 'Turn on camera'}
+                  tone={videoOn ? 'default' : 'off'}
+                  aria-pressed={!videoOn}
+                  onClick={() => setVideoOn((v) => !v)}
+                  className="backdrop-blur"
+                >
+                  {videoOn ? <VideoIcon /> : <VideoOffIcon />}
+                </IconButton>
+                {blurSupported && (
+                  <IconButton
+                    label={prefs.blur ? 'Turn off background blur' : 'Blur my background'}
+                    active={prefs.blur}
+                    aria-pressed={prefs.blur}
+                    onClick={() => setPrefs({ blur: !prefs.blur })}
+                    className="backdrop-blur"
                   >
-                    <PlayIcon size={12} />
-                    {testing ? 'Playing…' : 'Test'}
-                  </button>
+                    <SparklesIcon />
+                  </IconButton>
+                )}
+              </div>
+            </div>
+
+            {/* Device pickers */}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Chip
+                icon={<MicIcon size={16} />}
+                label={
+                  mics.length ? deviceLabel(mics[micIndex], micIndex, 'Microphone') : 'Microphone'
                 }
+                menuLabel="Choose a microphone"
               >
                 {(close) => (
                   <>
-                    <MenuLabel>Speaker</MenuLabel>
-                    {speakers.map((d, i) => (
+                    <MenuLabel>Microphone</MenuLabel>
+                    {mics.length === 0 && (
+                      <p className="px-3 py-2 text-faint">No microphones found</p>
+                    )}
+                    {mics.map((d, i) => (
                       <MenuItem
                         key={d.deviceId}
-                        selected={i === speakerIndex}
+                        selected={i === micIndex}
                         onSelect={() => {
-                          setPrefs({ audioOutputId: d.deviceId })
+                          setPrefs({ audioInputId: d.deviceId })
                           close()
                         }}
                       >
-                        {deviceLabel(d, i, 'Speaker')}
+                        {deviceLabel(d, i, 'Microphone')}
                       </MenuItem>
                     ))}
                   </>
                 )}
               </Chip>
+
+              {speakerSelectable && speakers.length > 0 && (
+                <Chip
+                  icon={<SpeakerIcon size={16} />}
+                  label={deviceLabel(speakers[speakerIndex], speakerIndex, 'Speaker')}
+                  menuLabel="Choose a speaker"
+                  trailing={
+                    <button
+                      type="button"
+                      onClick={() => void testSpeaker()}
+                      disabled={testing}
+                      className="ml-1 flex items-center gap-1.5 rounded-full px-3 py-2 text-sm text-muted transition hover:bg-white/[0.06] hover:text-ink disabled:opacity-60"
+                    >
+                      <PlayIcon size={12} />
+                      {testing ? 'Playing…' : 'Test'}
+                    </button>
+                  }
+                >
+                  {(close) => (
+                    <>
+                      <MenuLabel>Speaker</MenuLabel>
+                      {speakers.map((d, i) => (
+                        <MenuItem
+                          key={d.deviceId}
+                          selected={i === speakerIndex}
+                          onSelect={() => {
+                            setPrefs({ audioOutputId: d.deviceId })
+                            close()
+                          }}
+                        >
+                          {deviceLabel(d, i, 'Speaker')}
+                        </MenuItem>
+                      ))}
+                    </>
+                  )}
+                </Chip>
+              )}
+
+              <Chip
+                icon={<VideoIcon size={16} />}
+                label={
+                  cams.length ? deviceLabel(cams[camIndex], camIndex, 'Camera', cams) : 'Camera'
+                }
+                menuLabel="Choose a camera"
+              >
+                {(close) => (
+                  <>
+                    <MenuLabel>Camera</MenuLabel>
+                    {cams.length === 0 && <p className="px-3 py-2 text-faint">No cameras found</p>}
+                    {cams.map((d, i) => (
+                      <MenuItem
+                        key={d.deviceId}
+                        selected={i === camIndex}
+                        onSelect={() => {
+                          setPrefs({ videoInputId: d.deviceId })
+                          close()
+                        }}
+                      >
+                        {deviceLabel(d, i, 'Camera', cams)}
+                      </MenuItem>
+                    ))}
+                  </>
+                )}
+              </Chip>
+
+              <Chip
+                icon={<span className="text-[11px] font-bold tracking-tight">HD</span>}
+                label={QUALITY[prefs.quality].label}
+                menuLabel="Video quality"
+              >
+                {(close) => (
+                  <>
+                    <MenuLabel>Video quality</MenuLabel>
+                    {QUALITY_ORDER.map((q) => (
+                      <MenuItem
+                        key={q}
+                        selected={prefs.quality === q}
+                        disabled={q === 'fhd' && !fhdSupported}
+                        hint={
+                          q === 'fhd' && !fhdSupported
+                            ? `Your camera supports up to ${maxHeight}p`
+                            : QUALITY[q].detail
+                        }
+                        onSelect={() => {
+                          setPrefs({ quality: q })
+                          close()
+                        }}
+                      >
+                        {QUALITY[q].label}
+                      </MenuItem>
+                    ))}
+                  </>
+                )}
+              </Chip>
+            </div>
+            {!speakerSelectable && (
+              <p className="mt-3 text-xs text-faint">
+                Sound plays through your device&apos;s current output. You can change it in your
+                system settings.
+              </p>
+            )}
+            {testError && (
+              <p role="alert" className="mt-2 text-xs text-amber-200">
+                {testError}
+              </p>
+            )}
+          </section>
+
+          {/* Details / lobby */}
+          <section className="rise min-w-0" style={{ animationDelay: '80ms' }}>
+            <p className="text-sm font-semibold text-[var(--room-accent-text)]">
+              {isHost ? "You're hosting" : `Video call with ${brand.name}`}
+            </p>
+            <h1 className="mt-2 font-display text-3xl font-extrabold leading-tight tracking-tight text-ink sm:text-4xl">
+              {roomName}
+            </h1>
+            {brand.welcome && (
+              <p className="mt-3 max-w-md whitespace-pre-line text-lg leading-relaxed text-ink/85">
+                {brand.welcome}
+              </p>
             )}
 
-            <Chip
-              icon={<VideoIcon size={16} />}
-              label={cams.length ? deviceLabel(cams[camIndex], camIndex, 'Camera', cams) : 'Camera'}
-              menuLabel="Choose a camera"
-            >
-              {(close) => (
-                <>
-                  <MenuLabel>Camera</MenuLabel>
-                  {cams.length === 0 && <p className="px-3 py-2 text-faint">No cameras found</p>}
-                  {cams.map((d, i) => (
-                    <MenuItem
-                      key={d.deviceId}
-                      selected={i === camIndex}
-                      onSelect={() => {
-                        setPrefs({ videoInputId: d.deviceId })
-                        close()
-                      }}
-                    >
-                      {deviceLabel(d, i, 'Camera', cams)}
-                    </MenuItem>
-                  ))}
-                </>
-              )}
-            </Chip>
-
-            <Chip
-              icon={<span className="text-[11px] font-bold tracking-tight">HD</span>}
-              label={QUALITY[prefs.quality].label}
-              menuLabel="Video quality"
-            >
-              {(close) => (
-                <>
-                  <MenuLabel>Video quality</MenuLabel>
-                  {QUALITY_ORDER.map((q) => (
-                    <MenuItem
-                      key={q}
-                      selected={prefs.quality === q}
-                      disabled={q === 'fhd' && !fhdSupported}
-                      hint={
-                        q === 'fhd' && !fhdSupported
-                          ? `Your camera supports up to ${maxHeight}p`
-                          : QUALITY[q].detail
-                      }
-                      onSelect={() => {
-                        setPrefs({ quality: q })
-                        close()
-                      }}
-                    >
-                      {QUALITY[q].label}
-                    </MenuItem>
-                  ))}
-                </>
-              )}
-            </Chip>
-          </div>
-          {!speakerSelectable && (
-            <p className="mt-3 text-xs text-faint">
-              Sound plays through your device&apos;s current output. You can change it in your
-              system settings.
-            </p>
-          )}
-          {testError && <p className="mt-2 text-xs text-amber-200">{testError}</p>}
-        </section>
-
-        {/* Details / lobby */}
-        <section className="rise min-w-0" style={{ animationDelay: '80ms' }}>
-          <p className="text-sm font-semibold text-[var(--room-accent-text)]">
-            {isHost ? "You're hosting" : `Video call with ${brand.name}`}
-          </p>
-          <h1 className="mt-2 font-display text-3xl font-extrabold leading-tight tracking-tight text-ink sm:text-4xl">
-            {roomName}
-          </h1>
-          {brand.welcome && (
-            <p className="mt-3 max-w-md whitespace-pre-line text-lg leading-relaxed text-ink/85">
-              {brand.welcome}
-            </p>
-          )}
-
-          {phase === 'waiting' ? (
-            <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-              <div className="flex items-center gap-3">
-                <span
-                  className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-white/15 border-t-[var(--room-accent-ring)] motion-reduce:animate-none"
-                  aria-hidden
-                />
-                <p className="font-medium text-ink">Asking to join…</p>
-              </div>
-              <p className="mt-2 text-sm text-muted">
-                The host will let you in soon. Keep this page open; you can check your camera and
-                mic while you wait.
-              </p>
-              <button
-                type="button"
-                onClick={onCancelWaiting}
-                className="mt-4 rounded-full border border-white/10 px-4 py-2 text-sm text-muted transition hover:text-ink"
-              >
-                Cancel request
-              </button>
-            </div>
-          ) : phase === 'denied' ? (
-            <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-              <p className="font-medium text-ink">The host didn&apos;t let you in</p>
-              <p className="mt-2 text-sm text-muted">
-                If you think this is a mistake, you can ask again.
-              </p>
-              <button
-                type="button"
-                onClick={onAskAgain}
-                className="mt-4 rounded-full border border-white/10 px-4 py-2 text-sm text-ink transition hover:bg-white/[0.06]"
-              >
-                Ask again
-              </button>
-            </div>
-          ) : (
-            <form
-              className="mt-4"
-              onSubmit={(e) => {
-                e.preventDefault()
-                submit()
-              }}
-            >
-              <p className="text-muted">
-                {isHost
-                  ? "Guests waiting to join will show up once you're in."
-                  : 'Check how you look and sound, then join. Nothing to install.'}
-              </p>
-              <div className="mt-6 space-y-3">
-                <label className="block">
-                  <span className="mb-1.5 block text-xs font-medium text-faint">Your name</span>
-                  <input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    maxLength={60}
-                    autoComplete="name"
-                    placeholder="Your name"
-                    className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-3 text-base text-ink placeholder:text-faint focus:border-[var(--room-accent-ring)] focus:outline-none sm:text-sm"
-                  />
-                </label>
-                {!isHost && (
-                  <label className="block">
-                    <span className="mb-1.5 block text-xs font-medium text-faint">Your email</span>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      maxLength={200}
-                      autoComplete="email"
-                      placeholder="you@company.com"
-                      className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-3 text-base text-ink placeholder:text-faint focus:border-[var(--room-accent-ring)] focus:outline-none sm:text-sm"
+            {phase === 'waiting' ? (
+              <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                <div role="status">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-white/15 border-t-[var(--room-accent-ring)] motion-reduce:animate-none"
+                      aria-hidden
                     />
-                    <span className="mt-1.5 block text-xs text-faint">
-                      Only the host sees your email.
-                    </span>
-                  </label>
-                )}
-                <input
-                  type="text"
-                  name="website"
-                  value={website}
-                  onChange={(e) => setWebsite(e.target.value)}
-                  tabIndex={-1}
-                  autoComplete="off"
-                  aria-hidden
-                  className="hidden"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={!canSubmit}
-                className="mt-6 h-12 w-full rounded-xl bg-[var(--room-accent)] text-base font-semibold text-[var(--room-accent-fg)] shadow-[0_18px_40px_-18px_var(--room-accent)] transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--room-accent-ring)] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                {cta}
-              </button>
-              {videoOn && (
+                    <p className="font-medium text-ink">Asking to join…</p>
+                  </div>
+                  <p className="mt-2 text-sm text-muted">
+                    The host will let you in soon. Keep this page open; you can check your camera
+                    and mic while you wait.
+                  </p>
+                </div>
                 <button
                   type="button"
-                  disabled={!canSubmit}
-                  onClick={() => submit(false)}
-                  className="mt-2 w-full rounded-xl py-2.5 text-sm text-muted transition hover:text-ink disabled:opacity-40"
+                  onClick={onCancelWaiting}
+                  className="mt-4 rounded-full border border-white/10 px-4 py-2 text-sm text-muted transition hover:text-ink"
                 >
-                  Join without camera
+                  Cancel request
                 </button>
-              )}
-              {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
-              {!isHost && !emailOk && email.trim() && (
-                <p className="mt-3 text-sm text-amber-200">Please enter a valid email.</p>
-              )}
-            </form>
-          )}
-        </section>
+              </div>
+            ) : phase === 'denied' ? (
+              <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                <div role="status">
+                  <p className="font-medium text-ink">The host didn&apos;t let you in</p>
+                  <p className="mt-2 text-sm text-muted">
+                    If you think this is a mistake, you can ask again.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onAskAgain}
+                  className="mt-4 rounded-full border border-white/10 px-4 py-2 text-sm text-ink transition hover:bg-white/[0.06]"
+                >
+                  Ask again
+                </button>
+              </div>
+            ) : (
+              <form
+                className="mt-4"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  submit()
+                }}
+              >
+                <p className="text-muted">
+                  {isHost
+                    ? "Guests waiting to join will show up once you're in."
+                    : 'Check how you look and sound, then join. Nothing to install.'}
+                </p>
+                <div className="mt-6 space-y-3">
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs font-medium text-muted">Your name</span>
+                    <input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      maxLength={60}
+                      autoComplete="name"
+                      placeholder="Your name"
+                      className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-3 text-base text-ink placeholder:text-faint focus:border-[var(--room-accent-ring)] focus:outline-none sm:text-sm"
+                    />
+                  </label>
+                  {!isHost && (
+                    <label className="block">
+                      <span className="mb-1.5 block text-xs font-medium text-muted">
+                        Your email
+                      </span>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        maxLength={200}
+                        autoComplete="email"
+                        placeholder="you@company.com"
+                        aria-invalid={emailInvalid || undefined}
+                        aria-describedby={
+                          emailInvalid ? `${emailHintId} ${emailErrorId}` : emailHintId
+                        }
+                        className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-3 text-base text-ink placeholder:text-faint focus:border-[var(--room-accent-ring)] focus:outline-none sm:text-sm"
+                      />
+                      <span id={emailHintId} className="mt-1.5 block text-xs text-faint">
+                        Only the host sees your email.
+                      </span>
+                    </label>
+                  )}
+                  <input
+                    type="text"
+                    name="website"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    tabIndex={-1}
+                    autoComplete="off"
+                    aria-hidden
+                    className="hidden"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!canSubmit}
+                  className="mt-6 h-12 w-full rounded-xl bg-[var(--room-accent)] text-base font-semibold text-[var(--room-accent-fg)] shadow-[0_18px_40px_-18px_var(--room-accent)] transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--room-accent-ring)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {cta}
+                </button>
+                {videoOn && (
+                  <button
+                    type="button"
+                    disabled={!canSubmit}
+                    onClick={() => submit(false)}
+                    className="mt-2 w-full rounded-xl py-2.5 text-sm text-muted transition hover:text-ink disabled:opacity-40"
+                  >
+                    Join without camera
+                  </button>
+                )}
+                {error && (
+                  <p role="alert" className="mt-3 text-sm text-red-300">
+                    {error}
+                  </p>
+                )}
+                {emailInvalid && (
+                  // Tied to the field rather than an alert, which would interrupt
+                  // from the first letter typed.
+                  <p id={emailErrorId} className="mt-3 text-sm text-amber-200">
+                    Please enter a valid email.
+                  </p>
+                )}
+              </form>
+            )}
+          </section>
+        </div>
       </div>
     </main>
   )

@@ -280,6 +280,7 @@ function CallView({
     slug,
     notices,
     dismiss,
+    holdNotice,
     notify,
     panel,
     setLobbyEnabled,
@@ -368,11 +369,14 @@ function CallView({
         <BrandMark brand={brand} size="sm" showName={false} />
         <span className="min-w-0 truncate text-[15px] font-semibold">{roomName}</span>
         {call.lobbyEnabled && isHost && (
-          <LockIcon
-            size={14}
-            className="shrink-0 text-faint"
+          <span
+            role="img"
             aria-label="Guests must ask to join"
-          />
+            title="Guests must ask to join"
+            className="flex shrink-0 text-faint"
+          >
+            <LockIcon size={14} />
+          </span>
         )}
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
           {isRecording && (
@@ -396,8 +400,10 @@ function CallView({
             </span>
           )}
           <span
-            className={cx('hidden sm:inline', signal <= 1 ? 'text-amber-300' : 'text-muted')}
+            role="img"
+            aria-label={signal <= 1 ? 'Your connection is unstable' : 'Connection is good'}
             title={signal <= 1 ? 'Your connection is unstable' : 'Connection is good'}
+            className={cx('hidden sm:inline', signal <= 1 ? 'text-amber-300' : 'text-muted')}
           >
             <SignalIcon level={signal} size={18} />
           </span>
@@ -430,6 +436,9 @@ function CallView({
               isHost={isHost}
               slug={slug}
               onCopied={() => notify('Meeting link copied', 'success')}
+              onCopyFailed={() =>
+                notify("Couldn't copy the link. Copy it from your address bar instead.", 'warn')
+              }
               // While presenting, the top of the stage holds the point/draw tools.
               atBottom={isScreenShareEnabled}
             />
@@ -461,9 +470,7 @@ function CallView({
             chime) say someone's waiting; the card would cover the sheet. */}
         {isHost && guests[0] && panel !== 'people' && !(compactScreen && panel) && (
           <div className="pointer-events-auto rounded-2xl border border-amber-400/30 bg-[#15151f]/95 p-3 shadow-2xl backdrop-blur-xl">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-300">
-              Wants to join
-            </div>
+            <div className="mb-2 text-xs font-semibold text-amber-300">Wants to join</div>
             <GuestDecision guest={guests[0]} onChanged={refresh} />
             {guests.length > 1 && (
               <button
@@ -480,6 +487,18 @@ function CallView({
           <div
             key={n.id}
             role="status"
+            // Stays up while pointed at or focused, so there's time to read it
+            // or use its button.
+            onMouseEnter={() => holdNotice(n.id, true)}
+            onMouseLeave={(e) => {
+              if (!e.currentTarget.contains(document.activeElement)) holdNotice(n.id, false)
+            }}
+            onFocus={() => holdNotice(n.id, true)}
+            onBlur={(e) => {
+              const el = e.currentTarget
+              if (!el.contains(e.relatedTarget as Node | null) && !el.matches(':hover'))
+                holdNotice(n.id, false)
+            }}
             className={cx(
               'pointer-events-auto flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-2xl backdrop-blur-xl',
               n.tone === 'error' && 'border-red-500/30 bg-red-950/80 text-red-100',
@@ -588,7 +607,8 @@ function RecordingConsent({
             </h2>
           </div>
           <p id="rec-body" className="mt-3 text-sm leading-relaxed text-muted">
-            {brandName} is recording this call. The recording will be saved to their workspace.
+            {brandName} is recording this call. The recording will be saved to their business
+            account.
           </p>
           <div className="mt-6 flex justify-end gap-2">
             <button
@@ -617,11 +637,14 @@ function AloneHint({
   isHost,
   slug,
   onCopied,
+  onCopyFailed,
   atBottom,
 }: {
   isHost: boolean
   slug: string
   onCopied: () => void
+  /** The browser blocked the clipboard. */
+  onCopyFailed: () => void
   atBottom: boolean
 }) {
   return (
@@ -639,10 +662,13 @@ function AloneHint({
           <button
             type="button"
             onClick={() => {
-              navigator.clipboard
-                .writeText(`${window.location.origin}/m/${slug}`)
-                .then(onCopied)
-                .catch(() => undefined)
+              try {
+                navigator.clipboard
+                  .writeText(`${window.location.origin}/m/${slug}`)
+                  .then(onCopied, onCopyFailed)
+              } catch {
+                onCopyFailed() // no clipboard here at all
+              }
             }}
             className="rounded-full bg-[var(--room-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--room-accent-fg)] transition hover:opacity-90"
           >

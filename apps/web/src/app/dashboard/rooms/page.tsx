@@ -1,3 +1,4 @@
+import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { APP_DOMAIN } from '@lmsy/shared'
 import { ensureDefaultRoom, listStandingRoomsForWorkspace } from '@/db/meetings'
@@ -7,6 +8,8 @@ import { meetingsConfigured } from '@/lib/livekit'
 import { reconcileWorkspaceRecordings } from '@/lib/meeting-recording'
 import { RoomsManager } from './rooms-manager'
 import { PageHeader } from '../page-header'
+
+export const metadata: Metadata = { title: 'Meeting rooms' }
 
 export const dynamic = 'force-dynamic'
 

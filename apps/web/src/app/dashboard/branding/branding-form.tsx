@@ -12,6 +12,7 @@ import {
 } from '@/lib/brand-theme'
 import { resizeImage } from '@/lib/image-resize'
 import { Icon } from '@/components/brand/icons'
+import { colourName } from '../colour-names'
 import { saveBrandAction } from './actions'
 
 const SWATCHES = [
@@ -99,7 +100,7 @@ function ImagePicker({
             {value ? 'Replace' : 'Upload'}
           </button>
           {value && (
-            <button type="button" onClick={onRemove} className="text-muted hover:text-red-600">
+            <button type="button" onClick={onRemove} className="text-muted hover:text-danger">
               Remove
             </button>
           )}
@@ -306,7 +307,7 @@ export function BrandingForm({
         setCoverEdit(undefined)
         setPhotoEdit(undefined)
         router.refresh()
-      } else setError(result.error ?? 'Could not save.')
+      } else setError(result.error ?? "Couldn't save your branding. Try again.")
     })
   }
 
@@ -373,13 +374,14 @@ export function BrandingForm({
           title="Colour and style"
           hint="Your colour fills buttons and highlights. Pick a light or dark page and a heading style."
         >
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div role="group" aria-label="Colour" className="flex flex-wrap items-center gap-2.5">
             {SWATCHES.map((c) => (
               <button
                 key={c}
                 type="button"
                 onClick={() => (touch(), setColor(c))}
-                aria-label={`Use ${c}`}
+                aria-label={colourName(c)}
+                title={colourName(c)}
                 aria-pressed={color.toLowerCase() === c}
                 className={`h-9 w-9 rounded-full ring-offset-2 ring-offset-[var(--color-surface)] transition hover:scale-110 ${
                   color.toLowerCase() === c ? 'ring-[3px] ring-ink' : 'ring-1 ring-line'
@@ -520,12 +522,22 @@ export function BrandingForm({
           >
             {pending ? 'Saving…' : 'Save branding'}
           </button>
-          {saved && (
-            <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-700">
-              <Icon name="check" className="h-4 w-4" strokeWidth={2.6} /> Saved
+          {/* Always rendered so screen readers announce "Saved" when it appears. */}
+          <span
+            role="status"
+            className="flex items-center gap-1.5 text-sm font-medium text-success"
+          >
+            {saved && (
+              <>
+                <Icon name="check" className="h-4 w-4" strokeWidth={2.6} /> Saved
+              </>
+            )}
+          </span>
+          {error && (
+            <span role="alert" className="text-sm text-danger">
+              {error}
             </span>
           )}
-          {error && <span className="text-sm text-red-600">{error}</span>}
         </div>
       </div>
 

@@ -33,7 +33,7 @@ export function ProcessingState({
   return (
     <div className="glass flex aspect-video w-full flex-col items-center justify-center gap-4 rounded-2xl text-center">
       <div
-        className="h-10 w-10 animate-spin rounded-full border-2 border-line-strong"
+        className="h-10 w-10 animate-spin rounded-full motion-reduce:animate-[spin_3s_linear_infinite] border-2 border-line-strong"
         style={{ borderTopColor: accent }}
       />
       <div className="px-6">

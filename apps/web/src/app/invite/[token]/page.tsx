@@ -60,7 +60,7 @@ export default async function InvitePage({ params }: PageProps) {
                     href={`/login?redirect=${encodeURIComponent(here)}`}
                     className="btn-ghost w-full px-5 py-2.5 text-sm"
                   >
-                    Log in
+                    Sign in
                   </Link>
                 </div>
               )}

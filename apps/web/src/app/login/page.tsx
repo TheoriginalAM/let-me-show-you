@@ -27,7 +27,9 @@ function LoginForm() {
     const { error } = await authClient.signIn.email({ email, password })
     setPending(false)
     if (error) {
-      setError(error.message ?? 'Sign in failed')
+      setError(
+        error.message ?? "Couldn't sign you in. Check your email and password and try again.",
+      )
       return
     }
     router.push(redirectTo)
@@ -44,7 +46,7 @@ function LoginForm() {
     const { error } = await authClient.signIn.magicLink({ email, callbackURL: redirectTo })
     setPending(false)
     if (error) {
-      setError(error.message ?? 'Could not send magic link')
+      setError(error.message ?? "Couldn't send the sign-in link. Try again in a minute.")
       return
     }
     setMagicSent(true)
@@ -56,20 +58,26 @@ function LoginForm() {
         <div className="flex flex-col items-start gap-6">
           <LogoMark className="h-11 w-11" />
           <div>
-            <h1 className="font-display text-3xl font-extrabold tracking-tight">Log in</h1>
+            <h1 className="font-display text-3xl font-extrabold tracking-tight">Sign in</h1>
             <p className="mt-1.5 text-sm text-muted">Welcome back to Let Me Show You.</p>
           </div>
         </div>
 
         {error && (
-          <p className="mt-6 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger ring-1 ring-inset ring-danger/25">
+          <p
+            role="alert"
+            className="mt-6 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger ring-1 ring-inset ring-danger/25"
+          >
             {error}
           </p>
         )}
 
         {magicSent ? (
-          <p className="mt-6 rounded-lg bg-success/10 px-3 py-2 text-sm text-success ring-1 ring-inset ring-success/25">
-            Magic link sent — check your email (or the server console in dev).
+          <p
+            role="status"
+            className="mt-6 rounded-lg bg-success/10 px-3 py-2 text-sm text-success ring-1 ring-inset ring-success/25"
+          >
+            Check your email. We sent you a link to sign in.
           </p>
         ) : (
           <form onSubmit={onPasswordLogin} className="mt-6 flex flex-col gap-3">
@@ -77,24 +85,28 @@ function LoginForm() {
               type="email"
               required
               placeholder="you@example.com"
+              aria-label="Email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-line-strong focus:outline-none"
+              className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-ink focus:outline-none"
             />
             <input
               type="password"
               required
               placeholder="Password"
+              aria-label="Password"
+              autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-line-strong focus:outline-none"
+              className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-ink focus:outline-none"
             />
             <button
               type="submit"
               disabled={pending}
               className="btn-primary mt-1 px-4 py-2.5 text-sm disabled:opacity-50"
             >
-              {pending ? 'Working…' : 'Log in'}
+              {pending ? 'Signing in…' : 'Sign in'}
             </button>
             <button
               type="button"

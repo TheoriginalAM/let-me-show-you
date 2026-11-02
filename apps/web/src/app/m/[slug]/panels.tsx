@@ -1,7 +1,11 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { useLocalParticipant, useParticipants, type ReceivedChatMessage } from '@livekit/components-react'
+import {
+  useLocalParticipant,
+  useParticipants,
+  type ReceivedChatMessage,
+} from '@livekit/components-react'
 import { Track, type Participant } from 'livekit-client'
 import type { LobbyGuest } from '@/db/meetings'
 import {
@@ -28,7 +32,9 @@ import { cx, MenuDivider, MenuItem, Popover, Switch } from './ui'
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/).filter(Boolean)
-  return ((parts[0]?.[0] ?? '?') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase()
+  return (
+    (parts[0]?.[0] ?? '?') + (parts.length > 1 ? parts[parts.length - 1][0] : '')
+  ).toUpperCase()
 }
 
 // ---------------------------------------------------------------------------
@@ -67,7 +73,9 @@ export function SidePanel({
       if (visible(back)) return back.focus()
       // The opener went away (e.g. a toast): use the dock's Chat or More button.
       const fallback = [
-        ...document.querySelectorAll<HTMLElement>('button[aria-label^="Chat"], button[aria-label^="More options"]'),
+        ...document.querySelectorAll<HTMLElement>(
+          'button[aria-label^="Chat"], button[aria-label^="More options"]',
+        ),
       ].find(visible)
       fallback?.focus()
     })
@@ -99,7 +107,12 @@ export function SidePanel({
         </h2>
         <TabButton active={panel === 'people'} onClick={() => setPanel('people')}>
           People · {participants.length}
-          {guests.length > 0 && <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-amber-400" />}
+          {guests.length > 0 && (
+            <>
+              <span className="ml-1.5 inline-block h-2 w-2 rounded-full bg-amber-400" aria-hidden />
+              <span className="sr-only">, {guests.length} waiting to join</span>
+            </>
+          )}
         </TabButton>
         <TabButton active={panel === 'chat'} onClick={() => setPanel('chat')}>
           Chat
@@ -122,7 +135,15 @@ export function SidePanel({
   )
 }
 
-function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+function TabButton({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: ReactNode
+}) {
   return (
     <button
       type="button"
@@ -156,7 +177,13 @@ function sortParticipants(list: Participant[]): Participant[] {
   })
 }
 
-function PeoplePanel({ guests, refreshLobby }: { guests: LobbyGuest[]; refreshLobby: () => Promise<void> }) {
+function PeoplePanel({
+  guests,
+  refreshLobby,
+}: {
+  guests: LobbyGuest[]
+  refreshLobby: () => Promise<void>
+}) {
   const participants = useParticipants()
   const { role } = useCall()
   const isHost = role === 'host'
@@ -176,7 +203,7 @@ function PeoplePanel({ guests, refreshLobby }: { guests: LobbyGuest[]; refreshLo
       {isHost && guests.length > 0 && (
         <section>
           <div className="mb-2 flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-amber-300">
+            <h3 className="text-xs font-semibold text-amber-300">
               Waiting to join ({guests.length})
             </h3>
             {guests.length > 1 && (
@@ -201,7 +228,7 @@ function PeoplePanel({ guests, refreshLobby }: { guests: LobbyGuest[]; refreshLo
       )}
 
       <section>
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-faint">
+        <h3 className="mb-2 text-xs font-semibold text-muted">
           In the call ({participants.length})
         </h3>
         <ul className="space-y-0.5">
@@ -216,7 +243,13 @@ function PeoplePanel({ guests, refreshLobby }: { guests: LobbyGuest[]; refreshLo
   )
 }
 
-export function GuestDecision({ guest, onChanged }: { guest: LobbyGuest; onChanged: () => Promise<void> }) {
+export function GuestDecision({
+  guest,
+  onChanged,
+}: {
+  guest: LobbyGuest
+  onChanged: () => Promise<void>
+}) {
   const { slug } = useCall()
   const [busy, setBusy] = useState(false)
   async function decide(admit: boolean): Promise<void> {
@@ -239,6 +272,7 @@ export function GuestDecision({ guest, onChanged }: { guest: LobbyGuest; onChang
           type="button"
           disabled={busy}
           onClick={() => void decide(false)}
+          aria-label={`Deny ${guest.name}`}
           className="rounded-full px-3 py-1.5 text-xs font-semibold text-muted transition hover:bg-white/[0.07] hover:text-ink disabled:opacity-50"
         >
           Deny
@@ -247,6 +281,8 @@ export function GuestDecision({ guest, onChanged }: { guest: LobbyGuest; onChang
           type="button"
           disabled={busy}
           onClick={() => void decide(true)}
+          // Starts with the visible words, so voice control's "click Let in" still works.
+          aria-label={`Let in ${guest.name}`}
           className="rounded-full bg-[var(--room-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--room-accent-fg)] transition hover:opacity-90 disabled:opacity-50"
         >
           Let in
@@ -302,7 +338,7 @@ function PersonRow({ participant: p }: { participant: Participant }) {
             {p.isLocal && <span className="text-faint"> (you)</span>}
           </span>
           {hostRole && (
-            <span className="shrink-0 rounded bg-[var(--room-accent-soft)] px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-ink">
+            <span className="shrink-0 rounded bg-[var(--room-accent-soft)] px-1.5 py-px text-xs font-semibold text-ink">
               Host
             </span>
           )}
@@ -310,10 +346,18 @@ function PersonRow({ participant: p }: { participant: Participant }) {
         {confirmRemove ? (
           <div className="mt-1 flex items-center gap-2 text-xs">
             <span className="text-red-200">Remove {name}?</span>
-            <button type="button" onClick={() => void remove()} className="font-semibold text-red-300 hover:underline">
+            <button
+              type="button"
+              onClick={() => void remove()}
+              className="font-semibold text-red-300 hover:underline"
+            >
               Remove
             </button>
-            <button type="button" onClick={() => setConfirmRemove(false)} className="text-muted hover:text-ink">
+            <button
+              type="button"
+              onClick={() => setConfirmRemove(false)}
+              className="text-muted hover:text-ink"
+            >
               Cancel
             </button>
           </div>
@@ -325,7 +369,11 @@ function PersonRow({ participant: p }: { participant: Participant }) {
           )
         )}
       </div>
-      <span className={cx('shrink-0', micOn ? 'text-muted' : 'text-red-300')} aria-label={micOn ? 'Microphone on' : 'Microphone off'}>
+      <span
+        role="img"
+        aria-label={micOn ? 'Microphone on' : 'Microphone off'}
+        className={cx('shrink-0', micOn ? 'text-muted' : 'text-red-300')}
+      >
         {micOn ? <MicIcon size={16} /> : <MicOffIcon size={16} />}
       </span>
       <div ref={ref} className="relative shrink-0">
@@ -339,24 +387,44 @@ function PersonRow({ participant: p }: { participant: Participant }) {
         >
           <MoreIcon size={16} />
         </button>
-        <Popover open={open} onClose={() => setOpen(false)} anchorRef={ref} side="bottom" align="end" label={`Options for ${name}`}>
-          <MenuItem icon={<PinIcon size={16} />} onSelect={() => (call.setPinned(pinned ? null : camKey), setOpen(false))}>
+        <Popover
+          open={open}
+          onClose={() => setOpen(false)}
+          anchorRef={ref}
+          side="bottom"
+          align="end"
+          label={`Options for ${name}`}
+        >
+          <MenuItem
+            icon={<PinIcon size={16} />}
+            onSelect={() => (call.setPinned(pinned ? null : camKey), setOpen(false))}
+          >
             {pinned ? 'Unpin' : 'Pin for me'}
           </MenuItem>
           {isHost && !p.isLocal && (
             <>
               {micOn && (
-                <MenuItem icon={<MicOffIcon size={16} />} onSelect={() => (void mute(), setOpen(false))}>
+                <MenuItem
+                  icon={<MicOffIcon size={16} />}
+                  onSelect={() => (void mute(), setOpen(false))}
+                >
                   Mute
                 </MenuItem>
               )}
               {hand && (
-                <MenuItem icon={<HandIcon size={16} />} onSelect={() => (void lower(), setOpen(false))}>
+                <MenuItem
+                  icon={<HandIcon size={16} />}
+                  onSelect={() => (void lower(), setOpen(false))}
+                >
                   Lower hand
                 </MenuItem>
               )}
               <MenuDivider />
-              <MenuItem tone="danger" icon={<CloseIcon size={16} />} onSelect={() => (setConfirmRemove(true), setOpen(false))}>
+              <MenuItem
+                tone="danger"
+                icon={<CloseIcon size={16} />}
+                onSelect={() => (setConfirmRemove(true), setOpen(false))}
+              >
                 Remove from call
               </MenuItem>
             </>
@@ -377,7 +445,7 @@ function HostFooter() {
       await navigator.clipboard.writeText(`${window.location.origin}/m/${call.slug}`)
       call.notify('Meeting link copied', 'success')
     } catch {
-      call.notify('Copy the link from your address bar instead.', 'warn')
+      call.notify("Couldn't copy the link. Copy it from your address bar instead.", 'warn')
     }
   }
 
@@ -413,7 +481,7 @@ function HostFooter() {
 
   return (
     <section className="space-y-3 border-t border-white/[0.07] pt-4">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-faint">Invite</h3>
+      <h3 className="text-xs font-semibold text-muted">Invite</h3>
       <button
         type="button"
         onClick={() => void copyLink()}
@@ -427,6 +495,7 @@ function HostFooter() {
           onChange={(e) => setEmails(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && !sending && emails.trim() && void send()}
           placeholder="Emails, separated by commas"
+          aria-label="Email addresses to invite"
           className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-base text-ink placeholder:text-faint focus:border-[var(--room-accent-ring)] focus:outline-none sm:text-sm"
         />
         <button
@@ -480,7 +549,12 @@ function Linkified({ text }: { text: unknown }) {
 }
 
 function groupMessages(messages: ReceivedChatMessage[]) {
-  const groups: { key: string; from?: ReceivedChatMessage['from']; time: number; items: ReceivedChatMessage[] }[] = []
+  const groups: {
+    key: string
+    from?: ReceivedChatMessage['from']
+    time: number
+    items: ReceivedChatMessage[]
+  }[] = []
   for (const m of messages) {
     const last = groups[groups.length - 1]
     if (last && last.from?.identity === m.from?.identity && m.timestamp - last.time < 120_000) {
@@ -517,7 +591,11 @@ function ChatPanel() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div ref={listRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4" aria-live="polite">
+      <div
+        ref={listRef}
+        className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4"
+        aria-live="polite"
+      >
         {groups.length === 0 && (
           <p className="mt-6 text-center text-sm text-faint">
             Messages are visible to everyone in the call and disappear when it ends.
@@ -529,9 +607,11 @@ function ChatPanel() {
           return (
             <div key={g.key}>
               <div className="mb-1 flex items-baseline gap-2">
-                <span className="text-sm font-semibold text-ink">{mine ? 'You' : g.from?.name || 'Guest'}</span>
+                <span className="text-sm font-semibold text-ink">
+                  {mine ? 'You' : g.from?.name || 'Guest'}
+                </span>
                 {host && (
-                  <span className="rounded bg-[var(--room-accent-soft)] px-1.5 py-px text-[10px] font-bold uppercase tracking-wide text-ink">
+                  <span className="rounded bg-[var(--room-accent-soft)] px-1.5 py-px text-xs font-semibold text-ink">
                     Host
                   </span>
                 )}
@@ -545,7 +625,9 @@ function ChatPanel() {
                     key={m.id}
                     className={cx(
                       'whitespace-pre-wrap break-words text-sm leading-relaxed',
-                      mine ? 'rounded-xl bg-[var(--room-accent-soft)] px-3 py-2 text-ink' : 'text-ink/90',
+                      mine
+                        ? 'rounded-xl bg-[var(--room-accent-soft)] px-3 py-2 text-ink'
+                        : 'text-ink/90',
                     )}
                   >
                     <Linkified text={m.message} />

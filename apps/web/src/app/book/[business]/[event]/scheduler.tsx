@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   addDays,
@@ -29,7 +29,7 @@ interface Props {
 }
 
 const inputCls =
-  'w-full rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none'
+  'w-full rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-faint focus:border-accent-ink focus:outline-none'
 const WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function monthOf(date: string): string {
@@ -87,6 +87,24 @@ export function Scheduler(props: Props) {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [slot, setSlot] = useState<number | null>(null)
+  // Choosing a time (or going back) swaps the panel, so move focus with it.
+  const summaryRef = useRef<HTMLDivElement>(null)
+  const timesRef = useRef<HTMLUListElement>(null)
+  const lastSlot = useRef<number | null>(null)
+  const slotShown = useRef(false)
+  useEffect(() => {
+    if (slot !== null) {
+      lastSlot.current = slot
+      slotShown.current = true
+      summaryRef.current?.focus()
+    } else if (slotShown.current) {
+      const list = timesRef.current
+      ;(
+        list?.querySelector<HTMLButtonElement>(`[data-slot="${lastSlot.current}"]`) ??
+        list?.querySelector<HTMLButtonElement>('button')
+      )?.focus()
+    }
+  }, [slot])
   const [name, setName] = useState(props.reschedule?.name ?? '')
   const [email, setEmail] = useState(props.reschedule?.email ?? '')
   const [notes, setNotes] = useState('')
@@ -308,7 +326,9 @@ export function Scheduler(props: Props) {
 
           <div className="lg:w-52">
             {loadError ? (
-              <p className="text-sm text-danger">{loadError}</p>
+              <p role="alert" className="text-sm text-danger">
+                {loadError}
+              </p>
             ) : !byDay ? (
               <p className="text-sm text-muted">Loading times…</p>
             ) : byDay.size === 0 ? (
@@ -325,11 +345,15 @@ export function Scheduler(props: Props) {
             ) : selectedDay ? (
               <>
                 <h3 className="mb-3 text-sm font-semibold text-ink">{dayLabel(selectedDay)}</h3>
-                <ul className="flex max-h-[22rem] flex-col gap-2 overflow-y-auto pr-1">
+                <ul
+                  ref={timesRef}
+                  className="flex max-h-[22rem] flex-col gap-2 overflow-y-auto pr-1"
+                >
                   {times.map((t) => (
                     <li key={t}>
                       <button
                         type="button"
+                        data-slot={t}
                         onClick={() => {
                           setError(null)
                           setSlot(t)
@@ -343,7 +367,11 @@ export function Scheduler(props: Props) {
                 </ul>
               </>
             ) : null}
-            {error && <p className="mt-3 text-sm text-danger">{error}</p>}
+            {error && (
+              <p role="alert" className="mt-3 text-sm text-danger">
+                {error}
+              </p>
+            )}
           </div>
         </section>
       ) : (
@@ -355,7 +383,11 @@ export function Scheduler(props: Props) {
           >
             ‹ Pick another time
           </button>
-          <div className="rounded-2xl border-2 border-accent/40 bg-accent/8 p-4">
+          <div
+            ref={summaryRef}
+            tabIndex={-1}
+            className="rounded-2xl border-2 border-accent/40 bg-accent/8 p-4 focus:outline-none"
+          >
             <p className="font-brand text-lg font-bold text-ink">{formatWhen(slot, tz)}</p>
             <p className="text-sm text-muted">
               {formatDuration(props.durationMinutes)} · {tz.replace(/_/g, ' ')}
@@ -415,7 +447,11 @@ export function Scheduler(props: Props) {
                 />
               </label>
             ) : null}
-            {error && <p className="text-sm text-danger">{error}</p>}
+            {error && (
+              <p role="alert" className="text-sm text-danger">
+                {error}
+              </p>
+            )}
             <button type="submit" disabled={pending} className="btn-primary mt-1 px-5 py-3 text-sm">
               {pending ? 'Booking…' : props.reschedule ? 'Move my booking' : 'Confirm booking'}
             </button>
@@ -451,7 +487,7 @@ function QuestionField({
           {(question.options ?? []).map((o) => (
             <label
               key={o}
-              className={`cursor-pointer rounded-xl border-2 px-3 py-2 font-medium transition ${
+              className={`cursor-pointer rounded-xl border-2 px-3 py-2 font-medium transition has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-accent-ink ${
                 value === o
                   ? 'border-accent bg-accent text-on-accent'
                   : 'border-line-strong text-ink hover:border-accent'

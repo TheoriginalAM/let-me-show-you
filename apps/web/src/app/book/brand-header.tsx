@@ -65,7 +65,7 @@ function CtaButton({ brand, className = '' }: { brand: WorkspaceBrand; className
       href={brand.ctaUrl}
       target="_blank"
       rel="noopener noreferrer nofollow"
-      className={`btn-ghost shrink-0 px-4 py-2 text-sm ${className}`}
+      className={`btn-ghost px-4 py-2 text-center text-sm ${className}`}
     >
       {brand.ctaLabel}
     </a>
@@ -94,7 +94,7 @@ export function BrandHeader({
           )}
         </span>
       </span>
-      <CtaButton brand={brand} className="hidden sm:inline-flex" />
+      <CtaButton brand={brand} className="hidden shrink-0 sm:inline-flex" />
     </div>
   )
 }
@@ -130,7 +130,7 @@ export function BrandHero({
           <span className="grid min-h-20 min-w-20 place-items-center rounded-3xl border-4 border-[var(--color-canvas)] bg-surface p-2 shadow-sm">
             <Mark brand={brand} name={name} size="lg" />
           </span>
-          <CtaButton brand={brand} className="mb-1" />
+          <CtaButton brand={brand} className="mb-1 min-w-0" />
         </div>
         <h1 className="mt-4 font-brand text-[2.1rem] font-bold leading-tight tracking-tight text-ink sm:text-[2.6rem]">
           {name}
@@ -160,7 +160,7 @@ export function BrandHero({
 export function PoweredBy() {
   return (
     <footer className="mt-auto pb-8 pt-12 text-center text-xs text-faint">
-      <Link href="/" className="inline-flex items-center gap-1.5 transition hover:text-muted">
+      <Link href="/" className="inline-flex items-center gap-1.5 py-1 transition hover:text-muted">
         <LogoMark className="h-4 w-4" /> Powered by {APP_NAME}
       </Link>
     </footer>

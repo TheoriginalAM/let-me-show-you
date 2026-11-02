@@ -31,25 +31,32 @@ function useViewerZone(): string {
   return tz
 }
 
-function useCopy(): [string | null, (key: string, text: string) => void] {
+const NETWORK_HINT = 'Check your connection and try again.'
+const COPY_FAILED = 'Could not copy. Select the link and copy it manually.'
+
+/** Which link was just copied, and which one the browser refused to copy. */
+function useCopy(): [string | null, string | null, (key: string, text: string) => void] {
   const [copied, setCopied] = useState<string | null>(null)
+  const [failed, setFailed] = useState<string | null>(null)
   return [
     copied,
+    failed,
     (key, text) => {
+      setFailed(null)
       void navigator.clipboard
         .writeText(text)
         .then(() => {
           setCopied(key)
           setTimeout(() => setCopied(null), 2000)
         })
-        .catch(() => undefined)
+        .catch(() => setFailed(key))
     },
   ]
 }
 
 export function BookingManager(props: Props) {
   const tz = useViewerZone()
-  const [copied, copy] = useCopy()
+  const [copied, copyFailed, copy] = useCopy()
   const [editing, setEditing] = useState<string | 'new' | null>(null)
   const pageUrl = `https://${props.domain}/book/${props.pageSlug}`
 
@@ -61,6 +68,7 @@ export function BookingManager(props: Props) {
         domain={props.domain}
         isOwner={props.isOwner}
         copied={copied === 'page'}
+        copyFailed={copyFailed === 'page'}
         onCopy={() => copy('page', pageUrl)}
       />
 
@@ -104,6 +112,7 @@ export function BookingManager(props: Props) {
               url={`${pageUrl}/${e.slug}`}
               isMine={e.hostUserId === props.meId}
               copied={copied === e.id}
+              copyFailed={copyFailed === e.id}
               onCopy={() => copy(e.id, `${pageUrl}/${e.slug}`)}
               onEdit={() => setEditing(e.id)}
             />
@@ -144,6 +153,7 @@ function PageLinkCard(p: {
   domain: string
   isOwner: boolean
   copied: boolean
+  copyFailed: boolean
   onCopy: () => void
 }) {
   const [editing, setEditing] = useState(false)
@@ -156,7 +166,7 @@ function PageLinkCard(p: {
     startTransition(async () => {
       const res = await setBookingSlugAction(slug).catch(() => ({
         ok: false as const,
-        error: 'Try again.',
+        error: `Couldn't change your booking link. ${NETWORK_HINT}`,
       }))
       if (res.ok) setEditing(false)
       else setError(res.error)
@@ -173,6 +183,7 @@ function PageLinkCard(p: {
             value={slug}
             onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
             maxLength={48}
+            aria-label="Booking page link"
             className={`${inputCls} font-mono`}
             autoFocus
           />
@@ -199,7 +210,16 @@ function PageLinkCard(p: {
           <span className="mark [--hl:var(--color-hl-green)]">{p.slug}</span>
         </p>
       )}
-      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-2 text-sm text-danger">
+          {error}
+        </p>
+      )}
+      {p.copyFailed && !editing && (
+        <p role="alert" className="mt-2 text-sm text-muted">
+          {COPY_FAILED}
+        </p>
+      )}
       {editing && (
         <p className="mt-2 text-xs text-muted">
           The old link keeps working and sends people to the new one.
@@ -242,6 +262,7 @@ function EventTypeCard(p: {
   url: string
   isMine: boolean
   copied: boolean
+  copyFailed: boolean
   onCopy: () => void
   onEdit: () => void
 }) {
@@ -256,21 +277,26 @@ function EventTypeCard(p: {
     return () => clearTimeout(t)
   }, [confirmDelete])
 
-  function run(fn: () => Promise<{ ok: boolean; error?: string }>): void {
+  /** Run an action; `failed` says what didn't happen if it gives no reason. */
+  function run(fn: () => Promise<{ ok: boolean; error?: string }>, failed: string): void {
     setNote(null)
     startTransition(async () => {
-      const res = await fn().catch(() => ({ ok: false, error: 'Try again.' }))
-      if (!res.ok) setNote(res.error ?? 'Something went wrong.')
+      const res = await fn().catch(() => ({ ok: false, error: undefined }))
+      if (!res.ok) setNote(res.error ?? `${failed} ${NETWORK_HINT}`)
     })
   }
 
   return (
     <div
-      className={`card relative overflow-hidden rounded-2xl p-5 pl-6 ${e.active ? '' : 'opacity-70'}`}
+      className={`card relative overflow-hidden rounded-2xl p-5 pl-6 ${e.active ? '' : 'border-dashed bg-surface-2'}`}
     >
       <span
         className="absolute inset-y-0 left-0 w-1.5"
-        style={{ background: e.color ?? p.brandColor ?? 'var(--color-accent)' }}
+        style={{
+          background: e.active
+            ? (e.color ?? p.brandColor ?? 'var(--color-accent)')
+            : 'var(--color-line-strong)',
+        }}
         aria-hidden
       />
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -302,7 +328,13 @@ function EventTypeCard(p: {
             role="switch"
             checked={e.active}
             disabled={pending}
-            onChange={(ev) => run(() => setEventTypeActiveAction(e.id, ev.target.checked))}
+            onChange={(ev) => {
+              const on = ev.target.checked
+              run(
+                () => setEventTypeActiveAction(e.id, on),
+                on ? "Couldn't turn bookings back on." : "Couldn't pause this calendar.",
+              )
+            }}
             className="peer sr-only"
           />
           <span className="relative h-6 w-11 rounded-full bg-line-strong transition peer-checked:bg-hl-green peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-accent-ink after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5" />
@@ -326,11 +358,13 @@ function EventTypeCard(p: {
         </button>
         <button
           className={`ml-auto rounded-lg px-3 py-1.5 text-sm transition ${
-            confirmDelete ? 'bg-danger text-white' : 'text-faint hover:text-danger'
+            confirmDelete ? 'bg-danger text-on-danger' : 'text-faint hover:text-danger'
           }`}
           disabled={pending}
           onClick={() =>
-            confirmDelete ? run(() => deleteEventTypeAction(e.id)) : setConfirmDelete(true)
+            confirmDelete
+              ? run(() => deleteEventTypeAction(e.id), "Couldn't delete this calendar.")
+              : setConfirmDelete(true)
           }
         >
           {confirmDelete ? 'Confirm delete' : 'Delete'}
@@ -339,7 +373,16 @@ function EventTypeCard(p: {
       {confirmDelete && (
         <p className="mt-2 text-xs text-faint">Bookings already made stay on your calendar.</p>
       )}
-      {note && <p className="mt-2 text-sm text-danger">{note}</p>}
+      {note && (
+        <p role="alert" className="mt-2 text-sm text-danger">
+          {note}
+        </p>
+      )}
+      {p.copyFailed && (
+        <p role="alert" className="mt-2 text-sm text-muted">
+          {COPY_FAILED}
+        </p>
+      )}
     </div>
   )
 }
@@ -415,18 +458,20 @@ function BookingRow({
     startTransition(async () => {
       const res = await cancelBookingAction(b.id, reason).catch(() => ({
         ok: false as const,
-        error: 'Try again.',
+        error: `Couldn't cancel the booking. ${NETWORK_HINT}`,
       }))
       if (!res.ok) setError(res.error)
     })
   }
 
   return (
-    <div className={`card rounded-xl p-4 ${cancelled ? 'opacity-60' : ''}`}>
+    <div className={`card rounded-xl p-4 ${cancelled ? 'border-dashed bg-surface-2' : ''}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">
-            {formatTime(start, tz)} to {formatTime(end, tz)}{' '}
+            <span className={cancelled ? 'line-through decoration-1' : undefined}>
+              {formatTime(start, tz)} to {formatTime(end, tz)}
+            </span>{' '}
             <span className="font-normal text-muted">· {b.title}</span>
           </p>
           <p className="text-sm text-muted">
@@ -478,8 +523,9 @@ function BookingRow({
               <button
                 className="rounded-lg px-3 py-1.5 text-sm text-faint transition hover:text-danger"
                 onClick={() => setOpen((o) => !o)}
+                aria-expanded={open}
               >
-                Cancel
+                Cancel booking
               </button>
             )}
           </div>
@@ -492,10 +538,11 @@ function BookingRow({
             onChange={(e) => setReason(e.target.value)}
             maxLength={500}
             placeholder="Reason for the guest (optional)"
+            aria-label="Reason for the guest (optional)"
             className={inputCls}
           />
           <button
-            className="shrink-0 rounded-xl bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+            className="shrink-0 rounded-xl bg-danger px-4 py-2 text-sm font-semibold text-on-danger transition hover:opacity-90 disabled:opacity-60"
             disabled={pending}
             onClick={cancel}
           >
@@ -503,7 +550,11 @@ function BookingRow({
           </button>
         </div>
       )}
-      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="mt-2 text-sm text-danger">
+          {error}
+        </p>
+      )}
     </div>
   )
 }
@@ -520,7 +571,7 @@ function TimeOffSection({ items, tz }: { items: TimeOffItem[]; tz: string }) {
     startTransition(async () => {
       const res = await addTimeOffAction(from, to || from, tz, note).catch(() => ({
         ok: false as const,
-        error: 'Try again.',
+        error: `Couldn't block those days. ${NETWORK_HINT}`,
       }))
       if (res.ok) {
         setFrom('')
@@ -531,8 +582,13 @@ function TimeOffSection({ items, tz }: { items: TimeOffItem[]; tz: string }) {
   }
 
   function remove(id: string): void {
+    setError(null)
     startTransition(async () => {
-      await removeTimeOffAction(id).catch(() => undefined)
+      const res = await removeTimeOffAction(id).catch(() => ({
+        ok: false as const,
+        error: `Couldn't remove that time off. ${NETWORK_HINT}`,
+      }))
+      if (!res.ok) setError(res.error)
     })
   }
 
@@ -550,20 +606,24 @@ function TimeOffSection({ items, tz }: { items: TimeOffItem[]; tz: string }) {
             const s = new Date(t.startsAt).getTime()
             // Stored end is exclusive (midnight after the last day).
             const e = new Date(t.endsAt).getTime() - 1
+            const days =
+              zonedParts(s, tz).date !== zonedParts(e, tz).date
+                ? `${formatDay(s, tz)} to ${formatDay(e, tz)}`
+                : formatDay(s, tz)
             return (
               <li
                 key={t.id}
                 className="card flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm"
               >
                 <span className="text-ink">
-                  {formatDay(s, tz)}
-                  {zonedParts(s, tz).date !== zonedParts(e, tz).date && ` to ${formatDay(e, tz)}`}
+                  {days}
                   {t.note && <span className="text-muted"> · {t.note}</span>}
                 </span>
                 <button
                   className="text-faint transition hover:text-danger"
                   disabled={pending}
                   onClick={() => remove(t.id)}
+                  aria-label={`Remove time off, ${days}`}
                 >
                   Remove
                 </button>
@@ -610,7 +670,11 @@ function TimeOffSection({ items, tz }: { items: TimeOffItem[]; tz: string }) {
           Block days
         </button>
       </div>
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
     </section>
   )
 }

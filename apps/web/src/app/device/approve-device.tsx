@@ -36,7 +36,7 @@ export function ApproveDevice({ initialCode, account }: { initialCode: string; a
           </div>
           <h1 className="font-display text-3xl font-extrabold tracking-tight">Device connected</h1>
           <p className="text-sm leading-relaxed text-muted">
-            You can return to the desktop app — you’re signed in.
+            You’re signed in. You can go back to the desktop app now.
           </p>
         </div>
       </main>
@@ -61,7 +61,10 @@ export function ApproveDevice({ initialCode, account }: { initialCode: string; a
         </div>
 
         {error && (
-          <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger ring-1 ring-inset ring-danger/25">
+          <p
+            role="alert"
+            className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger ring-1 ring-inset ring-danger/25"
+          >
             {error}
           </p>
         )}
@@ -71,8 +74,10 @@ export function ApproveDevice({ initialCode, account }: { initialCode: string; a
             value={code}
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             placeholder="WXYZ-2345"
+            aria-label="Code shown in the app"
+            autoComplete="one-time-code"
             autoCapitalize="characters"
-            className="rounded-lg border border-line bg-surface px-3 py-3 text-center font-mono text-lg tracking-[0.3em] text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+            className="rounded-lg border border-line bg-surface px-3 py-3 text-center font-mono text-lg tracking-[0.3em] text-ink placeholder:text-faint focus:border-ink focus:outline-none"
           />
           <button
             type="submit"

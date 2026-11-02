@@ -26,7 +26,10 @@ const CHAT_OPTS: Parameters<typeof useChat>[0] = {
       if (typeof m?.message !== 'string' || !m.message.trim()) throw new Error('empty')
       return {
         id: typeof m.id === 'string' ? m.id.slice(0, 64) : crypto.randomUUID(),
-        timestamp: typeof m.timestamp === 'number' && Number.isFinite(m.timestamp) ? m.timestamp : Date.now(),
+        timestamp:
+          typeof m.timestamp === 'number' && Number.isFinite(m.timestamp)
+            ? m.timestamp
+            : Date.now(),
         message: m.message.slice(0, MAX_CHAT_CHARS),
         type: 'chatMessage',
       }
@@ -75,6 +78,8 @@ interface CallState {
   notices: Notice[]
   notify: (text: string, tone?: Notice['tone'], action?: Notice['action']) => void
   dismiss: (id: number) => void
+  /** Pause a notice's timer (while it's hovered or focused); releasing gives it a few more seconds. */
+  holdNotice: (id: number, held: boolean) => void
   chat: {
     messages: ReceivedChatMessage[]
     send: (text: string) => Promise<void>
@@ -135,17 +140,34 @@ export function CallProvider({
     timers.current.delete(id)
   }, [])
 
+  const schedule = useCallback(
+    (id: number, ms: number) => {
+      clearTimeout(timers.current.get(id))
+      timers.current.set(
+        id,
+        setTimeout(() => dismiss(id), ms),
+      )
+    },
+    [dismiss],
+  )
+
   const notify = useCallback(
     (text: string, tone: Notice['tone'] = 'info', action?: Notice['action']) => {
       const id = ++noticeId
       // At most three at once; newest last.
       setNotices((n) => [...n.filter((x) => x.text !== text), { id, text, tone, action }].slice(-3))
-      timers.current.set(
-        id,
-        setTimeout(() => dismiss(id), action ? 9000 : 5000),
-      )
+      schedule(id, action ? 9000 : 5000)
     },
-    [dismiss],
+    [schedule],
+  )
+
+  const holdNotice = useCallback(
+    (id: number, held: boolean) => {
+      if (!held) return schedule(id, 4000)
+      clearTimeout(timers.current.get(id))
+      timers.current.delete(id)
+    },
+    [schedule],
   )
 
   // Chat lives here (not in the panel) so history and the unread count survive
@@ -190,6 +212,7 @@ export function CallProvider({
       notices,
       notify,
       dismiss,
+      holdNotice,
       chat: { messages: chatMessages, send: sendChat, unread, isSending },
       markEndedByMe: () => {
         endedByMeRef.current = true
@@ -215,6 +238,7 @@ export function CallProvider({
       notices,
       notify,
       dismiss,
+      holdNotice,
       chatMessages,
       sendChat,
       unread,

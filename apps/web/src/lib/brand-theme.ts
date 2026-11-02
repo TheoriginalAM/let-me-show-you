@@ -72,8 +72,9 @@ function pushTo(rgb: RGB, bg: RGB, ratio: number, toward: RGB): RGB {
   return out
 }
 
+/** White or ink, whichever has more contrast on the colour. */
 function onRgb(rgb: RGB): string {
-  return contrast(rgb, WHITE) >= 3.6 ? '#ffffff' : rgbCss(INK)
+  return contrast(rgb, WHITE) >= contrast(rgb, INK) ? '#ffffff' : rgbCss(INK)
 }
 
 const hexOf = ([r, g, b]: RGB): string =>
@@ -106,9 +107,12 @@ export function themeVars(opts: {
   theme?: BrandTheme
   font?: BrandFont
 }): CSSProperties {
-  const rgb = parseHex(opts.accent) ?? parseHex(DEFAULT_ACCENT)!
   const dark = opts.theme === 'dark'
   const bg = dark ? DARK_SURFACE : LIGHT_CANVAS
+  const brand = parseHex(opts.accent) ?? parseHex(DEFAULT_ACCENT)!
+  // On a dark page a very dark brand colour (navy, ink) would vanish into the
+  // background, so lift it until buttons and selected days still stand out.
+  const rgb = dark ? pushTo(brand, bg, 3, WHITE) : brand
   const vars: Record<string, string> = {
     '--color-accent': rgbCss(rgb),
     // The "pressed key" edge under primary buttons.

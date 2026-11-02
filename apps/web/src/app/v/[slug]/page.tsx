@@ -214,7 +214,6 @@ export default async function SharePage({ params }: PageProps) {
               slug={slug}
               initialComments={commentsForClient}
               isOwner={isOwner}
-              accent={accent}
               defaultName={currentUser?.name ?? ''}
               defaultEmail={currentUser?.email ?? ''}
             />
@@ -232,11 +231,7 @@ export default async function SharePage({ params }: PageProps) {
           ) : (
             <>
               Recorded with {APP_NAME}.{' '}
-              <Link
-                href="/"
-                className="font-medium transition hover:opacity-80"
-                style={{ color: accent }}
-              >
+              <Link href="/" className="font-medium text-accent-ink transition hover:opacity-80">
                 Make your own
               </Link>
             </>

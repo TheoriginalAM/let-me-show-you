@@ -65,19 +65,20 @@ export function ApprovalWidget({
   }
 
   const inputCls =
-    'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none'
+    'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-ink focus:outline-none'
 
   if (done) {
     return (
       <div className="rise glass flex items-center gap-3 rounded-2xl p-4">
         <span
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-white"
-          style={{ background: done === 'approved' ? '#10b981' : '#f59e0b' }}
+          className={`grid h-9 w-9 shrink-0 place-items-center rounded-full font-bold ${
+            done === 'approved' ? 'bg-success text-on-success' : 'bg-hl-orange text-[#17132b]'
+          }`}
           aria-hidden
         >
           {done === 'approved' ? '✓' : '!'}
         </span>
-        <p className="text-sm text-ink">
+        <p role="status" className="text-sm text-ink">
           {done === 'approved'
             ? 'Thanks, your approval was recorded and the owner has been notified.'
             : 'Thanks, your change request was sent to the owner.'}
@@ -102,6 +103,8 @@ export function ApprovalWidget({
           onChange={(e) => setName(e.target.value)}
           maxLength={60}
           placeholder="Your name"
+          aria-label="Your name"
+          autoComplete="name"
           className={inputCls}
         />
         <input
@@ -110,6 +113,8 @@ export function ApprovalWidget({
           type="email"
           maxLength={200}
           placeholder="you@email.com"
+          aria-label="Your email"
+          autoComplete="email"
           className={inputCls}
         />
       </div>
@@ -119,21 +124,26 @@ export function ApprovalWidget({
         maxLength={1000}
         rows={2}
         placeholder="Optional note (e.g. what to change)"
+        aria-label="Note for the owner (optional)"
         className={`${inputCls} resize-y`}
       />
-      {error && <p className="text-xs text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="text-xs text-danger">
+          {error}
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => submit('approved')}
           disabled={pending}
-          className="rounded-lg bg-success px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
+          className="rounded-lg bg-success px-4 py-2 text-sm font-semibold text-on-success transition hover:opacity-90 disabled:opacity-50"
         >
           {pending ? 'Sending…' : '✓ Approve'}
         </button>
         <button
           onClick={() => submit('changes')}
           disabled={pending}
-          className="rounded-lg border border-hl-orange/60 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-[#8a4b00] transition hover:bg-amber-500/20 disabled:opacity-50"
+          className="rounded-lg border border-hl-orange/60 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-warning transition hover:bg-amber-500/20 disabled:opacity-50"
         >
           Request changes
         </button>

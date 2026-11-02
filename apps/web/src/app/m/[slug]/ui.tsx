@@ -37,7 +37,10 @@ export function useDismiss(
       e.preventDefault()
       close.current()
       const root = ref.current
-      ;(root?.querySelector<HTMLElement>('[aria-expanded="true"]') ?? root?.querySelector<HTMLElement>('button'))?.focus()
+      ;(
+        root?.querySelector<HTMLElement>('[aria-expanded="true"]') ??
+        root?.querySelector<HTMLElement>('button')
+      )?.focus()
     }
     document.addEventListener('pointerdown', onPointer)
     document.addEventListener('keydown', onKey)
@@ -70,7 +73,8 @@ export function IconButton({
         'relative grid h-11 w-11 shrink-0 place-items-center rounded-full transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--room-accent-ring)] disabled:cursor-not-allowed disabled:opacity-50',
         tone === 'off' && 'bg-red-500/20 text-red-200 hover:bg-red-500/30',
         tone === 'danger' && 'bg-red-500 text-white hover:bg-red-400',
-        tone === 'accent' && 'bg-[var(--room-accent)] text-[var(--room-accent-fg)] hover:opacity-90',
+        tone === 'accent' &&
+          'bg-[var(--room-accent)] text-[var(--room-accent-fg)] hover:opacity-90',
         tone === 'default' &&
           (active
             ? 'bg-[var(--room-accent-soft)] text-ink ring-1 ring-inset ring-[var(--room-accent-ring)]'
@@ -124,7 +128,10 @@ export function Popover({
         const active = document.activeElement
         if (!active || active === document.body) {
           const root = anchorRef.current
-          ;(root?.querySelector<HTMLElement>('[aria-haspopup]') ?? root?.querySelector<HTMLElement>('button'))?.focus()
+          ;(
+            root?.querySelector<HTMLElement>('[aria-haspopup]') ??
+            root?.querySelector<HTMLElement>('button')
+          )?.focus()
         }
       }
       return
@@ -168,11 +175,7 @@ export function Popover({
 }
 
 export function MenuLabel({ children }: { children: ReactNode }) {
-  return (
-    <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-faint">
-      {children}
-    </div>
-  )
+  return <div className="px-3 pb-1 pt-2 text-xs font-semibold text-muted">{children}</div>
 }
 
 export function MenuItem({
@@ -281,7 +284,7 @@ export function Select({
   const empty = options.length === 0
   return (
     <label className="block">
-      <span className="mb-1.5 block text-xs font-medium text-faint">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium text-muted">{label}</span>
       <select
         value={empty ? '' : value}
         disabled={disabled || empty}

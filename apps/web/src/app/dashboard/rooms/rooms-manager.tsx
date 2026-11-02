@@ -6,6 +6,7 @@ import { DEFAULT_ACCENT, onColor } from '@/lib/brand-theme'
 import { resizeImage } from '@/lib/image-resize'
 import { ROOM_BACKGROUNDS, roomBackgroundCss } from '@/lib/room-backgrounds'
 import { Icon } from '@/components/brand/icons'
+import { colourName } from '../colour-names'
 import { createRoomAction, deleteRoomAction, setLobbyAction, updateRoomAction } from './actions'
 
 interface RoomItem {
@@ -28,6 +29,7 @@ interface Brand {
 const inputCls =
   'w-full rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-faint focus:border-ink focus:outline-none'
 const ROOM_COLORS = ['#4f3cff', '#ff5fa2', '#ff8f2e', '#ffd23f', '#2fd98a', '#0ea5e9', '#e11d48']
+const NETWORK_HINT = 'Check your connection and try again.'
 
 function slugFrom(value: string): string {
   return value
@@ -122,7 +124,10 @@ export function RoomsManager({
     if (pending) return // Enter can fire while a create is already running
     setError(null)
     startTransition(async () => {
-      const res = await createRoomAction(name.trim() || 'Meeting room')
+      const res = await createRoomAction(name.trim() || 'Meeting room').catch(() => ({
+        ok: false as const,
+        error: `Couldn't create the room. ${NETWORK_HINT}`,
+      }))
       if (res.ok) setName('')
       else setError(res.error)
     })
@@ -157,7 +162,11 @@ export function RoomsManager({
             {pending ? 'Creating…' : 'Create room'}
           </button>
         </div>
-        {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+        {error && (
+          <p role="alert" className="mt-2 text-sm text-danger">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   )
@@ -190,18 +199,22 @@ function RoomCard({ room, domain, brand }: { room: RoomItem; domain: string; bra
     }
   }
 
-  function run(fn: () => Promise<{ ok: boolean; error?: string }>): void {
+  /** Run an action; `failed` says what didn't happen if it gives no reason. */
+  function run(fn: () => Promise<{ ok: boolean; error?: string }>, failed: string): void {
     setNote(null)
     startTransition(async () => {
-      const res = await fn()
-      if (!res.ok) setNote(res.error ?? 'Something went wrong.')
+      const res = await fn().catch(() => ({ ok: false, error: undefined }))
+      if (!res.ok) setNote(res.error ?? `${failed} ${NETWORK_HINT}`)
     })
   }
 
   function sendInvites(): void {
     setNote(null)
     startTransition(async () => {
-      const res = await inviteToRoom(room.slug, emails)
+      const res = await inviteToRoom(room.slug, emails).catch(() => ({
+        ok: false as const,
+        error: `Couldn't send the invites. ${NETWORK_HINT}`,
+      }))
       if (!res.ok) {
         setNote(res.error)
         return
@@ -271,7 +284,13 @@ function RoomCard({ room, domain, brand }: { room: RoomItem; domain: string; bra
             role="switch"
             checked={room.lobbyEnabled}
             disabled={pending}
-            onChange={(e) => run(() => setLobbyAction(room.id, e.target.checked))}
+            onChange={(e) => {
+              const on = e.target.checked
+              run(
+                () => setLobbyAction(room.id, on),
+                on ? "Couldn't turn the lobby on." : "Couldn't turn the lobby off.",
+              )
+            }}
             className="peer sr-only"
           />
           <span className="relative h-6 w-11 rounded-full bg-line-strong transition peer-checked:bg-hl-sky peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-accent-ink after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5" />
@@ -279,11 +298,13 @@ function RoomCard({ room, domain, brand }: { room: RoomItem; domain: string; bra
         </label>
         <button
           className={`ml-auto rounded-lg px-3 py-1.5 text-sm transition ${
-            confirmDelete ? 'bg-danger text-white' : 'text-faint hover:text-danger'
+            confirmDelete ? 'bg-danger text-on-danger' : 'text-faint hover:text-danger'
           }`}
           disabled={pending}
           onClick={() =>
-            confirmDelete ? run(() => deleteRoomAction(room.id)) : setConfirmDelete(true)
+            confirmDelete
+              ? run(() => deleteRoomAction(room.id), "Couldn't delete the room.")
+              : setConfirmDelete(true)
           }
         >
           {confirmDelete ? 'Confirm delete' : 'Delete'}
@@ -308,7 +329,12 @@ function RoomCard({ room, domain, brand }: { room: RoomItem; domain: string; bra
           </button>
         </div>
       )}
-      {note && <p className="mt-3 text-sm text-muted">{note}</p>}
+      {/* Notes are both confirmations ("Invite sent") and errors, so a polite status. */}
+      {note && (
+        <p role="status" className="mt-3 text-sm text-muted">
+          {note}
+        </p>
+      )}
     </div>
   )
 }
@@ -359,7 +385,7 @@ function RoomEditor({
         accentColor: color,
         background: background === 'image' && !imageUrl ? 'midnight' : background,
         backgroundImage: imageEdit,
-      }).catch(() => ({ ok: false as const, error: 'Could not save. Try again.' }))
+      }).catch(() => ({ ok: false as const, error: `Couldn't save the room. ${NETWORK_HINT}` }))
       if (res.ok) onDone()
       else setError(res.error)
     })
@@ -442,7 +468,8 @@ function RoomEditor({
                 key={c}
                 type="button"
                 onClick={() => setColor(c)}
-                aria-label={`Colour ${c}`}
+                aria-label={colourName(c)}
+                title={colourName(c)}
                 aria-pressed={color === c}
                 className={`h-8 w-8 rounded-full transition hover:scale-110 ${color === c ? 'ring-[3px] ring-ink ring-offset-2 ring-offset-[var(--color-surface)]' : ''}`}
                 style={{ background: c }}
@@ -519,7 +546,11 @@ function RoomEditor({
             }}
           />
         </fieldset>
-        {error && <p className="text-sm text-danger">{error}</p>}
+        {error && (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
         <div className="flex gap-2">
           <button className="btn-primary px-5 py-2.5 text-sm" disabled={pending} onClick={save}>
             {pending ? 'Saving…' : 'Save room'}

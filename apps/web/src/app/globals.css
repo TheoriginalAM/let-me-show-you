@@ -23,16 +23,19 @@
   --color-surface: #ffffff;
   --color-surface-2: #f6f5fc;
   --color-ink: #17132b;
-  --color-muted: #5d5873;
-  --color-faint: #8a85a0;
+  --color-muted: #524d69;
+  --color-faint: #696482;
   --color-line: #e3e0f0;
   --color-line-strong: #cbc6e0;
   --color-accent: #4f3cff;
   --color-accent-strong: #2f22b8;
   --color-accent-ink: #3a27f0;
   --color-on-accent: #ffffff;
-  --color-danger: #d92d20;
-  --color-success: #0f8a5f;
+  --color-danger: #b42318;
+  --color-success: #0b7350;
+  --color-on-danger: #ffffff;
+  --color-on-success: #ffffff;
+  --color-warning: #8a4b00;
 
   /* Highlighters: one per part of the product, and for marking things up. */
   --color-hl-yellow: #ffe14a;
@@ -61,13 +64,16 @@
   --color-surface: rgb(255 255 255 / 0.045);
   --color-surface-2: rgb(255 255 255 / 0.085);
   --color-ink: #f5f3ff;
-  --color-muted: #aaa4c6;
-  --color-faint: #7a7494;
+  --color-muted: #b4aed0;
+  --color-faint: #958fb0;
   --color-line: rgb(255 255 255 / 0.1);
   --color-line-strong: rgb(255 255 255 / 0.18);
   --color-accent-ink: #b9b0ff;
   --color-danger: #ff8a80;
   --color-success: #5ee6a8;
+  --color-on-danger: #12101f;
+  --color-on-success: #12101f;
+  --color-warning: #ffc46b;
 }
 
 /* Element defaults. In a layer, so utilities (border-ink, bg-canvas…) win. */
@@ -147,6 +153,14 @@
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
     box-shadow: none;
+  }
+  /* Meeting lobby panels: dark enough that the room's backdrop (even a bright
+     gradient or photo) never washes out the text on top of it. */
+  .room-sheet {
+    background: rgb(18 16 31 / 0.88);
+    border: 1px solid rgb(255 255 255 / 0.1);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
   }
   .glass-hover {
     transition:
@@ -377,5 +391,8 @@ body:has([data-meeting-call]) .atmosphere {
   .draw {
     animation: none;
     stroke-dashoffset: 0;
+  }
+  html {
+    scroll-behavior: auto;
   }
 }

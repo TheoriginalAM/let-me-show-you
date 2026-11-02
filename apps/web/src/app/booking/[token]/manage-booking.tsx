@@ -116,7 +116,7 @@ export function ManageBooking(p: Props) {
       <dl className="grid gap-2 rounded-2xl border border-line bg-surface-2 p-4 text-sm">
         <div className="flex gap-3">
           <dt className="w-16 shrink-0 text-faint">When</dt>
-          <dd className={`text-ink ${confirmed ? '' : 'line-through opacity-60'}`}>
+          <dd className={`text-ink ${confirmed ? '' : 'line-through decoration-1'}`}>
             {formatWhen(p.startsAt, tz)} to {formatTime(p.endsAt, tz)}
             <span className="block text-xs text-faint">{tz.replace(/_/g, ' ')}</span>
           </dd>
@@ -199,7 +199,7 @@ export function ManageBooking(p: Props) {
                 type="button"
                 disabled={pending}
                 onClick={cancel}
-                className="self-start rounded-xl bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
+                className="self-start rounded-xl bg-danger px-4 py-2 text-sm font-semibold text-on-danger transition hover:opacity-90 disabled:opacity-60"
               >
                 {pending ? 'Cancelling…' : 'Yes, cancel it'}
               </button>

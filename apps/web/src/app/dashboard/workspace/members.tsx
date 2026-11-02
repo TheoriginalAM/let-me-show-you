@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { inviteMemberAction, removeMemberAction, revokeInviteAction } from './actions'
 
@@ -32,9 +32,18 @@ export function Members({
   const [notice, setNotice] = useState<string | null>(null)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  const [copyFailed, setCopyFailed] = useState(false)
+  // Which member's Remove has been pressed once (a second press removes them).
+  const [confirmRemove, setConfirmRemove] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
 
   const ownerCount = members.filter((m) => m.role === 'owner').length
+
+  useEffect(() => {
+    if (!confirmRemove) return
+    const t = setTimeout(() => setConfirmRemove(null), 3000)
+    return () => clearTimeout(t)
+  }, [confirmRemove])
 
   function invite(e: React.FormEvent): void {
     e.preventDefault()
@@ -44,8 +53,12 @@ export function Members({
     setNotice(null)
     setInviteLink(null)
     setCopied(false)
+    setCopyFailed(false)
     startTransition(async () => {
-      const res = await inviteMemberAction(value, role)
+      const res = await inviteMemberAction(value, role).catch(() => ({
+        ok: false as const,
+        error: "Couldn't send the invite. Check your connection and try again.",
+      }))
       if (res.ok) {
         setEmail('')
         setInviteLink(res.url)
@@ -63,27 +76,38 @@ export function Members({
 
   async function copyLink(): Promise<void> {
     if (!inviteLink) return
+    setCopyFailed(false)
     try {
       await navigator.clipboard.writeText(inviteLink)
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      /* ignore */
+      setCopyFailed(true)
     }
   }
 
   function remove(userId: string): void {
+    setConfirmRemove(null)
+    setError(null)
     startTransition(async () => {
-      const res = await removeMemberAction(userId)
+      const res = await removeMemberAction(userId).catch(() => ({
+        ok: false,
+        error: "Couldn't remove them. Check your connection and try again.",
+      }))
       if (res.ok) router.refresh()
-      else setError(res.error ?? 'Could not remove member.')
+      else setError(res.error ?? "Couldn't remove them. Try again.")
     })
   }
 
   function revoke(inviteId: string): void {
+    setError(null)
     startTransition(async () => {
-      const res = await revokeInviteAction(inviteId)
+      const res = await revokeInviteAction(inviteId).catch(() => ({
+        ok: false,
+        error: "Couldn't revoke the invite. Check your connection and try again.",
+      }))
       if (res.ok) router.refresh()
+      else setError(res.error ?? "Couldn't revoke the invite. Try again.")
     })
   }
 
@@ -92,7 +116,7 @@ export function Members({
       <div>
         <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">Members</h2>
         <p className="mt-1 text-sm text-muted">
-          Invite people by email. They can view and add recordings in this workspace.
+          Invite people by email. They can view and add recordings in this business.
         </p>
       </div>
 
@@ -102,12 +126,14 @@ export function Members({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="teammate@company.com"
-          className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+          aria-label="Email address to invite"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-ink focus:outline-none"
         />
         <select
           value={role}
           onChange={(e) => setRole(e.target.value as 'owner' | 'member')}
-          className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-line-strong focus:outline-none"
+          aria-label="Role"
+          className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-ink focus:outline-none"
         >
           <option value="member">Member</option>
           <option value="owner">Owner</option>
@@ -120,10 +146,16 @@ export function Members({
           Send invite
         </button>
       </form>
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
       {notice && (
         <div className="flex flex-col gap-2 rounded-xl border border-line bg-surface p-3">
-          <p className="text-sm text-muted">{notice}</p>
+          <p role="status" className="text-sm text-muted">
+            {notice}
+          </p>
           {inviteLink && (
             <div className="flex items-center gap-2">
               <code className="min-w-0 flex-1 truncate rounded-lg bg-surface px-2.5 py-2 text-xs text-ink">
@@ -137,6 +169,11 @@ export function Members({
                 {copied ? 'Copied!' : 'Copy'}
               </button>
             </div>
+          )}
+          {copyFailed && (
+            <p role="alert" className="text-xs text-muted">
+              Could not copy. Select the link and copy it manually.
+            </p>
           )}
         </div>
       )}
@@ -162,11 +199,18 @@ export function Members({
               <span className="text-xs capitalize text-muted">{m.role}</span>
               {!isSelf && !lastOwner && (
                 <button
-                  onClick={() => remove(m.userId)}
+                  onClick={() =>
+                    confirmRemove === m.userId ? remove(m.userId) : setConfirmRemove(m.userId)
+                  }
                   disabled={pending}
-                  className="text-xs text-faint transition hover:text-danger disabled:opacity-50"
+                  aria-label={`${confirmRemove === m.userId ? 'Confirm remove' : 'Remove'} ${m.name || m.email}`}
+                  className={`rounded-lg px-2 py-1 text-xs transition disabled:opacity-50 ${
+                    confirmRemove === m.userId
+                      ? 'bg-danger font-medium text-on-danger'
+                      : 'text-faint hover:text-danger'
+                  }`}
                 >
-                  Remove
+                  {confirmRemove === m.userId ? 'Confirm remove' : 'Remove'}
                 </button>
               )}
             </li>
@@ -190,6 +234,7 @@ export function Members({
                 <button
                   onClick={() => revoke(inv.id)}
                   disabled={pending}
+                  aria-label={`Revoke invite for ${inv.email}`}
                   className="text-xs text-faint transition hover:text-danger disabled:opacity-50"
                 >
                   Revoke

@@ -31,7 +31,7 @@ export default async function AdminPage() {
           </h1>
           <p className="mt-2 text-sm text-muted">
             {pendingCount > 0 ? (
-              <span className="font-medium text-[#8a4b00]">{pendingCount} awaiting approval</span>
+              <span className="font-medium text-warning">{pendingCount} awaiting approval</span>
             ) : (
               'Nobody awaiting approval'
             )}{' '}
@@ -79,7 +79,7 @@ export default async function AdminPage() {
                 </>
               ) : (
                 <>
-                  <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-[#8a4b00] ring-1 ring-inset ring-hl-orange/60">
+                  <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-warning ring-1 ring-inset ring-hl-orange/60">
                     Pending
                   </span>
                   <form action={approveUserAction.bind(null, u.id)}>

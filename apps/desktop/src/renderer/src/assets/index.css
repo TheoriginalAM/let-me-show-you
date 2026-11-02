@@ -53,16 +53,16 @@
   --border: #e3e0f0;
   --border-strong: #cbc6e0;
   --fg: #17132b;
-  --muted: #5d5873;
-  --faint: #8a85a0;
+  --muted: #524d69;
+  --faint: #696482;
   --accent: #4f3cff;
   --accent-edge: #2f22b8;
   --accent-ink: #3a27f0;
   /* Recording is pink, like Recordings on the web dashboard. */
   --rec: #ff5fa2;
   --rec-edge: #c2306f;
-  --danger: #d92d20;
-  --success: #0f8a5f;
+  --danger: #b42318;
+  --success: #0b7350;
   --hl-yellow: #ffe14a;
   --hl-pink: #ff5fa2;
   --hl-green: #2fd98a;
@@ -401,6 +401,11 @@ a,
 .device-chip select:focus {
   outline: none;
 }
+/* The select draws no ring of its own, so the whole chip shows focus. */
+.device-chip:focus-within {
+  outline: 2.5px solid var(--accent-ink);
+  outline-offset: 2px;
+}
 .device-chip select option {
   background: #fff;
   color: var(--fg);
@@ -609,7 +614,7 @@ a,
   font-weight: 500;
 }
 .badge {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   padding: 2px 9px;
   border-radius: 999px;
@@ -861,7 +866,7 @@ select.uinput option {
 }
 .pw-hint {
   margin-top: 6px;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--faint);
 }
 
@@ -1097,7 +1102,7 @@ select.uinput option {
 .upload-url {
   width: 100%;
   font-family: var(--mono);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   text-align: center;
   white-space: nowrap;
@@ -1257,7 +1262,7 @@ select.uinput option {
   padding: 3px 10px;
   border-radius: 999px;
   background: var(--fg);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   color: #fff;
 }
@@ -1321,7 +1326,7 @@ select.uinput option {
   height: 20px;
 }
 .mode-tab-label {
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -1619,7 +1624,7 @@ select.uinput option {
   background: var(--surface);
   color: var(--fg);
   font-family: inherit;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -1629,6 +1634,10 @@ select.uinput option {
 .btn-mini.active {
   border-color: var(--danger);
   background: #fde4e2;
+  color: var(--danger);
+}
+.btn-mini.failed {
+  border-color: var(--danger);
   color: var(--danger);
 }
 .badge-unknown {
@@ -1671,7 +1680,7 @@ select.uinput option {
   font-weight: 800;
 }
 .update-toast-sub {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .update-toast-actions {
@@ -1774,7 +1783,7 @@ select.uinput option {
 .editor-times {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
@@ -1870,7 +1879,7 @@ select.uinput option {
   gap: 6px;
   padding: 3px 4px 3px 9px;
   border-radius: 7px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   color: var(--danger);
@@ -1982,7 +1991,7 @@ select.uinput option {
   background: var(--fg);
   color: #fff;
   font-family: var(--font);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -2090,7 +2099,7 @@ select.uinput option {
 }
 .room-url {
   font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 12px;
   color: var(--faint);
   white-space: nowrap;
   overflow: hidden;
@@ -2134,7 +2143,7 @@ select.uinput option {
   font-weight: 800;
 }
 .booking-end {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--faint);
 }
 .booking-main {
@@ -2150,7 +2159,7 @@ select.uinput option {
   line-height: 1.3;
 }
 .booking-meta {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--muted);
 }
 .booking-answers {
@@ -2174,7 +2183,7 @@ select.uinput option {
   user-select: text;
 }
 .booking-answers dt {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
 }
 .booking-answers dd {
@@ -2185,4 +2194,20 @@ select.uinput option {
 .booking-join {
   flex-shrink: 0;
   align-self: center;
+}
+
+/* ---------- Reduced motion ---------- */
+/* Stop the looping pulses, drop entrance pops and slides, and slow the spinner
+   (rather than stopping it) so progress still reads as progress. */
+@media (prefers-reduced-motion: reduce) {
+  .rec-dot,
+  .rec-indicator,
+  .rec-pill-dot,
+  .countdown-num,
+  .update-toast {
+    animation: none;
+  }
+  .proc-spinner {
+    animation-duration: 2s;
+  }
 }

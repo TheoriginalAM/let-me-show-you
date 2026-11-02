@@ -34,7 +34,7 @@ function SignupForm() {
     const { error } = await authClient.signUp.email({ name, email, password })
     setPending(false)
     if (error) {
-      setError(error.message ?? 'Sign up failed')
+      setError(error.message ?? "Couldn't create your account. Check your details and try again.")
       return
     }
     // New accounts are invite-gated; land on the requested page (or the pending
@@ -53,7 +53,7 @@ function SignupForm() {
     const { error } = await authClient.signIn.magicLink({ email, callbackURL: redirectTo })
     setPending(false)
     if (error) {
-      setError(error.message ?? 'Could not send magic link')
+      setError(error.message ?? "Couldn't send the sign-in link. Try again in a minute.")
       return
     }
     setMagicSent(true)
@@ -73,14 +73,20 @@ function SignupForm() {
         </div>
 
         {error && (
-          <p className="mt-6 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger ring-1 ring-inset ring-danger/25">
+          <p
+            role="alert"
+            className="mt-6 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger ring-1 ring-inset ring-danger/25"
+          >
             {error}
           </p>
         )}
 
         {magicSent ? (
-          <p className="mt-6 rounded-lg bg-success/10 px-3 py-2 text-sm text-success ring-1 ring-inset ring-success/25">
-            Magic link sent — check your email (or the server console in dev).
+          <p
+            role="status"
+            className="mt-6 rounded-lg bg-success/10 px-3 py-2 text-sm text-success ring-1 ring-inset ring-success/25"
+          >
+            Check your email. We sent you a link to sign in.
           </p>
         ) : (
           <form onSubmit={onSignUp} className="mt-6 flex flex-col gap-3">
@@ -88,26 +94,32 @@ function SignupForm() {
               type="text"
               required
               placeholder="Your name"
+              aria-label="Your name"
+              autoComplete="name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-line-strong focus:outline-none"
+              className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-ink focus:outline-none"
             />
             <input
               type="email"
               required
               placeholder="you@example.com"
+              aria-label="Email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-line-strong focus:outline-none"
+              className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-ink focus:outline-none"
             />
             <input
               type="password"
               required
               minLength={8}
               placeholder="Password (min 8 characters)"
+              aria-label="Password"
+              autoComplete="new-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-line-strong focus:outline-none"
+              className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-ink focus:outline-none"
             />
             <button
               type="submit"
@@ -130,7 +142,7 @@ function SignupForm() {
         <p className="mt-6 text-sm text-muted">
           Already have an account?{' '}
           <Link href={loginHref} className="text-accent transition-colors hover:text-accent-ink">
-            Log in
+            Sign in
           </Link>
         </p>
       </div>

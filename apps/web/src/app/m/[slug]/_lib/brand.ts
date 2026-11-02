@@ -62,7 +62,7 @@ function lightenTo(rgb: RGB, bg: RGB, ratio: number): RGB {
  */
 export function brandVars(accent: string): CSSProperties {
   const rgb = parseHex(accent) ?? FALLBACK
-  const fg = contrast(rgb, WHITE) >= 4.5 ? WHITE : INK
+  const fg = contrast(rgb, WHITE) >= contrast(rgb, INK) ? WHITE : INK
   return {
     '--room-accent': css(rgb),
     '--room-accent-fg': css(fg),

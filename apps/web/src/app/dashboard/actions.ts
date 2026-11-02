@@ -17,6 +17,8 @@ type ActionResult = { ok: boolean; error?: string }
 /** Minimum share-password length. Short enough to be memorable, long enough to matter. */
 const MIN_PASSWORD_LENGTH = 4
 
+const NOT_FOUND = "Couldn't find that video. Refresh the page and try again."
+
 async function requireUserId(): Promise<string> {
   const session = await auth.api.getSession({ headers: await headers() })
   if (!session) throw new Error('Unauthorized')
@@ -27,10 +29,10 @@ async function requireUserId(): Promise<string> {
 export async function renameVideoAction(videoId: string, title: string): Promise<ActionResult> {
   const userId = await requireUserId()
   const clean = title.trim().slice(0, 200)
-  if (!clean) return { ok: false, error: 'Title cannot be empty' }
+  if (!clean) return { ok: false, error: 'Give the video a title.' }
   const ok = await renameOwnedVideo(userId, videoId, clean)
   revalidatePath('/dashboard')
-  return { ok, error: ok ? undefined : 'Video not found' }
+  return { ok, error: ok ? undefined : NOT_FOUND }
 }
 
 /** Set (or clear) a video's description. Workspace-membership scoped. */
@@ -42,7 +44,7 @@ export async function setDescriptionAction(
   const clean = description && description.trim() ? description.trim().slice(0, 2000) : null
   const ok = await setOwnedVideoDescription(userId, videoId, clean)
   revalidatePath('/dashboard')
-  return { ok, error: ok ? undefined : 'Video not found' }
+  return { ok, error: ok ? undefined : NOT_FOUND }
 }
 
 /** Toggle the client approve/request-changes control on a video's share page. */
@@ -53,7 +55,7 @@ export async function setApprovalEnabledAction(
   const userId = await requireUserId()
   const ok = await setVideoApprovalEnabled(userId, videoId, enabled)
   revalidatePath('/dashboard')
-  return { ok, error: ok ? undefined : 'Video not found' }
+  return { ok, error: ok ? undefined : NOT_FOUND }
 }
 
 /** Toggle a video the caller owns between public and private. */
@@ -64,7 +66,7 @@ export async function setVisibilityAction(
   const userId = await requireUserId()
   const ok = await setOwnedVideoVisibility(userId, videoId, isPublic)
   revalidatePath('/dashboard')
-  return { ok, error: ok ? undefined : 'Video not found' }
+  return { ok, error: ok ? undefined : NOT_FOUND }
 }
 
 /**
@@ -79,11 +81,11 @@ export async function setVideoPasswordAction(
   let hash: string | null = null
   if (password !== null) {
     if (password.length < MIN_PASSWORD_LENGTH) {
-      return { ok: false, error: `Use at least ${MIN_PASSWORD_LENGTH} characters` }
+      return { ok: false, error: `Use at least ${MIN_PASSWORD_LENGTH} characters.` }
     }
     hash = hashSharePassword(password)
   }
   const ok = await setOwnedVideoPassword(userId, videoId, hash)
   revalidatePath('/dashboard')
-  return { ok, error: ok ? undefined : 'Video not found' }
+  return { ok, error: ok ? undefined : NOT_FOUND }
 }

@@ -107,6 +107,7 @@ export function WebcamBubble() {
                 className={`bubble-ctl ${shape === s ? 'on' : ''}`}
                 title={s}
                 aria-label={`${s} shape`}
+                aria-pressed={shape === s}
                 onClick={() => changeShape(s)}
               >
                 <span className={`shape-ico shape-${s}`} />
@@ -120,6 +121,8 @@ export function WebcamBubble() {
                 key={s.key}
                 className={`bubble-ctl ${size === s.key ? 'on' : ''}`}
                 title={`${s.key} size`}
+                aria-label={`${s.key} size`}
+                aria-pressed={size === s.key}
                 onClick={() => changeSize(s.key)}
               >
                 {s.label}

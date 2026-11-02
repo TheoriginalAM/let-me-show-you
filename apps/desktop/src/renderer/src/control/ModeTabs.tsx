@@ -69,15 +69,18 @@ export function ModeTabs() {
   const setMode = useRecorderStore((s) => s.setMode)
 
   return (
-    <div className="mode-tabs no-drag">
+    <div className="mode-tabs no-drag" role="group" aria-label="What to record">
       {TABS.map((t) => (
         <button
           key={t.mode}
           className={`mode-tab ${mode === t.mode ? 'on' : ''}`}
           data-mode={t.mode}
+          aria-pressed={mode === t.mode}
           onClick={() => setMode(t.mode)}
         >
-          <span className="mode-tab-ico">{t.icon}</span>
+          <span className="mode-tab-ico" aria-hidden>
+            {t.icon}
+          </span>
           <span className="mode-tab-label">{t.label}</span>
         </button>
       ))}

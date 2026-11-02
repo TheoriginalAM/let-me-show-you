@@ -28,7 +28,9 @@ export default async function NotificationsPage() {
 
       {items.length === 0 ? (
         <div className="glass rise rounded-2xl border-dashed p-12 text-center">
-          <p className="text-muted">Nothing yet. Comments and workspace activity will show here.</p>
+          <p className="text-muted">
+            Nothing yet. Comments and activity in your business will show here.
+          </p>
         </div>
       ) : (
         <ul className="rise flex flex-col gap-2">

@@ -11,12 +11,16 @@ import {
   setVisibilityAction,
 } from '@/app/dashboard/actions'
 
-const STATUS_STYLES: Record<VideoStatus, string> = {
-  ready: 'bg-success/15 text-success ring-1 ring-inset ring-success/25',
-  processing: 'bg-amber-500/15 text-[#8a4b00] ring-1 ring-inset ring-hl-orange/60',
-  uploading: 'bg-blue-500/15 text-blue-300 ring-1 ring-inset ring-blue-500/25',
-  errored: 'bg-danger/15 text-danger ring-1 ring-inset ring-danger/25',
+// Pills sit on the thumbnail, so they're solid dark with white text whatever
+// the page theme; the dot carries the colour.
+const STATUS: Record<VideoStatus, { label: string; dot: string }> = {
+  ready: { label: 'Ready', dot: 'bg-hl-green' },
+  processing: { label: 'Processing', dot: 'bg-hl-orange' },
+  uploading: { label: 'Uploading', dot: 'bg-hl-sky' },
+  errored: { label: 'Failed', dot: 'bg-red-400' },
 }
+
+const NETWORK_HINT = 'Check your connection and try again.'
 
 export type VideoCardProps = {
   id: string
@@ -66,7 +70,7 @@ export function VideoCard(props: VideoCardProps) {
       setCopied(true)
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      setError('Could not copy link')
+      setError(`Couldn't copy. Here's the link to copy yourself: ${props.shareUrl}`)
     }
   }
 
@@ -88,10 +92,13 @@ export function VideoCard(props: VideoCardProps) {
     setTitle(next)
     setError(null)
     startTransition(async () => {
-      const result = await renameVideoAction(props.id, next)
+      const result = await renameVideoAction(props.id, next).catch(() => ({
+        ok: false,
+        error: undefined,
+      }))
       if (!result.ok) {
         setTitle(previous)
-        setError(result.error ?? 'Rename failed')
+        setError(result.error ?? `Couldn't rename the video. ${NETWORK_HINT}`)
       }
     })
   }
@@ -101,10 +108,15 @@ export function VideoCard(props: VideoCardProps) {
     setIsPublic(next)
     setError(null)
     startTransition(async () => {
-      const result = await setVisibilityAction(props.id, next)
+      const result = await setVisibilityAction(props.id, next).catch(() => ({
+        ok: false,
+        error: undefined,
+      }))
       if (!result.ok) {
         setIsPublic(!next)
-        setError(result.error ?? 'Update failed')
+        setError(
+          result.error ?? `Couldn't make the video ${next ? 'public' : 'private'}. ${NETWORK_HINT}`,
+        )
       }
     })
   }
@@ -157,10 +169,13 @@ export function VideoCard(props: VideoCardProps) {
     setApprovalOn(next)
     setError(null)
     startTransition(async () => {
-      const result = await setApprovalEnabledAction(props.id, next)
+      const result = await setApprovalEnabledAction(props.id, next).catch(() => ({
+        ok: false,
+        error: undefined,
+      }))
       if (!result.ok) {
         setApprovalOn(!next)
-        setError(result.error ?? 'Update failed')
+        setError(result.error ?? `Couldn't turn approval ${next ? 'on' : 'off'}. ${NETWORK_HINT}`)
       }
     })
   }
@@ -174,9 +189,9 @@ export function VideoCard(props: VideoCardProps) {
         router.refresh()
         return
       }
-      setError('Delete failed')
+      setError(`Couldn't delete the video. Refresh the page and try again.`)
     } catch {
-      setError('Delete failed')
+      setError(`Couldn't delete the video. ${NETWORK_HINT}`)
     } finally {
       setDeleting(false)
       setConfirmingDelete(false)
@@ -199,15 +214,16 @@ export function VideoCard(props: VideoCardProps) {
           No preview yet
         </div>
       )}
-      <span
-        className={`absolute left-2 top-2 rounded-full px-2 py-0.5 text-xs font-medium capitalize ${STATUS_STYLES[props.status]}`}
-      >
-        {props.status}
+      <span className="absolute left-2 top-2 flex items-center gap-1.5 rounded-full bg-black/75 px-2 py-0.5 text-xs font-medium text-white backdrop-blur">
+        <span className={`h-2 w-2 rounded-full ${STATUS[props.status].dot}`} aria-hidden />
+        {STATUS[props.status].label}
       </span>
       {isProtected && (
+        // "Protected" is also spelled out under the title, so this is visual only.
         <span
-          className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/70 text-accent-ink ring-1 ring-inset ring-accent/30 backdrop-blur"
+          className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-black/75 text-white backdrop-blur"
           title="Password protected"
+          aria-hidden
         >
           <svg
             viewBox="0 0 24 24"
@@ -235,7 +251,13 @@ export function VideoCard(props: VideoCardProps) {
   return (
     <div className="glass glass-hover flex flex-col overflow-hidden rounded-xl">
       {thumbClickable ? (
-        <a href={props.shareUrl} target="_blank" rel="noopener noreferrer" className="block">
+        <a
+          href={props.shareUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Watch ${title} (opens in a new tab)`}
+          className="block"
+        >
           {Thumb}
         </a>
       ) : (
@@ -247,6 +269,7 @@ export function VideoCard(props: VideoCardProps) {
           <input
             ref={inputRef}
             autoFocus
+            aria-label="Video title"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => {
@@ -260,7 +283,7 @@ export function VideoCard(props: VideoCardProps) {
               }
             }}
             onBlur={commitRename}
-            className="w-full rounded-lg border border-line bg-surface px-2 py-1 text-sm font-medium text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+            className="w-full rounded-lg border border-line bg-surface px-2 py-1 text-sm font-medium text-ink placeholder:text-faint focus:border-ink focus:outline-none"
           />
         ) : (
           <h3 className="truncate text-sm font-semibold text-ink" title={title}>
@@ -289,7 +312,7 @@ export function VideoCard(props: VideoCardProps) {
           {props.approvalCounts.changes > 0 && (
             <>
               <span aria-hidden>·</span>
-              <span className="font-medium text-[#8a4b00]">
+              <span className="font-medium text-warning">
                 {props.approvalCounts.changes} changes
               </span>
             </>
@@ -308,7 +331,11 @@ export function VideoCard(props: VideoCardProps) {
           )}
         </div>
 
-        {error && <p className="text-xs text-danger">{error}</p>}
+        {error && (
+          <p role="alert" className="break-words text-xs text-danger">
+            {error}
+          </p>
+        )}
 
         <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
           <button
@@ -341,6 +368,7 @@ export function VideoCard(props: VideoCardProps) {
               setManagingPassword((v) => !v)
             }}
             disabled={busy}
+            aria-expanded={managingPassword}
             className={`px-2 py-1 text-xs disabled:opacity-50 ${
               isProtected
                 ? 'rounded-lg border border-accent/30 bg-accent-strong/15 font-medium text-accent-ink transition hover:bg-accent-strong/25'
@@ -355,21 +383,24 @@ export function VideoCard(props: VideoCardProps) {
               setManagingDescription((v) => !v)
             }}
             disabled={busy}
+            aria-expanded={managingDescription}
             className="btn-ghost px-2 py-1 text-xs disabled:opacity-50"
           >
             {description ? 'Description ✓' : 'Description'}
           </button>
+          {/* A true toggle: the name stays put and aria-pressed carries the state. */}
           <button
             onClick={toggleApproval}
             disabled={busy}
+            aria-pressed={approvalOn}
             className={`px-2 py-1 text-xs disabled:opacity-50 ${
               approvalOn
                 ? 'rounded-lg border border-accent/30 bg-accent-strong/15 font-medium text-accent-ink transition hover:bg-accent-strong/25'
                 : 'btn-ghost'
             }`}
-            title="Show an Approve / Request-changes button on the share page"
+            title="Show Approve and Request changes buttons on the share page"
           >
-            {approvalOn ? 'Approval on' : 'Approval'}
+            Ask for approval{approvalOn && <span aria-hidden> ✓</span>}
           </button>
 
           {confirmingDelete ? (
@@ -377,7 +408,7 @@ export function VideoCard(props: VideoCardProps) {
               <button
                 onClick={confirmDelete}
                 disabled={deleting}
-                className="rounded-lg bg-danger px-2 py-1 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
+                className="rounded-lg bg-danger px-2 py-1 text-xs font-medium text-on-danger transition hover:opacity-90 disabled:opacity-50"
               >
                 {deleting ? 'Deleting…' : 'Confirm'}
               </button>
@@ -404,12 +435,13 @@ export function VideoCard(props: VideoCardProps) {
           <div className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-2.5">
             <textarea
               autoFocus
+              aria-label="Description"
               value={descDraft}
               onChange={(e) => setDescDraft(e.target.value)}
               maxLength={2000}
               rows={3}
               placeholder="Add a description shown under the video on its share page…"
-              className="w-full resize-y rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+              className="w-full resize-y rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-faint focus:border-ink focus:outline-none"
             />
             <div className="flex flex-wrap items-center gap-1.5">
               <button
@@ -438,6 +470,7 @@ export function VideoCard(props: VideoCardProps) {
             <input
               type="password"
               autoFocus
+              aria-label={isProtected ? 'New video password' : 'Video password'}
               value={passwordDraft}
               onChange={(e) => setPasswordDraft(e.target.value)}
               onKeyDown={(e) => {
@@ -451,7 +484,7 @@ export function VideoCard(props: VideoCardProps) {
                 }
               }}
               placeholder={isProtected ? 'New password' : 'Set a password'}
-              className="w-full rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+              className="w-full rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink placeholder:text-faint focus:border-ink focus:outline-none"
             />
             <div className="flex flex-wrap items-center gap-1.5">
               <button

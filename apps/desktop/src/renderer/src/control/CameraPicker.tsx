@@ -15,6 +15,7 @@ export function CameraPicker() {
         <button
           key={c.deviceId}
           className={`cam-opt no-drag ${active === c.deviceId ? 'on' : ''}`}
+          aria-pressed={active === c.deviceId}
           onClick={() => selectCameraModeDevice(c.deviceId)}
         >
           {c.label}

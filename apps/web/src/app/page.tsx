@@ -202,19 +202,19 @@ export default function Home() {
           <nav className="flex items-center gap-1.5 text-sm sm:gap-2">
             <a
               href="#how"
-              className="hidden rounded-lg px-3 py-1.5 font-medium text-muted transition hover:text-ink md:inline"
+              className="hidden rounded-lg px-3 py-1.5 font-medium text-muted transition hover:text-ink md:inline-flex"
             >
               What it does
             </a>
             <a
               href="#brand"
-              className="hidden rounded-lg px-3 py-1.5 font-medium text-muted transition hover:text-ink md:inline"
+              className="hidden rounded-lg px-3 py-1.5 font-medium text-muted transition hover:text-ink md:inline-flex"
             >
               Your brand
             </a>
             <Link
               href="/login"
-              className="whitespace-nowrap rounded-lg px-3 py-1.5 font-medium text-ink transition hover:bg-surface"
+              className="inline-flex whitespace-nowrap rounded-lg px-3 py-1.5 font-medium text-ink transition hover:bg-surface"
             >
               Sign in
             </Link>
@@ -230,8 +230,7 @@ export default function Home() {
         <section className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-14 px-5 pb-20 pt-12 sm:px-6 sm:pt-16 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:pb-28">
           <div className="flex flex-col items-start gap-7">
             <h1 className="wide rise font-display text-[2.9rem] font-black leading-[0.9] tracking-[-0.03em] text-ink sm:text-[4.6rem] lg:text-[5.2rem]">
-              Show,
-              <br />
+              Show, <br />
               don&rsquo;t tell.
             </h1>
             <p
@@ -327,7 +326,7 @@ export default function Home() {
         </section>
 
         {/* Call to action */}
-        <section className="bg-ink text-canvas">
+        <section className="bg-ink text-canvas [--color-accent-ink:#b9b0ff]">
           <div className="relative mx-auto flex w-full max-w-6xl flex-col items-start gap-7 px-5 py-20 sm:px-6 lg:flex-row lg:items-end lg:justify-between">
             <h2 className="wide relative font-display text-[2.8rem] font-black leading-[0.95] tracking-tight sm:text-[3.8rem]">
               Stop typing.
@@ -359,14 +358,14 @@ export default function Home() {
         </section>
       </main>
 
-      <footer className="bg-ink text-canvas/60">
+      <footer className="bg-ink text-canvas/60 [--color-accent-ink:#b9b0ff]">
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-3 border-t border-canvas/15 px-5 py-6 text-sm sm:px-6">
           <span>© 2026 {APP_NAME}</span>
           <div className="flex gap-5">
-            <Link href="/login" className="transition hover:text-canvas">
+            <Link href="/login" className="inline-flex py-1 transition hover:text-canvas">
               Sign in
             </Link>
-            <Link href="/download" className="transition hover:text-canvas">
+            <Link href="/download" className="inline-flex py-1 transition hover:text-canvas">
               Download
             </Link>
           </div>

@@ -26,7 +26,8 @@ export async function createRoomAction(name: string): Promise<Result> {
   const user = await me()
   if (!user) return { ok: false, error: 'Not signed in.' }
   const workspaceId = await getActiveWorkspaceId(user.id)
-  if (!workspaceId) return { ok: false, error: 'No workspace.' }
+  if (!workspaceId)
+    return { ok: false, error: 'No business selected. Pick one from the menu and try again.' }
   const room = await createRoom(user.id, workspaceId, String(name ?? ''))
   if (!room) return { ok: false, error: 'Could not create the room.' }
   revalidatePath('/dashboard/rooms')

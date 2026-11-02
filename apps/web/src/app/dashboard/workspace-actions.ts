@@ -20,7 +20,7 @@ export async function createWorkspaceAction(
   const me = await getCurrentUser()
   if (!me) return { ok: false, error: 'Not signed in.' }
   const clean = name.trim()
-  if (!clean) return { ok: false, error: 'Enter a workspace name.' }
+  if (!clean) return { ok: false, error: 'Enter a business name.' }
   const { id } = await createWorkspace(me.id, clean)
   revalidatePath('/dashboard', 'layout')
   return { ok: true, id }

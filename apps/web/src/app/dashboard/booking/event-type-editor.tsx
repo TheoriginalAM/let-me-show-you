@@ -13,6 +13,7 @@ import {
   parseClock,
   type WeeklyHours,
 } from '@/lib/booking-time'
+import { colourName } from '../colour-names'
 import { saveEventTypeAction } from './actions'
 
 export interface EventTypeItem {
@@ -175,7 +176,10 @@ export function EventTypeEditor({
         confirmationMessage: message,
         remindersEnabled: reminders,
         active: initial?.active ?? true,
-      }).catch(() => ({ ok: false as const, error: 'Could not save. Please try again.' }))
+      }).catch(() => ({
+        ok: false as const,
+        error: "Couldn't save the calendar. Check your connection and try again.",
+      }))
       if (res.ok) onDone()
       else setError(res.error)
     })
@@ -280,7 +284,8 @@ export function EventTypeEditor({
                 key={c}
                 type="button"
                 onClick={() => setColor(c)}
-                aria-label={`Colour ${c}`}
+                aria-label={colourName(c)}
+                title={colourName(c)}
                 aria-pressed={color === c}
                 className={`h-8 w-8 rounded-full transition hover:scale-110 ${color === c ? 'ring-[3px] ring-ink ring-offset-2 ring-offset-[var(--color-surface)]' : ''}`}
                 style={{ background: c }}
@@ -290,6 +295,7 @@ export function EventTypeEditor({
               className="ml-1 h-8 w-8 rounded-full border-2 border-dashed border-line-strong"
               style={{ background: color ?? brandColor ?? 'var(--color-accent)' }}
               title="This calendar’s colour"
+              aria-hidden
             />
           </div>
         </fieldset>
@@ -331,9 +337,11 @@ export function EventTypeEditor({
                   {WEEKDAY_NAMES[day]}
                 </label>
                 {on ? (
-                  <div className="flex flex-1 flex-col gap-1.5">
+                  // The min width drops the hours under the day name on a phone
+                  // instead of squeezing them beside it; each row then wraps.
+                  <div className="flex min-w-[14rem] flex-1 flex-col gap-1.5">
                     {windows.map((w, i) => (
-                      <div key={i} className="flex items-center gap-2">
+                      <div key={i} className="flex flex-wrap items-center gap-2">
                         <input
                           type="time"
                           value={w.start}
@@ -365,7 +373,7 @@ export function EventTypeEditor({
                         />
                         <button
                           type="button"
-                          aria-label="Remove these hours"
+                          aria-label={`Remove ${WEEKDAY_NAMES[day]} ${w.start} to ${w.end}`}
                           className="px-2 text-faint transition hover:text-danger"
                           onClick={() =>
                             setDay(
@@ -380,6 +388,7 @@ export function EventTypeEditor({
                           <button
                             type="button"
                             className="text-sm text-faint transition hover:text-ink"
+                            aria-label={`Add more hours on ${WEEKDAY_NAMES[day]}`}
                             onClick={() =>
                               setDay(day, [...windows, { start: '13:00', end: '17:00' }])
                             }
@@ -509,7 +518,11 @@ export function EventTypeEditor({
         </div>
       </details>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
       <div className="flex gap-2">
         <button className="btn-primary px-5 py-2.5 text-sm" disabled={pending} onClick={save}>
           {pending ? 'Saving…' : initial ? 'Save changes' : 'Create'}
@@ -603,7 +616,7 @@ function QuestionsEditor({
                   {(q.options ?? []).length > 2 && (
                     <button
                       type="button"
-                      aria-label="Remove option"
+                      aria-label={`Remove option ${oi + 1}`}
                       className="px-1 text-faint hover:text-danger"
                       onClick={() =>
                         update(i, { options: (q.options ?? []).filter((_, xi) => xi !== oi) })
@@ -641,7 +654,7 @@ function QuestionsEditor({
                 className="px-2 text-faint hover:text-ink disabled:opacity-30"
                 disabled={i === 0}
                 onClick={() => move(i, -1)}
-                aria-label="Move up"
+                aria-label={`Move question ${i + 1} up`}
               >
                 ↑
               </button>
@@ -650,7 +663,7 @@ function QuestionsEditor({
                 className="px-2 text-faint hover:text-ink disabled:opacity-30"
                 disabled={i === questions.length - 1}
                 onClick={() => move(i, 1)}
-                aria-label="Move down"
+                aria-label={`Move question ${i + 1} down`}
               >
                 ↓
               </button>
@@ -658,6 +671,7 @@ function QuestionsEditor({
                 type="button"
                 className="px-2 text-faint hover:text-danger"
                 onClick={() => onChange(questions.filter((_, j) => j !== i))}
+                aria-label={`Remove question ${i + 1}`}
               >
                 Remove
               </button>

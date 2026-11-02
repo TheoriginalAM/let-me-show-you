@@ -73,12 +73,15 @@ export function Settings({ onClose }: { onClose: () => void }) {
         <div className="settings-sub">A countdown before capture, and a safety auto-stop.</div>
 
         <div className="settings-row">
-          <span className="settings-row-label">Countdown</span>
-          <div className="seg no-drag">
+          <span className="settings-row-label" id="countdown-label">
+            Countdown
+          </span>
+          <div className="seg no-drag" role="group" aria-labelledby="countdown-label">
             {COUNTDOWN_OPTIONS.map((o) => (
               <button
                 key={o.value}
                 className={`seg-btn ${guardrails.countdownSeconds === o.value ? 'active' : ''}`}
+                aria-pressed={guardrails.countdownSeconds === o.value}
                 onClick={() => saveGuardrails({ countdownSeconds: o.value })}
               >
                 {o.label}
@@ -88,8 +91,11 @@ export function Settings({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="settings-row">
-          <span className="settings-row-label">Auto-stop after</span>
+          <label className="settings-row-label" htmlFor="autostop-minutes">
+            Auto-stop after
+          </label>
           <select
+            id="autostop-minutes"
             className="uinput settings-select no-drag"
             value={guardrails.autoStopMinutes}
             onChange={(e) => saveGuardrails({ autoStopMinutes: Number(e.target.value) })}

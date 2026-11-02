@@ -60,7 +60,7 @@ export function AccountSettings({ name, email }: { name: string; email: string }
   }
 
   const inputCls =
-    'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none'
+    'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-ink focus:outline-none'
 
   return (
     <div className="flex flex-col gap-10">
@@ -72,8 +72,12 @@ export function AccountSettings({ name, email }: { name: string; email: string }
         </div>
         <form onSubmit={saveName} className="flex flex-col gap-3">
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-muted">Name</label>
+            <label htmlFor="account-name" className="mb-1.5 block text-sm font-medium text-muted">
+              Name
+            </label>
             <input
+              id="account-name"
+              autoComplete="name"
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
               maxLength={80}
@@ -81,8 +85,15 @@ export function AccountSettings({ name, email }: { name: string; email: string }
             />
           </div>
           <div>
-            <label className="mb-1.5 block text-sm font-medium text-muted">Email</label>
-            <input value={email} disabled className={`${inputCls} cursor-not-allowed opacity-60`} />
+            <label htmlFor="account-email" className="mb-1.5 block text-sm font-medium text-muted">
+              Email
+            </label>
+            <input
+              id="account-email"
+              value={email}
+              readOnly
+              className={`${inputCls} bg-surface-2 text-muted`}
+            />
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -107,6 +118,7 @@ export function AccountSettings({ name, email }: { name: string; email: string }
           <input
             type="password"
             placeholder="Current password"
+            aria-label="Current password"
             autoComplete="current-password"
             value={current}
             onChange={(e) => setCurrent(e.target.value)}
@@ -115,6 +127,7 @@ export function AccountSettings({ name, email }: { name: string; email: string }
           <input
             type="password"
             placeholder="New password (min 8 characters)"
+            aria-label="New password"
             autoComplete="new-password"
             value={next}
             onChange={(e) => setNext(e.target.value)}
@@ -123,6 +136,7 @@ export function AccountSettings({ name, email }: { name: string; email: string }
           <input
             type="password"
             placeholder="Confirm new password"
+            aria-label="Confirm new password"
             autoComplete="new-password"
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}

@@ -32,7 +32,8 @@ export default function NotFound() {
         This link isn’t available
       </h1>
       <p className="rise max-w-md leading-relaxed text-muted" style={{ animationDelay: '210ms' }}>
-        The video may have been removed, set to private, or the link is incorrect.
+        It may have been moved, removed or made private, or there’s a typo in the link. Check with
+        whoever sent it to you.
       </p>
       <Link
         href="/"

@@ -64,13 +64,12 @@ export function BrandDemo() {
   const b = BRANDS.find((x) => x.id === id)!
   return (
     <div className="grid items-center gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-      <div className="flex flex-col gap-3" role="radiogroup" aria-label="Example businesses">
+      <div className="flex flex-col gap-3" role="group" aria-label="Example businesses">
         {BRANDS.map((x) => (
           <button
             key={x.id}
             type="button"
-            role="radio"
-            aria-checked={x.id === id}
+            aria-pressed={x.id === id}
             onClick={() => setId(x.id)}
             className={`flex items-center gap-4 rounded-2xl border-2 p-4 text-left transition ${
               x.id === id
@@ -97,7 +96,6 @@ export function BrandDemo() {
         data-theme={b.theme}
         style={themeVars({ accent: b.accent, theme: b.theme, font: b.font })}
         className="theme-root overflow-hidden rounded-[1.6rem] border-2 border-ink shadow-[8px_8px_0_0_var(--color-ink)] transition-colors duration-300"
-        aria-live="polite"
       >
         <div
           className="h-24 w-full transition-[background] duration-300"
