@@ -5,6 +5,7 @@ import { customAlphabet } from 'nanoid'
 import { pgErrorCode } from './errors'
 import { db } from './index'
 import {
+  bookings,
   meetingKnocks,
   meetingRecordings,
   meetingRooms,
@@ -112,6 +113,18 @@ export async function listRoomsForWorkspace(workspaceId: string): Promise<Meetin
     .orderBy(meetingRooms.createdAt)
 }
 
+/** A room that isn't some booking's private room (booking rooms are managed from Booking). */
+const isStandingRoom = sql`not exists (select 1 from ${bookings} where ${bookings.meetingRoomId} = ${meetingRooms.id})`
+
+/** A workspace's own rooms, without the per-booking ones, oldest first. */
+export async function listStandingRoomsForWorkspace(workspaceId: string): Promise<MeetingRoom[]> {
+  return db
+    .select(roomColumns)
+    .from(meetingRooms)
+    .where(and(eq(meetingRooms.workspaceId, workspaceId), isStandingRoom))
+    .orderBy(meetingRooms.createdAt)
+}
+
 /** A room the user can manage (any member of its workspace), or null. */
 export async function getRoomForMember(userId: string, roomId: string): Promise<MeetingRoom | null> {
   const rows = await db
@@ -173,7 +186,7 @@ export async function ensureDefaultRoom(
     const rows = await tx
       .select({ n: count() })
       .from(meetingRooms)
-      .where(eq(meetingRooms.workspaceId, workspaceId))
+      .where(and(eq(meetingRooms.workspaceId, workspaceId), isStandingRoom))
     if (Number(rows[0]?.n ?? 0) > 0) return
     await tx.insert(meetingRooms).values({
       workspaceId,

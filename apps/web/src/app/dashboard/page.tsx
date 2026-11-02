@@ -47,6 +47,9 @@ export default async function DashboardPage() {
           <Link href="/dashboard/rooms" className="btn-ghost px-3 py-1.5 text-sm">
             Meetings
           </Link>
+          <Link href="/dashboard/booking" className="btn-ghost px-3 py-1.5 text-sm">
+            Booking
+          </Link>
           <Link href="/dashboard/settings" className="btn-ghost px-3 py-1.5 text-sm">
             Settings
           </Link>

@@ -4,6 +4,7 @@ import {
   boolean,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -12,6 +13,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { VIDEO_STATUSES } from '@lmsy/shared'
+import type { WeeklyHours } from '../lib/booking-time'
 
 // Better Auth's generated tables (user, session, account, verification).
 export * from './auth-schema'
@@ -35,6 +37,8 @@ export const workspaces = pgTable('workspaces', {
   brandLogoSize: text('brand_logo_size'), // 'small' | 'medium' | 'large' (null = medium)
   brandCtaLabel: text('brand_cta_label'), // optional call-to-action button label
   brandCtaUrl: text('brand_cta_url'), // optional call-to-action button URL
+  // Public booking page: /book/<booking_slug>. Set the first time it's opened.
+  bookingSlug: text('booking_slug').unique(),
   createdByUserId: text('created_by_user_id').references(() => user.id, { onDelete: 'set null' }),
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
     .notNull()
@@ -303,6 +307,114 @@ export const meetingRecordings = pgTable(
   ],
 )
 
+/**
+ * Something clients can book with a business (a workspace), like "30 minute
+ * intro call". Public at /book/<workspace booking slug>/<slug>. Times are offered
+ * from `weekly_hours` in `time_zone`, minus the host's other bookings (in every
+ * workspace) and time off.
+ */
+export const bookingEventTypes = pgTable(
+  'booking_event_types',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    // Whose calendar it fills: their bookings everywhere block these times.
+    hostUserId: text('host_user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    slug: text('slug').notNull(),
+    description: text('description'),
+    durationMinutes: integer('duration_minutes').notNull().default(30),
+    // Start times are offered every this many minutes (e.g. :00 and :30).
+    slotStepMinutes: integer('slot_step_minutes').notNull().default(30),
+    bufferBeforeMinutes: integer('buffer_before_minutes').notNull().default(0),
+    bufferAfterMinutes: integer('buffer_after_minutes').notNull().default(0),
+    minNoticeMinutes: integer('min_notice_minutes').notNull().default(240),
+    maxDaysAhead: integer('max_days_ahead').notNull().default(60),
+    timeZone: text('time_zone').notNull(),
+    weeklyHours: jsonb('weekly_hours').$type<WeeklyHours>().notNull(),
+    active: boolean('active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('booking_event_types_ws_slug_idx').on(table.workspaceId, table.slug),
+    index('booking_event_types_host_idx').on(table.hostUserId),
+  ],
+)
+
+/** A host's time away (holidays, days off): no bookings in any workspace. */
+export const bookingTimeOff = pgTable(
+  'booking_time_off',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => user.id, { onDelete: 'cascade' }),
+    startsAt: timestamp('starts_at', { withTimezone: true, mode: 'string' }).notNull(),
+    endsAt: timestamp('ends_at', { withTimezone: true, mode: 'string' }).notNull(),
+    note: text('note'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index('booking_time_off_user_idx').on(table.userId, table.endsAt)],
+)
+
+/**
+ * A time a client booked. Each booking gets its own private meeting room, so the
+ * link only lets that client in. The guest manages it (cancel, reschedule) from
+ * /booking/<token>; only the token's hash is stored.
+ * status: 'confirmed' | 'cancelled'. cancelled_by: 'guest' | 'host'.
+ */
+export const bookings = pgTable(
+  'bookings',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    eventTypeId: uuid('event_type_id').references(() => bookingEventTypes.id, {
+      onDelete: 'set null',
+    }),
+    hostUserId: text('host_user_id').references(() => user.id, { onDelete: 'set null' }),
+    title: text('title').notNull(), // the event type's title when booked
+    startsAt: timestamp('starts_at', { withTimezone: true, mode: 'string' }).notNull(),
+    endsAt: timestamp('ends_at', { withTimezone: true, mode: 'string' }).notNull(),
+    guestName: text('guest_name').notNull(),
+    guestEmail: text('guest_email').notNull(),
+    guestNotes: text('guest_notes'),
+    guestTimeZone: text('guest_time_zone'),
+    status: text('status').notNull().default('confirmed'),
+    meetingRoomId: uuid('meeting_room_id').references(() => meetingRooms.id, {
+      onDelete: 'set null',
+    }),
+    manageTokenHash: text('manage_token_hash').notNull().unique(),
+    // Calendar invite identity: a reschedule keeps the UID and bumps the
+    // sequence, so calendar apps move the event instead of adding another.
+    icsUid: text('ics_uid').notNull(),
+    icsSequence: integer('ics_sequence').notNull().default(0),
+    ipHash: text('ip_hash'),
+    cancelledAt: timestamp('cancelled_at', { withTimezone: true, mode: 'string' }),
+    cancelledBy: text('cancelled_by'),
+    cancelReason: text('cancel_reason'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // Conflict checks: a host's bookings overlapping a window.
+    index('bookings_host_starts_idx').on(table.hostUserId, table.startsAt),
+    index('bookings_workspace_starts_idx').on(table.workspaceId, table.startsAt),
+    index('bookings_meeting_room_idx').on(table.meetingRoomId),
+    index('bookings_ip_created_idx').on(table.ipHash, table.createdAt),
+  ],
+)
+
 /** Long-lived bearer tokens for the desktop app — stored hashed, never plaintext. */
 export const apiTokens = pgTable(
   'api_tokens',
@@ -353,5 +465,8 @@ export type WorkspaceRole = (typeof workspaceRole.enumValues)[number]
 export type MeetingRoomRow = typeof meetingRooms.$inferSelect
 export type MeetingKnockRow = typeof meetingKnocks.$inferSelect
 export type MeetingRecordingRow = typeof meetingRecordings.$inferSelect
+export type BookingEventTypeRow = typeof bookingEventTypes.$inferSelect
+export type BookingTimeOffRow = typeof bookingTimeOff.$inferSelect
+export type BookingRow = typeof bookings.$inferSelect
 export type ApiTokenRow = typeof apiTokens.$inferSelect
 export type DeviceCodeRow = typeof deviceCodes.$inferSelect

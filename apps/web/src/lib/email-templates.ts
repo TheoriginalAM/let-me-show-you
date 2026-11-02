@@ -227,3 +227,124 @@ export function approvedEmail(opts: { name: string; loginUrl: string }) {
     text: `You're in, ${firstName(opts.name)}.\n\nYour ${APP_NAME} account has been approved. Sign in and start recording: ${opts.loginUrl}`,
   }
 }
+
+/** Label/value rows for booking details (email-safe table). */
+function detailRows(rows: [string, string | null | undefined][]): string {
+  const body = rows
+    .filter(([, v]) => v)
+    .map(
+      ([label, value]) =>
+        `<tr><td style="padding:6px 14px 6px 0;color:${FAINT};font-size:13px;vertical-align:top;white-space:nowrap;">${escapeHtml(label)}</td><td style="padding:6px 0;color:${INK};font-size:14px;line-height:1.5;">${escapeHtml(String(value)).replace(/\n/g, '<br>')}</td></tr>`,
+    )
+    .join('')
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:18px 0 0;border-top:1px solid ${BORDER_SOFT};padding-top:8px;">${body}</table>`
+}
+
+function textRows(rows: [string, string | null | undefined][]): string {
+  return rows
+    .filter(([, v]) => v)
+    .map(([label, value]) => `${label}: ${value}`)
+    .join('\n')
+}
+
+/** To the client who booked: it's confirmed (or moved), with join + manage links. */
+export function bookingConfirmedEmail(opts: {
+  guestName: string
+  businessName: string
+  title: string
+  when: string
+  duration: string
+  hostName: string | null
+  joinUrl: string
+  manageUrl: string
+  googleUrl: string
+  rescheduled: boolean
+}) {
+  const rows: [string, string | null][] = [
+    ['What', opts.title],
+    ['When', opts.when],
+    ['Length', opts.duration],
+    [
+      'With',
+      opts.hostName && opts.hostName !== opts.businessName
+        ? `${opts.hostName}, ${opts.businessName}`
+        : opts.businessName,
+    ],
+    ['Where', 'Video call in your browser (link below)'],
+  ]
+  const verb = opts.rescheduled ? 'moved' : 'booked'
+  return {
+    subject: `${opts.rescheduled ? 'Updated' : 'Confirmed'}: ${opts.title} with ${opts.businessName}`,
+    html: layout({
+      preview: `${opts.when}. ${opts.title} with ${opts.businessName}.`,
+      heading: `You're ${verb}, ${escapeHtml(firstName(opts.guestName))}`,
+      body: `Your ${escapeHtml(opts.title)} with <strong style="color:${INK};">${escapeHtml(opts.businessName)}</strong> is ${opts.rescheduled ? 'now' : 'confirmed'}. A calendar invite is attached.${detailRows(rows)}<p style="margin:18px 0 0;font-size:13.5px;"><a href="${escapeHtml(opts.googleUrl)}" style="color:${ACCENT_LINK};text-decoration:none;">Add to Google Calendar</a> &middot; <a href="${opts.manageUrl}" style="color:${ACCENT_LINK};text-decoration:none;">Reschedule or cancel</a></p>`,
+      cta: { label: 'Join the call', url: opts.joinUrl },
+      footNote: 'Open the join link at meeting time. It runs in your browser, so there is nothing to install. The host will let you in.',
+    }),
+    text: `You're ${verb}, ${firstName(opts.guestName)}.\n\n${textRows(rows)}\n\nJoin: ${opts.joinUrl}\nReschedule or cancel: ${opts.manageUrl}`,
+  }
+}
+
+/** To the host: someone booked (or moved) a time with them. */
+export function bookingHostEmail(opts: {
+  hostName: string
+  businessName: string
+  title: string
+  when: string
+  guestName: string
+  guestEmail: string
+  notes: string | null
+  previousWhen: string | null
+  joinUrl: string
+  dashboardUrl: string
+}) {
+  const rows: [string, string | null][] = [
+    ['What', opts.title],
+    ['When', opts.when],
+    ['Was', opts.previousWhen],
+    ['Who', `${opts.guestName} (${opts.guestEmail})`],
+    ['Notes', opts.notes],
+    ['Business', opts.businessName],
+  ]
+  const moved = Boolean(opts.previousWhen)
+  return {
+    subject: `${moved ? 'Rescheduled' : 'New booking'}: ${opts.guestName}, ${opts.when}`,
+    html: layout({
+      preview: `${opts.guestName} ${moved ? 'moved' : 'booked'} ${opts.title}.`,
+      heading: moved ? `${escapeHtml(opts.guestName)} moved their booking` : `New booking from ${escapeHtml(opts.guestName)}`,
+      body: `Hi ${escapeHtml(firstName(opts.hostName))}, ${moved ? 'a booking has a new time' : 'you have a new booking'}. A calendar invite is attached.${detailRows(rows)}<p style="margin:18px 0 0;font-size:13.5px;"><a href="${opts.dashboardUrl}" style="color:${ACCENT_LINK};text-decoration:none;">See all bookings</a></p>`,
+      cta: { label: 'Open the meeting room', url: opts.joinUrl },
+      footNote: 'Reply to this email to reach them directly.',
+    }),
+    text: `${moved ? 'Rescheduled booking' : 'New booking'}.\n\n${textRows(rows)}\n\nRoom: ${opts.joinUrl}\nAll bookings: ${opts.dashboardUrl}`,
+  }
+}
+
+/** To either side: a booking was cancelled. */
+export function bookingCancelledEmail(opts: {
+  recipientName: string
+  businessName: string
+  title: string
+  when: string
+  cancelledBy: string
+  reason: string | null
+  rebookUrl: string | null
+}) {
+  const rows: [string, string | null][] = [
+    ['What', opts.title],
+    ['When', opts.when],
+    ['Cancelled by', opts.cancelledBy],
+    ['Reason', opts.reason],
+  ]
+  return {
+    subject: `Cancelled: ${opts.title}, ${opts.when}`,
+    html: layout({
+      preview: `${opts.title} on ${opts.when} was cancelled.`,
+      heading: 'Booking cancelled',
+      body: `Hi ${escapeHtml(firstName(opts.recipientName))}, this booking with <strong style="color:${INK};">${escapeHtml(opts.businessName)}</strong> has been cancelled, and the meeting link no longer works.${detailRows(rows)}`,
+      cta: opts.rebookUrl ? { label: 'Book a new time', url: opts.rebookUrl } : undefined,
+    }),
+    text: `Booking cancelled.\n\n${textRows(rows)}${opts.rebookUrl ? `\n\nBook a new time: ${opts.rebookUrl}` : ''}`,
+  }
+}

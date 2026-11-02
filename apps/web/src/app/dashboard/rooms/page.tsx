@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { APP_DOMAIN } from '@lmsy/shared'
-import { ensureDefaultRoom, listRoomsForWorkspace } from '@/db/meetings'
+import { ensureDefaultRoom, listStandingRoomsForWorkspace } from '@/db/meetings'
 import { getActiveWorkspaceId, getWorkspaceForMember } from '@/db/workspaces'
 import { getCurrentUser } from '@/lib/current-user'
 import { meetingsConfigured } from '@/lib/livekit'
@@ -23,7 +23,7 @@ export default async function RoomsPage() {
   // Tidy up any recording that ended without a Stop (everyone left, etc.).
   if (configured) await reconcileWorkspaceRecordings(workspaceId)
   await ensureDefaultRoom(user.id, workspaceId, ws.name)
-  const rooms = await listRoomsForWorkspace(workspaceId)
+  const rooms = await listStandingRoomsForWorkspace(workspaceId)
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-6 px-4 py-10 sm:px-6">
