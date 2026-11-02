@@ -13,7 +13,7 @@ import {
   expireAdmissions,
   expireKnock,
   findLatestKnock,
-  getRoomBySlug,
+  getRoomBySlugOrMoved,
   knockIsPresent,
   listPendingKnocks,
   roomLobbyEnabled,
@@ -87,7 +87,7 @@ async function hostContext(
   slug: string,
 ): Promise<{ room: PublicMeetingRoom; me: CurrentUser } | null> {
   if (!meetingsConfigured()) return null
-  const room = await getRoomBySlug(String(slug))
+  const room = await getRoomBySlugOrMoved(String(slug))
   if (!room) return null
   const me = await hostFor(room)
   return me ? { room, me } : null
@@ -177,7 +177,7 @@ export async function requestJoin(
   if (input.website != null && String(input.website).trim() !== '') {
     return { status: 'error', error: 'Unable to join this meeting.' }
   }
-  const room = await getRoomBySlug(String(slug))
+  const room = await getRoomBySlugOrMoved(String(slug))
   if (!room) return { status: 'error', error: 'This meeting link is not valid.' }
 
   const host = await hostFor(room)
@@ -253,7 +253,7 @@ export async function requestJoin(
 /** A waiting guest polls this until a host lets them in (or declines). */
 export async function checkJoin(slug: string, guestKey: string): Promise<JoinResult> {
   if (!meetingsConfigured()) return { status: 'error', error: 'Meetings are not set up yet.' }
-  const room = await getRoomBySlug(String(slug))
+  const room = await getRoomBySlugOrMoved(String(slug))
   if (!room) return { status: 'error', error: 'This meeting link is not valid.' }
   const identity = guestIdentity(room.id, String(guestKey ?? ''))
   if (!identity) return { status: 'none' }
@@ -285,7 +285,7 @@ export async function checkJoin(slug: string, guestKey: string): Promise<JoinRes
 /** A guest leaves the lobby before being let in. */
 export async function cancelKnock(slug: string, guestKey: string): Promise<void> {
   if (!meetingsConfigured()) return
-  const room = await getRoomBySlug(String(slug))
+  const room = await getRoomBySlugOrMoved(String(slug))
   if (!room) return
   const identity = guestIdentity(room.id, String(guestKey ?? ''))
   if (!identity) return
@@ -442,7 +442,7 @@ const HAND_THROTTLE_MS = 700
  */
 export async function setHand(slug: string, raised: boolean, guestKey?: string): Promise<Ok> {
   if (!meetingsConfigured()) return { ok: false, error: 'Meetings are not set up yet.' }
-  const room = await getRoomBySlug(String(slug))
+  const room = await getRoomBySlugOrMoved(String(slug))
   if (!room) return { ok: false, error: 'This meeting link is not valid.' }
 
   let identity: string | null = null
@@ -496,7 +496,9 @@ export async function lowerHand(slug: string, identity: string): Promise<Ok> {
 }
 
 /** Host: mute every microphone except your own. */
-export async function muteEveryone(slug: string): Promise<{ ok: true; muted: number } | { ok: false; error: string }> {
+export async function muteEveryone(
+  slug: string,
+): Promise<{ ok: true; muted: number } | { ok: false; error: string }> {
   const ctx = await hostContext(slug)
   if (!ctx) return { ok: false, error: 'Only hosts can do that.' }
   const lkRoom = livekitRoomName(ctx.room.id)
@@ -539,7 +541,8 @@ export async function endCallForEveryone(slug: string): Promise<Ok> {
     await roomService().deleteRoom(livekitRoomName(ctx.room.id))
   } catch (error) {
     // Already closed is fine; anything else means everyone is still connected.
-    const notFound = error instanceof ServerError && (error.code === 'not_found' || error.status === 404)
+    const notFound =
+      error instanceof ServerError && (error.code === 'not_found' || error.status === 404)
     if (!notFound) {
       console.error('[meeting] end call failed:', error)
       return { ok: false, error: 'Could not end the call. Please try again.' }
@@ -577,7 +580,8 @@ export async function inviteToRoom(
   const invalid = list.filter((e) => !EMAIL_RE.test(e))
   if (invalid.length) return { ok: false, error: `Not a valid email: ${invalid[0]}` }
   if (list.length === 0) return { ok: false, error: 'Add at least one email.' }
-  if (list.length > MAX_INVITES) return { ok: false, error: `Invite up to ${MAX_INVITES} at a time.` }
+  if (list.length > MAX_INVITES)
+    return { ok: false, error: `Invite up to ${MAX_INVITES} at a time.` }
 
   const url = `https://${APP_DOMAIN}/m/${ctx.room.slug}`
   // Awaited so delivery actually completes before the action returns.

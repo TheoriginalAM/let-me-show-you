@@ -209,7 +209,8 @@ export function MeetingRoom({
       <Shell brand={brand}>
         <Card title="Meetings aren't switched on yet">
           <p className="text-sm text-muted">
-            This workspace&apos;s meeting rooms aren&apos;t available right now. Please check back soon.
+            This workspace&apos;s meeting rooms aren&apos;t available right now. Please check back
+            soon.
           </p>
         </Card>
       </Shell>
@@ -309,7 +310,7 @@ function Shell({ brand, children }: { brand: MeetingBrand; children: React.React
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="rise glass w-full max-w-md rounded-3xl p-7">
-      <h1 className="font-display text-xl font-semibold tracking-tight text-ink">{title}</h1>
+      <h1 className="font-display text-xl font-extrabold tracking-tight text-ink">{title}</h1>
       <div className="mt-3">{children}</div>
     </div>
   )

@@ -2,8 +2,17 @@ import 'server-only'
 
 import { and, count, desc, eq, gt, inArray, ne, or, sql } from 'drizzle-orm'
 import { customAlphabet } from 'nanoid'
+import { cleanHex } from '../lib/brand-theme'
+import { isRoomBackground } from '../lib/room-backgrounds'
 import { pgErrorCode } from './errors'
 import { db } from './index'
+import {
+  forgetRedirects,
+  lockSlugs,
+  rememberOldSlug,
+  resolveRedirect,
+  slugHeldElsewhere,
+} from './redirects'
 import {
   bookings,
   meetingKnocks,
@@ -44,9 +53,17 @@ export interface MeetingRoom {
   name: string
   slug: string
   lobbyEnabled: boolean
+  welcomeMessage: string | null
+  accentColor: string | null
+  background: string | null
+  /** Served from /api/img when the room has its own photo. */
+  backgroundImageUrl: string | null
   createdByUserId: string | null
   createdAt: string
 }
+
+/** A room link people can choose: 3 to 50 lowercase letters, numbers and dashes. */
+export const ROOM_SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,48}[a-z0-9])$/
 
 export interface PublicMeetingRoom extends MeetingRoom {
   workspaceName: string
@@ -59,6 +76,12 @@ const roomColumns = {
   name: meetingRooms.name,
   slug: meetingRooms.slug,
   lobbyEnabled: meetingRooms.lobbyEnabled,
+  welcomeMessage: meetingRooms.welcomeMessage,
+  accentColor: meetingRooms.accentColor,
+  background: meetingRooms.background,
+  backgroundImageUrl: sql<
+    string | null
+  >`case when ${meetingRooms.backgroundImage} is null then null else '/api/img/room/' || ${meetingRooms.id} || '?v=' || left(md5(${meetingRooms.backgroundImage}), 12) end`,
   createdByUserId: meetingRooms.createdByUserId,
   createdAt: meetingRooms.createdAt,
 }
@@ -91,17 +114,31 @@ export async function getRoomBySlug(slug: string): Promise<PublicMeetingRoom | n
     .limit(1)
   const r = rows[0]
   if (!r) return null
-  return {
-    id: r.id,
-    workspaceId: r.workspaceId,
-    name: r.name,
-    slug: r.slug,
-    lobbyEnabled: r.lobbyEnabled,
-    createdByUserId: r.createdByUserId,
-    createdAt: r.createdAt,
-    workspaceName: r.workspaceName,
-    brand: { name: r.brandName, logo: r.brandLogo, color: r.brandColor },
-  }
+  const { workspaceName, brandName, brandLogo, brandColor, ...room } = r
+  return { ...room, workspaceName, brand: { name: brandName, logo: brandLogo, color: brandColor } }
+}
+
+/**
+ * A room by its link, following a rename: a call or lobby opened on the old link
+ * keeps working after someone changes it.
+ */
+export async function getRoomBySlugOrMoved(slug: string): Promise<PublicMeetingRoom | null> {
+  const room = await getRoomBySlug(slug)
+  if (room) return room
+  const moved = await findMovedRoom(slug)
+  return moved ? getRoomBySlug(moved) : null
+}
+
+/** Where a renamed room's old link points now (its current slug), if anywhere. */
+export async function findMovedRoom(slug: string): Promise<string | null> {
+  const target = await resolveRedirect('room', '', slug)
+  if (!target) return null
+  const rows = await db
+    .select({ slug: meetingRooms.slug })
+    .from(meetingRooms)
+    .where(eq(meetingRooms.id, target))
+    .limit(1)
+  return rows[0]?.slug ?? null
 }
 
 /** A workspace's rooms, oldest first (the default room stays on top). */
@@ -126,7 +163,10 @@ export async function listStandingRoomsForWorkspace(workspaceId: string): Promis
 }
 
 /** A room the user can manage (any member of its workspace), or null. */
-export async function getRoomForMember(userId: string, roomId: string): Promise<MeetingRoom | null> {
+export async function getRoomForMember(
+  userId: string,
+  roomId: string,
+): Promise<MeetingRoom | null> {
   const rows = await db
     .select(roomColumns)
     .from(meetingRooms)
@@ -205,6 +245,75 @@ export async function renameRoom(userId: string, roomId: string, name: string): 
   return true
 }
 
+export interface RoomSettingsInput {
+  name: string
+  slug: string
+  welcomeMessage: string | null
+  accentColor: string | null
+  background: string | null
+  /** A data URL, null to remove, undefined to keep. */
+  backgroundImage?: string | null
+}
+
+/**
+ * Save a room's name, link and look (any member of its workspace). A new link
+ * keeps the old one working.
+ */
+export async function updateRoomSettings(
+  userId: string,
+  roomId: string,
+  input: RoomSettingsInput,
+): Promise<'ok' | 'forbidden' | 'invalid-name' | 'invalid-link' | 'taken'> {
+  const room = await getRoomForMember(userId, roomId)
+  if (!room) return 'forbidden'
+  const name = cleanRoomName(input.name)
+  if (!name) return 'invalid-name'
+  const slug = input.slug.trim().toLowerCase()
+  if (!ROOM_SLUG_RE.test(slug)) return 'invalid-link'
+  const values = {
+    name,
+    slug,
+    welcomeMessage: input.welcomeMessage?.trim().slice(0, 280) || null,
+    accentColor: cleanHex(input.accentColor),
+    background: isRoomBackground(input.background) ? input.background : null,
+    ...(input.backgroundImage !== undefined ? { backgroundImage: input.backgroundImage } : {}),
+  }
+  try {
+    const taken = await db.transaction(async (tx) => {
+      await lockSlugs(tx, 'room', '', [room.slug, slug])
+      if (slug !== room.slug && (await slugHeldElsewhere('room', '', slug, room.workspaceId, tx))) {
+        return true
+      }
+      await tx.update(meetingRooms).set(values).where(eq(meetingRooms.id, roomId))
+      if (slug !== room.slug) {
+        await rememberOldSlug(tx, {
+          kind: 'room',
+          scope: '',
+          oldSlug: room.slug,
+          newSlug: slug,
+          targetId: room.id,
+          workspaceId: room.workspaceId,
+        })
+      }
+      return false
+    })
+    return taken ? 'taken' : 'ok'
+  } catch (error) {
+    if (pgErrorCode(error) === '23505') return 'taken'
+    throw error
+  }
+}
+
+/** A room's backdrop photo (data URL), for the image route. */
+export async function roomBackgroundImage(roomId: string): Promise<string | null> {
+  const rows = await db
+    .select({ v: meetingRooms.backgroundImage })
+    .from(meetingRooms)
+    .where(eq(meetingRooms.id, roomId))
+    .limit(1)
+  return rows[0]?.v ?? null
+}
+
 /** Turn a room's lobby on/off (member-scoped). */
 export async function setRoomLobby(
   userId: string,
@@ -237,6 +346,7 @@ export async function expireAdmissions(roomId: string): Promise<void> {
 export async function deleteRoom(userId: string, roomId: string): Promise<boolean> {
   if (!(await getRoomForMember(userId, roomId))) return false
   await db.delete(meetingRooms).where(eq(meetingRooms.id, roomId))
+  await forgetRedirects(roomId)
   return true
 }
 
@@ -438,9 +548,7 @@ export async function listInFlightRecordings(roomId: string): Promise<MeetingRec
   return db
     .select()
     .from(meetingRecordings)
-    .where(
-      and(eq(meetingRecordings.roomId, roomId), inArray(meetingRecordings.status, IN_FLIGHT)),
-    )
+    .where(and(eq(meetingRecordings.roomId, roomId), inArray(meetingRecordings.status, IN_FLIGHT)))
 }
 
 /**

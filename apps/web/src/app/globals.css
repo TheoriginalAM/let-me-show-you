@@ -10,223 +10,315 @@
 @custom-variant short (@media (max-height: 31.25rem));
 
 /* ------------------------------------------------------------------ *
- * Let Me Show You — "dark & premium" design system
- * Deep near-black canvas, luminous violet accents, glass surfaces,
- * film grain. Dark-first (no light mode).
+ * Let Me Show You: "show, don't tell"
+ * A crisp light canvas, ink type, one electric blue-violet, and a set of
+ * highlighter colours, as if someone marked up the screen for you.
+ * Every colour is a variable, so [data-theme='dark'] (the call screen, and
+ * businesses that pick a dark theme) and a business's own accent re-theme
+ * whatever sits inside them.
  * ------------------------------------------------------------------ */
 @theme {
-  --color-canvas: #08080c;
-  --color-canvas-2: #0d0d15;
-  --color-ink: #f6f6fb;
-  --color-muted: #9c9cb4;
-  --color-faint: #6a6a80;
-  --color-line: rgba(255, 255, 255, 0.09);
-  --color-line-strong: rgba(255, 255, 255, 0.16);
-  --color-accent: #8b8bf6;
-  --color-accent-strong: #6d6df5;
-  --color-accent-ink: #c9c9ff;
+  --color-canvas: #f4f3fb;
+  --color-canvas-2: #eceaf7;
+  --color-surface: #ffffff;
+  --color-surface-2: #f6f5fc;
+  --color-ink: #17132b;
+  --color-muted: #5d5873;
+  --color-faint: #8a85a0;
+  --color-line: #e3e0f0;
+  --color-line-strong: #cbc6e0;
+  --color-accent: #4f3cff;
+  --color-accent-strong: #2f22b8;
+  --color-accent-ink: #3a27f0;
+  --color-on-accent: #ffffff;
+  --color-danger: #d92d20;
+  --color-success: #0f8a5f;
 
-  --font-display: var(--font-display), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+  /* Highlighters: one per part of the product, and for marking things up. */
+  --color-hl-yellow: #ffe14a;
+  --color-hl-pink: #ff5fa2;
+  --color-hl-green: #2fd98a;
+  --color-hl-orange: #ff8f2e;
+  --color-hl-sky: #38bdff;
+
+  --font-display: var(--font-anybody), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-hanken), ui-sans-serif, system-ui, sans-serif;
+  --font-hand: var(--font-caveat), 'Comic Sans MS', cursive;
+  /* A business's heading font on its public pages (see lib/brand-theme). */
+  --font-brand: var(--font-anybody), ui-sans-serif, system-ui, sans-serif;
 
   --radius: 0.9rem;
 }
 
 :root {
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
   color-scheme: dark;
+  --color-canvas: #12101f;
+  --color-canvas-2: #1a1729;
+  --color-surface: rgb(255 255 255 / 0.045);
+  --color-surface-2: rgb(255 255 255 / 0.085);
+  --color-ink: #f5f3ff;
+  --color-muted: #aaa4c6;
+  --color-faint: #7a7494;
+  --color-line: rgb(255 255 255 / 0.1);
+  --color-line-strong: rgb(255 255 255 / 0.18);
+  --color-accent-ink: #b9b0ff;
+  --color-danger: #ff8a80;
+  --color-success: #5ee6a8;
 }
 
-* {
-  border-color: var(--color-line);
-}
+/* Element defaults. In a layer, so utilities (border-ink, bg-canvas…) win. */
+@layer base {
+  * {
+    border-color: var(--color-line);
+  }
 
-html {
-  scroll-behavior: smooth;
-  /* Base type scale bumped up for readability — everything sized in rem grows
-     with this (text and spacing stay in proportion). */
-  font-size: 18px;
-}
-@media (max-width: 640px) {
   html {
-    font-size: 16.5px;
+    scroll-behavior: smooth;
+    /* Base type scale bumped up for readability: everything sized in rem grows
+       with this (text and spacing stay in proportion). */
+    font-size: 18px;
+  }
+  @media (max-width: 640px) {
+    html {
+      font-size: 16.5px;
+    }
+  }
+
+  body {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-feature-settings: 'ss01', 'cv01';
+    text-rendering: optimizeLegibility;
+    line-height: 1.55;
   }
 }
 
-body {
-  background-color: var(--color-canvas);
-  color: var(--color-ink);
-  font-feature-settings: 'ss01', 'cv01';
-  text-rendering: optimizeLegibility;
-  line-height: 1.55;
-}
-
-/* Layered ambient glow behind everything (fixed so it never scrolls away). */
-.atmosphere {
-  position: fixed;
-  inset: 0;
-  z-index: -10;
-  overflow: hidden;
-  pointer-events: none;
-  background:
-    radial-gradient(60rem 40rem at 50% -12%, rgba(120, 110, 255, 0.28), transparent 60%),
-    radial-gradient(45rem 40rem at 100% 0%, rgba(90, 80, 220, 0.12), transparent 55%),
-    radial-gradient(50rem 40rem at 0% 30%, rgba(60, 90, 200, 0.1), transparent 55%);
-}
-.atmosphere::before {
-  /* faint dot grid for texture/depth */
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  background-size: 26px 26px;
-  mask-image: radial-gradient(70% 55% at 50% 0%, black, transparent 75%);
-}
-
-/* Film-grain overlay for that premium, non-flat feel. */
-.grain {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  pointer-events: none;
-  opacity: 0.045;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-/* Glass surface — translucent, hairline border, blur, top highlight. */
-.glass {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
-    rgba(12, 12, 20, 0.55);
-  border: 1px solid var(--color-line);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-}
-.glass-hover {
-  transition:
-    border-color 0.2s ease,
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-}
-.glass-hover:hover {
-  border-color: var(--color-line-strong);
-  transform: translateY(-2px);
-  box-shadow: 0 20px 60px -25px rgba(110, 100, 245, 0.4);
-}
-
-/* Primary luminous button. */
-.btn-primary {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  border-radius: 0.7rem;
-  background: linear-gradient(180deg, #8281ff, var(--color-accent-strong));
-  color: #fff;
-  font-weight: 600;
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.25) inset,
-    0 12px 30px -12px rgba(109, 109, 245, 0.75);
-  transition:
-    transform 0.15s ease,
-    box-shadow 0.2s ease,
-    filter 0.2s ease;
-}
-.btn-primary:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.08);
-  box-shadow:
-    0 1px 0 0 rgba(255, 255, 255, 0.3) inset,
-    0 16px 40px -12px rgba(109, 109, 245, 0.9);
-}
-.btn-ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  border-radius: 0.7rem;
-  border: 1px solid var(--color-line);
-  background: rgba(255, 255, 255, 0.02);
-  color: var(--color-ink);
-  font-weight: 500;
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease;
-}
-.btn-ghost:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: var(--color-line-strong);
-}
-
-/* Small caps eyebrow label. */
-.eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.72rem;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--color-accent-ink);
-}
-
-/* Gradient text for accent words. */
-.text-gradient {
-  background: linear-gradient(180deg, #ffffff 30%, #b8b8ff);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-
-/* Staggered entrance for hero elements. */
-@keyframes rise {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
+/* Brand building blocks. Also layered, so a utility on the same element wins. */
+@layer components {
+  /* A themed region paints its own canvas (business pages, the call screen). */
+  .theme-root {
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-.rise {
-  animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
 
-/* Slow drift for the ambient glow so it feels alive. */
-@keyframes drift {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
+  /* A faint pixel grid at the top of the page, like an artboard. */
+  .atmosphere {
+    position: fixed;
+    inset: 0;
+    z-index: -10;
+    overflow: hidden;
+    pointer-events: none;
+    background-image: radial-gradient(rgb(23 19 43 / 0.09) 1px, transparent 1px);
+    background-size: 22px 22px;
+    mask-image: linear-gradient(to bottom, black, transparent 26rem);
   }
-  50% {
-    transform: translate3d(2%, 1.5%, 0);
+
+  /* Film grain belongs to dark scenes only. */
+  .grain {
+    display: none;
   }
-}
 
-::selection {
-  background: rgba(130, 129, 255, 0.35);
-  color: #fff;
-}
+  /* Display type: Anybody has a width axis, so the brand can go wide. */
+  .wide {
+    font-stretch: 125%;
+  }
+  .extra-wide {
+    font-stretch: 150%;
+  }
+  .condensed {
+    font-stretch: 80%;
+  }
 
-/* Thin custom scrollbar. */
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 999px;
-  border: 2px solid transparent;
-  background-clip: content-box;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.18);
-  background-clip: content-box;
+  /* A panel: solid on light, translucent glass on dark. (Named .glass for history.) */
+  .glass,
+  .card {
+    background: var(--color-surface);
+    border: 1px solid var(--color-line);
+    box-shadow: 0 1px 0 rgb(23 19 43 / 0.03);
+  }
+  [data-theme='dark'] .glass,
+  [data-theme='dark'] .card {
+    background:
+      linear-gradient(180deg, rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.02)), rgb(18 16 31 / 0.6);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: none;
+  }
+  .glass-hover {
+    transition:
+      border-color 0.2s ease,
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+  .glass-hover:hover {
+    border-color: var(--color-line-strong);
+    transform: translateY(-2px);
+    box-shadow: 0 14px 30px -18px rgb(23 19 43 / 0.35);
+  }
+
+  /* Primary button: a key you press. The darker edge underneath sinks on click. */
+  .btn-primary {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.8rem;
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+    font-weight: 650;
+    box-shadow: 0 3px 0 0 var(--color-accent-strong);
+    transition:
+      transform 0.12s ease,
+      box-shadow 0.12s ease,
+      filter 0.2s ease;
+  }
+  .btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 0 0 var(--color-accent-strong);
+    filter: saturate(1.1) brightness(1.04);
+  }
+  .btn-primary:active {
+    transform: translateY(2px);
+    box-shadow: 0 1px 0 0 var(--color-accent-strong);
+  }
+  .btn-primary:disabled {
+    opacity: 0.6;
+    transform: none;
+    box-shadow: 0 3px 0 0 var(--color-accent-strong);
+  }
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.8rem;
+    border: 1px solid var(--color-line-strong);
+    background: var(--color-surface);
+    color: var(--color-ink);
+    font-weight: 550;
+    transition:
+      background 0.2s ease,
+      border-color 0.2s ease;
+  }
+  .btn-ghost:hover {
+    background: var(--color-surface-2);
+    border-color: var(--color-ink);
+  }
+
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2.5px solid var(--color-accent-ink);
+    outline-offset: 2px;
+  }
+
+  /* Small label above a group (sentence case, never shouted). */
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 0.82rem;
+    font-weight: 650;
+    color: var(--color-accent-ink);
+  }
+
+  /* Highlighter swipe behind a few words. Set --hl to change the pen. */
+  .mark {
+    --hl: var(--color-hl-yellow);
+    background-image: linear-gradient(
+      100deg,
+      transparent 0.2em,
+      var(--hl) 0.35em,
+      var(--hl) calc(100% - 0.3em),
+      transparent calc(100% - 0.1em)
+    );
+    background-size: 100% 0.62em;
+    background-position: 0 88%;
+    background-repeat: no-repeat;
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    padding: 0 0.12em;
+  }
+
+  .text-gradient {
+    color: var(--color-ink);
+  }
+
+  /* Marker strokes that draw themselves (see components/brand/scribble.tsx). */
+  @keyframes draw {
+    to {
+      stroke-dashoffset: 0;
+    }
+  }
+  .draw {
+    stroke-dasharray: var(--len, 1000);
+    stroke-dashoffset: var(--len, 1000);
+    animation: draw var(--dur, 0.9s) cubic-bezier(0.65, 0, 0.35, 1) var(--delay, 0s) forwards;
+  }
+  @keyframes swipe {
+    from {
+      background-size: 0% 0.62em;
+    }
+  }
+  .mark-swipe {
+    animation: swipe 0.7s cubic-bezier(0.65, 0, 0.35, 1) var(--delay, 0.3s) both;
+  }
+
+  /* Staggered entrance for hero elements. */
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .rise {
+    animation: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  ::selection {
+    background: var(--color-hl-yellow);
+    color: #17132b;
+  }
+
+  /* Thin custom scrollbar. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(23 19 43 / 0.16);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(23 19 43 / 0.28);
+    background-clip: content-box;
+  }
+  [data-theme='dark'] ::-webkit-scrollbar-thumb {
+    background: rgb(255 255 255 / 0.12);
+    background-clip: content-box;
+  }
 }
 
 /* ---- Meeting rooms ---- */
+
+/* The call screen is always dark, whatever the page around it. */
+html:has([data-meeting-page]),
+html:has([data-meeting-call]) {
+  color-scheme: dark;
+}
+body:has([data-meeting-page]),
+body:has([data-meeting-call]) {
+  background-color: #12101f;
+}
 
 /*
  * Meeting pages never pull-to-refresh: on Android a downward swipe on the
@@ -238,8 +330,8 @@ html:has([data-meeting-call]) {
   overscroll-behavior-y: none;
 }
 
-/* Keep the film grain and ambient glow off live video. */
-body:has([data-meeting-call]) .grain,
+/* Keep the artboard grid off meeting screens. */
+body:has([data-meeting-page]) .atmosphere,
 body:has([data-meeting-call]) .atmosphere {
   display: none;
 }
@@ -278,7 +370,12 @@ body:has([data-meeting-call]) .atmosphere {
     animation: none;
     opacity: 1;
   }
-  .rise {
+  .rise,
+  .mark-swipe {
     animation: none;
+  }
+  .draw {
+    animation: none;
+    stroke-dashoffset: 0;
   }
 }

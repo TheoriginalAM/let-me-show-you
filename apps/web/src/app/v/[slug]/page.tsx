@@ -20,6 +20,9 @@ import { Comments } from './comments'
 import { PasswordGate } from './password-gate'
 import { ProcessingState } from './processing-state'
 import { ShareView } from './share-view'
+import { BrandedPage, BrandHeader } from '../../book/brand-header'
+import { DEFAULT_ACCENT } from '@/lib/brand-theme'
+import { Logo } from '@/components/brand/logo'
 
 // Reads the DB per request and records views, so never static.
 export const dynamic = 'force-dynamic'
@@ -32,8 +35,6 @@ async function hasUnlocked(videoId: string, passwordHash: string): Promise<boole
   const token = (await cookies()).get(unlockCookieName(videoId))?.value
   return Boolean(token && verifyUnlockToken(token, videoId, passwordHash))
 }
-
-const DEFAULT_ACCENT = '#8b8bf6' // luminous violet — the default brand accent
 
 /** Mux static MP4 rendition (enabled via mp4_support: 'capped-1080p'). */
 function muxMp4Url(playbackId: string): string {
@@ -141,154 +142,107 @@ export default async function SharePage({ params }: PageProps) {
   const { brand } = video
   const accent = brand.color ?? DEFAULT_ACCENT
   const branded = Boolean(brand.name || brand.logo)
-  const logoH =
-    brand.logoSize === 'small' ? 'h-9' : brand.logoSize === 'large' ? 'h-16' : 'h-12'
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
-      <div className="flex items-center justify-between gap-3">
+    <BrandedPage brand={brand}>
+      <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 sm:py-10">
         {branded ? (
-          <span className="flex min-w-0 items-center gap-3 tracking-tight text-ink">
-            {brand.logo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={brand.logo} alt="" className={`${logoH} w-auto rounded-md object-contain`} />
-            ) : brand.name ? (
-              <span
-                className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-sm font-bold text-white"
-                style={{ background: accent }}
-              >
-                {brand.name.charAt(0).toUpperCase()}
-              </span>
-            ) : null}
-            <span className="min-w-0">
-              {brand.name && (
-                <span className="block truncate font-semibold">{brand.name}</span>
-              )}
-              {brand.tagline && (
-                <span className="block truncate text-sm font-normal text-muted">
-                  {brand.tagline}
-                </span>
-              )}
-            </span>
-          </span>
+          <BrandHeader brand={brand} fallbackName={brand.name ?? ''} />
         ) : (
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-sm font-semibold tracking-tight text-ink"
-          >
-            <span className="grid h-6 w-6 place-items-center rounded-md bg-gradient-to-b from-[#8281ff] to-accent-strong text-[10px] text-white shadow-[0_6px_16px_-6px_rgba(109,109,245,0.9)]">
-              ▶
-            </span>
-            {APP_NAME}
+          <Link href="/" aria-label={APP_NAME} className="self-start">
+            <Logo className="text-sm" markClass="h-7 w-7" />
           </Link>
         )}
-        {branded && brand.ctaLabel && brand.ctaUrl && (
-          <a
-            href={brand.ctaUrl}
-            target="_blank"
-            rel="noopener noreferrer nofollow"
-            className="shrink-0 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-[0_10px_30px_-12px_rgba(109,109,245,0.7)] transition hover:opacity-90"
-            style={{ background: accent }}
-          >
-            {brand.ctaLabel}
-          </a>
-        )}
-      </div>
 
-      {locked ? (
-        <PasswordGate slug={slug} accent={accent} />
-      ) : (
-        <>
-          {isReady && video.muxPlaybackId ? (
-            <div className="rise relative" style={{ animationDelay: '80ms' }}>
-              <div
-                className="absolute -inset-6 -z-10 rounded-[2rem] blur-2xl"
-                style={{
-                  background: `radial-gradient(60% 60% at 50% 20%, ${accent}4d, transparent 70%)`,
-                }}
-              />
-              <div className="glass overflow-hidden rounded-2xl p-2 shadow-[0_40px_120px_-40px_rgba(80,70,220,0.7)]">
-                <ShareView
-                  slug={slug}
-                  playbackId={video.muxPlaybackId}
-                  title={video.title}
-                  poster={poster}
-                  accentColor={accent}
-                />
+        {locked ? (
+          <PasswordGate slug={slug} accent={accent} />
+        ) : (
+          <>
+            {isReady && video.muxPlaybackId ? (
+              <div className="rise relative" style={{ animationDelay: '80ms' }}>
+                <div className="card overflow-hidden rounded-3xl p-2">
+                  <ShareView
+                    slug={slug}
+                    playbackId={video.muxPlaybackId}
+                    title={video.title}
+                    poster={poster}
+                    accentColor={accent}
+                  />
+                </div>
               </div>
-            </div>
-          ) : (
-            <ProcessingState slug={slug} title={video.title} accent={accent} />
-          )}
+            ) : (
+              <ProcessingState slug={slug} title={video.title} accent={accent} />
+            )}
 
-          <div className="rise flex flex-col gap-2" style={{ animationDelay: '150ms' }}>
-            <h1 className="font-display text-2xl font-semibold tracking-tight text-ink sm:text-3xl">
-              {video.title}
-            </h1>
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-faint">
-              <span className="font-medium text-muted">{video.ownerName}</span>
-              <span aria-hidden>·</span>
-              <span>{formatRelativeDate(video.createdAt)}</span>
-              {isReady && (
-                <>
-                  <span aria-hidden>·</span>
-                  <span>{viewLabel(viewCount)}</span>
-                  {video.durationSeconds != null && (
-                    <>
-                      <span aria-hidden>·</span>
-                      <span>{formatDuration(video.durationSeconds)}</span>
-                    </>
-                  )}
-                </>
+            <div className="rise flex flex-col gap-2" style={{ animationDelay: '150ms' }}>
+              <h1 className="font-display text-2xl font-extrabold tracking-tight text-ink sm:text-3xl">
+                {video.title}
+              </h1>
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-faint">
+                <span className="font-medium text-muted">{video.ownerName}</span>
+                <span aria-hidden>·</span>
+                <span>{formatRelativeDate(video.createdAt)}</span>
+                {isReady && (
+                  <>
+                    <span aria-hidden>·</span>
+                    <span>{viewLabel(viewCount)}</span>
+                    {video.durationSeconds != null && (
+                      <>
+                        <span aria-hidden>·</span>
+                        <span>{formatDuration(video.durationSeconds)}</span>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+              {video.description && (
+                <p className="mt-2 whitespace-pre-wrap leading-relaxed text-muted">
+                  {video.description}
+                </p>
               )}
             </div>
-            {video.description && (
-              <p className="mt-2 whitespace-pre-wrap leading-relaxed text-muted">
-                {video.description}
-              </p>
-            )}
-          </div>
 
-          {video.approvalEnabled && isReady && (
-            <ApprovalWidget
+            {video.approvalEnabled && isReady && (
+              <ApprovalWidget
+                slug={slug}
+                defaultName={currentUser?.name ?? ''}
+                defaultEmail={currentUser?.email ?? ''}
+              />
+            )}
+
+            <Comments
               slug={slug}
+              initialComments={commentsForClient}
+              isOwner={isOwner}
+              accent={accent}
               defaultName={currentUser?.name ?? ''}
               defaultEmail={currentUser?.email ?? ''}
             />
-          )}
-
-          <Comments
-            slug={slug}
-            initialComments={commentsForClient}
-            isOwner={isOwner}
-            accent={accent}
-            defaultName={currentUser?.name ?? ''}
-            defaultEmail={currentUser?.email ?? ''}
-          />
-        </>
-      )}
-
-      <footer className="mt-auto border-t border-line pt-6 text-sm text-faint">
-        {branded ? (
-          <span>
-            Powered by{' '}
-            <Link href="/" className="font-medium text-muted transition hover:text-ink">
-              {APP_NAME}
-            </Link>
-          </span>
-        ) : (
-          <>
-            Recorded with {APP_NAME}.{' '}
-            <Link
-              href="/"
-              className="font-medium transition hover:opacity-80"
-              style={{ color: accent }}
-            >
-              Make your own →
-            </Link>
           </>
         )}
-      </footer>
-    </main>
+
+        <footer className="mt-auto border-t border-line pt-6 text-sm text-faint">
+          {branded ? (
+            <span>
+              Powered by{' '}
+              <Link href="/" className="font-medium text-muted transition hover:text-ink">
+                {APP_NAME}
+              </Link>
+            </span>
+          ) : (
+            <>
+              Recorded with {APP_NAME}.{' '}
+              <Link
+                href="/"
+                className="font-medium transition hover:opacity-80"
+                style={{ color: accent }}
+              >
+                Make your own
+              </Link>
+            </>
+          )}
+        </footer>
+      </main>
+    </BrandedPage>
   )
 }

@@ -51,7 +51,9 @@ export function WorkspacesPanel({
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="font-display text-xl font-semibold tracking-tight text-ink">Workspaces</h2>
+          <h2 className="font-display text-xl font-extrabold tracking-tight text-ink">
+            Workspaces
+          </h2>
           <p className="mt-1 text-sm text-muted">
             Each workspace has its own recordings, branding, and members. Switch the active one or
             create another.
@@ -73,7 +75,7 @@ export function WorkspacesPanel({
             maxLength={80}
             autoFocus
             placeholder="Workspace name"
-            className="min-w-0 flex-1 rounded-lg border border-line bg-white/[0.03] px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+            className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
           />
           <button
             type="submit"
@@ -91,7 +93,7 @@ export function WorkspacesPanel({
           return (
             <li
               key={w.id}
-              className="flex items-center gap-3 rounded-xl border border-line bg-white/[0.02] px-4 py-3"
+              className="flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3"
             >
               <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-b from-[#8281ff] to-accent-strong text-sm font-bold text-white">
                 {initial(w.name)}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState, useTransition, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   addDays,
@@ -11,6 +11,7 @@ import {
   zonedParts,
   zonedTimeToUtc,
 } from '@/lib/booking-time'
+import type { BookingQuestion } from '@/lib/booking-questions'
 import { bookSlot, getSlots } from '../../actions'
 
 interface Props {
@@ -20,14 +21,15 @@ interface Props {
   description: string | null
   durationMinutes: number
   hostName: string
+  hostPhoto: string | null
   hostTimeZone: string
   firstSlot: string | null
-  accent: string
+  questions: BookingQuestion[]
   reschedule: { token: string; name: string; email: string; startsAt: string } | null
 }
 
 const inputCls =
-  'w-full rounded-lg border border-line bg-white/[0.03] px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none'
+  'w-full rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-faint focus:border-accent focus:outline-none'
 const WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
 function monthOf(date: string): string {
@@ -42,9 +44,11 @@ function shiftMonth(month: string, n: number): string {
 
 function monthLabel(month: string): string {
   const [y, m] = month.split('-').map(Number)
-  return new Intl.DateTimeFormat('en-AU', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(
-    new Date(Date.UTC(y!, m! - 1, 1)),
-  )
+  return new Intl.DateTimeFormat('en-AU', {
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(y!, m! - 1, 1)))
 }
 
 function dayLabel(date: string): string {
@@ -60,7 +64,10 @@ function dayLabel(date: string): string {
 function allTimeZones(current: string[]): string[] {
   let zones: string[] = []
   try {
-    zones = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.('timeZone') ?? []
+    zones =
+      (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.(
+        'timeZone',
+      ) ?? []
   } catch {
     zones = []
   }
@@ -71,7 +78,10 @@ export function Scheduler(props: Props) {
   const router = useRouter()
   const [tz, setTz] = useState(props.hostTimeZone)
   const [month, setMonth] = useState(() =>
-    monthOf(zonedParts(props.firstSlot ? Date.parse(props.firstSlot) : Date.now(), props.hostTimeZone).date),
+    monthOf(
+      zonedParts(props.firstSlot ? Date.parse(props.firstSlot) : Date.now(), props.hostTimeZone)
+        .date,
+    ),
   )
   const [byDay, setByDay] = useState<Map<string, number[]> | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -80,6 +90,7 @@ export function Scheduler(props: Props) {
   const [name, setName] = useState(props.reschedule?.name ?? '')
   const [email, setEmail] = useState(props.reschedule?.email ?? '')
   const [notes, setNotes] = useState('')
+  const [answers, setAnswers] = useState<Record<string, string>>({})
   const [error, setError] = useState<string | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
   const [pending, startTransition] = useTransition()
@@ -89,7 +100,9 @@ export function Scheduler(props: Props) {
     const mine = Intl.DateTimeFormat().resolvedOptions().timeZone
     if (mine && mine !== props.hostTimeZone) {
       setTz(mine)
-      setMonth(monthOf(zonedParts(props.firstSlot ? Date.parse(props.firstSlot) : Date.now(), mine).date))
+      setMonth(
+        monthOf(zonedParts(props.firstSlot ? Date.parse(props.firstSlot) : Date.now(), mine).date),
+      )
     }
   }, [props.hostTimeZone, props.firstSlot])
 
@@ -150,8 +163,9 @@ export function Scheduler(props: Props) {
     return out
   }, [month])
 
-  const times = selectedDay ? byDay?.get(selectedDay) ?? [] : []
-  const style = { '--bk-accent': props.accent } as CSSProperties
+  const times = selectedDay ? (byDay?.get(selectedDay) ?? []) : []
+  // A moved booking keeps its first answers, so only new bookings are asked.
+  const askQuestions = !props.reschedule && props.questions.length > 0
 
   function confirm(): void {
     if (slot === null || pending) return
@@ -161,8 +175,9 @@ export function Scheduler(props: Props) {
         startsAt: new Date(slot).toISOString(),
         name,
         email,
-        notes,
+        notes: askQuestions ? '' : notes,
         timeZone: tz,
+        answers: askQuestions ? answers : undefined,
         rescheduleToken: props.reschedule?.token,
       }).catch(() => ({ ok: false as const, error: 'Something went wrong. Please try again.' }))
       if (res.ok) {
@@ -178,10 +193,19 @@ export function Scheduler(props: Props) {
   }
 
   return (
-    <div className="glass rise grid overflow-hidden rounded-2xl md:grid-cols-[17rem_1fr]" style={style}>
-      <aside className="flex flex-col gap-3 border-b border-line p-5 md:border-b-0 md:border-r">
-        <p className="text-sm text-muted">{props.hostName}</p>
-        <h1 className="font-display text-2xl font-semibold tracking-tight text-ink">{props.title}</h1>
+    <div className="card grid overflow-hidden rounded-3xl md:grid-cols-[18rem_1fr]">
+      <aside className="relative flex flex-col gap-3 border-b border-line p-6 md:border-b-0 md:border-r">
+        <span className="absolute inset-x-0 top-0 h-1.5 bg-accent" aria-hidden />
+        <p className="flex items-center gap-2.5 text-sm font-medium text-muted">
+          {props.hostPhoto && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={props.hostPhoto} alt="" className="h-9 w-9 rounded-full object-cover" />
+          )}
+          {props.hostName}
+        </p>
+        <h1 className="font-brand text-[1.7rem] font-bold leading-tight tracking-tight text-ink">
+          {props.title}
+        </h1>
         <p className="flex items-center gap-2 text-sm text-muted">
           <ClockIcon /> {formatDuration(props.durationMinutes)}
         </p>
@@ -189,21 +213,27 @@ export function Scheduler(props: Props) {
           <VideoIcon /> Video call in your browser
         </p>
         {props.reschedule && (
-          <p className="rounded-lg border border-line bg-white/[0.03] p-3 text-sm text-muted">
+          <p className="rounded-xl border border-line bg-surface-2 p-3 text-sm text-muted">
             Moving your booking from{' '}
-            <span className="text-ink">{formatWhen(Date.parse(props.reschedule.startsAt), tz)}</span>
+            <span className="text-ink">
+              {formatWhen(Date.parse(props.reschedule.startsAt), tz)}
+            </span>
           </p>
         )}
         {props.description && (
-          <p className="whitespace-pre-line text-sm leading-relaxed text-faint">{props.description}</p>
+          <p className="whitespace-pre-line text-sm leading-relaxed text-muted">
+            {props.description}
+          </p>
         )}
       </aside>
 
       {slot === null ? (
-        <section className="flex flex-col gap-5 p-5 lg:flex-row">
+        <section className="flex flex-col gap-6 p-6 lg:flex-row">
           <div className="min-w-0 flex-1">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="font-display text-lg font-semibold tracking-tight text-ink">{monthLabel(month)}</h2>
+              <h2 className="font-brand text-lg font-bold tracking-tight text-ink">
+                {monthLabel(month)}
+              </h2>
               <div className="flex gap-1">
                 <button
                   type="button"
@@ -246,15 +276,15 @@ export function Scheduler(props: Props) {
                     aria-label={`${dayLabel(d)}${open ? '' : ', no times'}`}
                     className={`relative grid aspect-square place-items-center rounded-full text-sm transition ${
                       selected
-                        ? 'bg-[var(--bk-accent)] font-semibold text-white'
+                        ? 'bg-accent font-bold text-on-accent'
                         : open
-                          ? 'bg-white/[0.06] font-semibold text-ink hover:bg-white/[0.12]'
+                          ? 'bg-accent/12 font-semibold text-accent-ink hover:bg-accent/25'
                           : 'text-faint/60'
                     }`}
                   >
                     {Number(d.slice(8))}
                     {d === today && !selected && (
-                      <span className="absolute bottom-1.5 h-1 w-1 rounded-full bg-[var(--bk-accent)]" />
+                      <span className="absolute bottom-1.5 h-1 w-1 rounded-full bg-accent" />
                     )}
                   </button>
                 )
@@ -278,7 +308,7 @@ export function Scheduler(props: Props) {
 
           <div className="lg:w-52">
             {loadError ? (
-              <p className="text-sm text-red-300">{loadError}</p>
+              <p className="text-sm text-danger">{loadError}</p>
             ) : !byDay ? (
               <p className="text-sm text-muted">Loading times…</p>
             ) : byDay.size === 0 ? (
@@ -304,7 +334,7 @@ export function Scheduler(props: Props) {
                           setError(null)
                           setSlot(t)
                         }}
-                        className="w-full rounded-lg border border-[var(--bk-accent)]/50 px-3 py-2.5 text-sm font-semibold text-ink transition hover:bg-[var(--bk-accent)] hover:text-white"
+                        className="w-full rounded-xl border-2 border-accent/40 px-3 py-2.5 text-sm font-bold text-accent-ink transition hover:border-accent hover:bg-accent hover:text-on-accent"
                       >
                         {formatTime(t, tz)}
                       </button>
@@ -313,20 +343,20 @@ export function Scheduler(props: Props) {
                 </ul>
               </>
             ) : null}
-            {error && <p className="mt-3 text-sm text-red-300">{error}</p>}
+            {error && <p className="mt-3 text-sm text-danger">{error}</p>}
           </div>
         </section>
       ) : (
-        <section className="flex flex-col gap-4 p-5">
+        <section className="flex flex-col gap-4 p-6">
           <button
             type="button"
             className="self-start text-sm text-faint transition hover:text-ink"
             onClick={() => setSlot(null)}
           >
-            ← Pick another time
+            ‹ Pick another time
           </button>
-          <div className="rounded-xl border border-line bg-white/[0.03] p-4">
-            <p className="font-semibold text-ink">{formatWhen(slot, tz)}</p>
+          <div className="rounded-2xl border-2 border-accent/40 bg-accent/8 p-4">
+            <p className="font-brand text-lg font-bold text-ink">{formatWhen(slot, tz)}</p>
             <p className="text-sm text-muted">
               {formatDuration(props.durationMinutes)} · {tz.replace(/_/g, ' ')}
             </p>
@@ -362,25 +392,31 @@ export function Scheduler(props: Props) {
                 className={`${inputCls} read-only:opacity-70`}
               />
             </label>
-            <label className="flex flex-col gap-1 text-sm text-muted">
-              <span>
-                Anything to share before the call? <span className="text-faint">(optional)</span>
-              </span>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                maxLength={1000}
-                rows={3}
-                className={inputCls}
-              />
-            </label>
-            {error && <p className="text-sm text-red-300">{error}</p>}
-            <button
-              type="submit"
-              disabled={pending}
-              className="mt-1 rounded-lg px-5 py-3 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
-              style={{ background: props.accent }}
-            >
+            {askQuestions ? (
+              props.questions.map((q) => (
+                <QuestionField
+                  key={q.id}
+                  question={q}
+                  value={answers[q.id] ?? ''}
+                  onChange={(v) => setAnswers((a) => ({ ...a, [q.id]: v }))}
+                />
+              ))
+            ) : !props.reschedule ? (
+              <label className="flex flex-col gap-1 text-sm text-muted">
+                <span>
+                  Anything to share before the call? <span className="text-faint">(optional)</span>
+                </span>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  maxLength={1000}
+                  rows={3}
+                  className={inputCls}
+                />
+              </label>
+            ) : null}
+            {error && <p className="text-sm text-danger">{error}</p>}
+            <button type="submit" disabled={pending} className="btn-primary mt-1 px-5 py-3 text-sm">
               {pending ? 'Booking…' : props.reschedule ? 'Move my booking' : 'Confirm booking'}
             </button>
             <p className="text-xs text-faint">
@@ -393,9 +429,88 @@ export function Scheduler(props: Props) {
   )
 }
 
+function QuestionField({
+  question,
+  value,
+  onChange,
+}: {
+  question: BookingQuestion
+  value: string
+  onChange: (value: string) => void
+}) {
+  const label = (
+    <span>
+      {question.label} {!question.required && <span className="text-faint">(optional)</span>}
+    </span>
+  )
+  if (question.kind === 'choice') {
+    return (
+      <fieldset className="flex flex-col gap-2 text-sm text-muted">
+        <legend className="mb-1">{label}</legend>
+        <div className="flex flex-wrap gap-2">
+          {(question.options ?? []).map((o) => (
+            <label
+              key={o}
+              className={`cursor-pointer rounded-xl border-2 px-3 py-2 font-medium transition ${
+                value === o
+                  ? 'border-accent bg-accent text-on-accent'
+                  : 'border-line-strong text-ink hover:border-accent'
+              }`}
+            >
+              <input
+                type="radio"
+                name={question.id}
+                value={o}
+                checked={value === o}
+                required={question.required}
+                onChange={() => onChange(o)}
+                className="sr-only"
+              />
+              {o}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+    )
+  }
+  return (
+    <label className="flex flex-col gap-1 text-sm text-muted">
+      {label}
+      {question.kind === 'long' ? (
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required={question.required}
+          maxLength={2000}
+          rows={3}
+          className={inputCls}
+        />
+      ) : (
+        <input
+          type={question.kind === 'phone' ? 'tel' : 'text'}
+          autoComplete={question.kind === 'phone' ? 'tel' : undefined}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          required={question.required}
+          maxLength={question.kind === 'phone' ? 40 : 200}
+          className={inputCls}
+        />
+      )}
+    </label>
+  )
+}
+
 function ClockIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden
+    >
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 2" strokeLinecap="round" />
     </svg>
@@ -404,7 +519,15 @@ function ClockIcon() {
 
 function VideoIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      aria-hidden
+    >
       <rect x="3" y="6" width="13" height="12" rx="2" />
       <path d="M16 10l5-3v10l-5-3" strokeLinejoin="round" />
     </svg>

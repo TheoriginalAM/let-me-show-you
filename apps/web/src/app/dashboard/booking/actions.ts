@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import {
   addTimeOff,
+  cleanEventSlug,
   cleanEventTypeInput,
   createEventType,
   deleteEventType,
@@ -38,11 +39,13 @@ export async function setBookingSlugAction(slug: string): Promise<Result> {
   const workspaceId = await getActiveWorkspaceId(user.id)
   if (!workspaceId) return { ok: false, error: 'No workspace.' }
   const res = await setBookingSlug(user.id, workspaceId, String(slug ?? ''))
-  if (res === 'forbidden') return { ok: false, error: 'Only workspace owners can change the address.' }
+  if (res === 'forbidden')
+    return { ok: false, error: 'Only workspace owners can change the address.' }
   if (res === 'invalid') {
     return { ok: false, error: 'Use lowercase letters, numbers and dashes (up to 48).' }
   }
   if (res === 'taken') return { ok: false, error: 'That address is taken. Try another.' }
+  revalidatePath('/dashboard', 'layout')
   return done()
 }
 
@@ -55,23 +58,35 @@ export async function saveEventTypeAction(
   if (!user) return { ok: false, error: 'Not signed in.' }
   const input = cleanEventTypeInput(raw ?? {})
   if (!input.ok) return input
+  const slug = cleanEventSlug(raw?.slug)
+  if (slug === 'invalid')
+    return { ok: false, error: 'Links use lowercase letters, numbers and dashes (up to 48).' }
+  const takenError = {
+    ok: false as const,
+    error: 'Another calendar in this business already uses that link.',
+  }
   if (id) {
     if (!UUID_RE.test(String(id))) return { ok: false, error: 'Not found.' }
-    if (!(await updateEventType(user.id, String(id), input.value))) return { ok: false, error: 'Not found.' }
+    const res = await updateEventType(user.id, String(id), input.value, slug)
+    if (res === 'forbidden') return { ok: false, error: 'Not found.' }
+    if (res === 'taken') return takenError
     return done()
   }
   const workspaceId = await getActiveWorkspaceId(user.id)
   if (!workspaceId) return { ok: false, error: 'No workspace.' }
-  if (!(await createEventType(user.id, workspaceId, input.value))) {
-    return { ok: false, error: 'Could not create it.' }
-  }
+  const res = await createEventType(user.id, workspaceId, input.value, slug)
+  if (!res.ok)
+    return res.reason === 'taken' ? takenError : { ok: false, error: 'Could not create it.' }
   return done()
 }
 
 export async function setEventTypeActiveAction(id: string, active: boolean): Promise<Result> {
   const user = await me()
   if (!user) return { ok: false, error: 'Not signed in.' }
-  if (!UUID_RE.test(String(id)) || !(await setEventTypeActive(user.id, String(id), Boolean(active)))) {
+  if (
+    !UUID_RE.test(String(id)) ||
+    !(await setEventTypeActive(user.id, String(id), Boolean(active)))
+  ) {
     return { ok: false, error: 'Not found.' }
   }
   return done()
@@ -94,7 +109,13 @@ export async function cancelBookingAction(id: string, reason: string): Promise<R
   const b = await getBookingForMember(user.id, String(id))
   if (!b) return { ok: false, error: 'Not found.' }
   if (b.status !== 'confirmed') return { ok: false, error: 'It’s already cancelled.' }
-  const cancelled = await cancelAndNotify(b.id, 'host', String(reason ?? '').trim().slice(0, 500) || null)
+  const cancelled = await cancelAndNotify(
+    b.id,
+    'host',
+    String(reason ?? '')
+      .trim()
+      .slice(0, 500) || null,
+  )
   if (!cancelled) return { ok: false, error: 'It’s already cancelled.' }
   return done()
 }
@@ -118,8 +139,16 @@ export async function addTimeOffAction(
   const startsAt = zonedTimeToUtc(from, 0, tz)
   const endsAt = zonedTimeToUtc(addDays(to, 1), 0, tz)
   if (startsAt === null || endsAt === null) return { ok: false, error: 'Pick the dates.' }
-  if (endsAt - startsAt > 366 * 24 * 60 * 60 * 1000) return { ok: false, error: 'Up to a year at a time.' }
-  await addTimeOff(user.id, startsAt, endsAt, String(note ?? '').trim().slice(0, 120) || null)
+  if (endsAt - startsAt > 366 * 24 * 60 * 60 * 1000)
+    return { ok: false, error: 'Up to a year at a time.' }
+  await addTimeOff(
+    user.id,
+    startsAt,
+    endsAt,
+    String(note ?? '')
+      .trim()
+      .slice(0, 120) || null,
+  )
   return done()
 }
 

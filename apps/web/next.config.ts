@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
   // Compile the shared workspace package (shipped as TypeScript source) as
   // part of the Next build instead of expecting a pre-built dist.
   transpilePackages: ['@lmsy/shared'],
+  experimental: {
+    // Branding photos (cover, portrait, logo, room backdrops) are sent to server
+    // actions as resized data URLs; the default 1 MB can't fit a cover + logo.
+    serverActions: { bodySizeLimit: '4mb' },
+  },
   eslint: {
     // Linting runs once at the repo root via `pnpm lint` (flat config), so skip
     // Next's redundant build-time lint (which can't discover the root config).

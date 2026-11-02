@@ -12,10 +12,10 @@ import {
 } from '@/app/dashboard/actions'
 
 const STATUS_STYLES: Record<VideoStatus, string> = {
-  ready: 'bg-green-500/15 text-green-300 ring-1 ring-inset ring-green-500/25',
-  processing: 'bg-amber-500/15 text-amber-300 ring-1 ring-inset ring-amber-500/25',
+  ready: 'bg-success/15 text-success ring-1 ring-inset ring-success/25',
+  processing: 'bg-amber-500/15 text-[#8a4b00] ring-1 ring-inset ring-hl-orange/60',
   uploading: 'bg-blue-500/15 text-blue-300 ring-1 ring-inset ring-blue-500/25',
-  errored: 'bg-red-500/15 text-red-300 ring-1 ring-inset ring-red-500/25',
+  errored: 'bg-danger/15 text-danger ring-1 ring-inset ring-danger/25',
 }
 
 export type VideoCardProps = {
@@ -260,7 +260,7 @@ export function VideoCard(props: VideoCardProps) {
               }
             }}
             onBlur={commitRename}
-            className="w-full rounded-lg border border-line bg-white/[0.03] px-2 py-1 text-sm font-medium text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+            className="w-full rounded-lg border border-line bg-surface px-2 py-1 text-sm font-medium text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
           />
         ) : (
           <h3 className="truncate text-sm font-semibold text-ink" title={title}>
@@ -281,7 +281,7 @@ export function VideoCard(props: VideoCardProps) {
           {props.approvalCounts.approved > 0 && (
             <>
               <span aria-hidden>·</span>
-              <span className="font-medium text-green-300">
+              <span className="font-medium text-success">
                 {props.approvalCounts.approved} approved
               </span>
             </>
@@ -289,7 +289,7 @@ export function VideoCard(props: VideoCardProps) {
           {props.approvalCounts.changes > 0 && (
             <>
               <span aria-hidden>·</span>
-              <span className="font-medium text-amber-300">
+              <span className="font-medium text-[#8a4b00]">
                 {props.approvalCounts.changes} changes
               </span>
             </>
@@ -308,7 +308,7 @@ export function VideoCard(props: VideoCardProps) {
           )}
         </div>
 
-        {error && <p className="text-xs text-red-300">{error}</p>}
+        {error && <p className="text-xs text-danger">{error}</p>}
 
         <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-1">
           <button
@@ -377,7 +377,7 @@ export function VideoCard(props: VideoCardProps) {
               <button
                 onClick={confirmDelete}
                 disabled={deleting}
-                className="rounded-lg bg-red-500 px-2 py-1 text-xs font-medium text-white shadow-[0_10px_24px_-12px_rgba(239,68,68,0.8)] transition hover:bg-red-400 disabled:opacity-50"
+                className="rounded-lg bg-danger px-2 py-1 text-xs font-medium text-white transition hover:opacity-90 disabled:opacity-50"
               >
                 {deleting ? 'Deleting…' : 'Confirm'}
               </button>
@@ -393,7 +393,7 @@ export function VideoCard(props: VideoCardProps) {
             <button
               onClick={() => setConfirmingDelete(true)}
               disabled={busy}
-              className="ml-auto rounded-lg border border-red-500/25 bg-red-500/10 px-2 py-1 text-xs font-medium text-red-300 transition hover:bg-red-500/20 hover:border-red-500/40 disabled:opacity-50"
+              className="ml-auto rounded-lg border border-danger/25 bg-danger/10 px-2 py-1 text-xs font-medium text-danger transition hover:bg-danger/20 hover:border-danger/40 disabled:opacity-50"
             >
               Delete
             </button>
@@ -401,7 +401,7 @@ export function VideoCard(props: VideoCardProps) {
         </div>
 
         {managingDescription && (
-          <div className="flex flex-col gap-2 rounded-lg border border-line bg-white/[0.02] p-2.5">
+          <div className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-2.5">
             <textarea
               autoFocus
               value={descDraft}
@@ -409,7 +409,7 @@ export function VideoCard(props: VideoCardProps) {
               maxLength={2000}
               rows={3}
               placeholder="Add a description shown under the video on its share page…"
-              className="w-full resize-y rounded-lg border border-line bg-white/[0.03] px-2 py-1.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+              className="w-full resize-y rounded-lg border border-line bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
             />
             <div className="flex flex-wrap items-center gap-1.5">
               <button
@@ -434,7 +434,7 @@ export function VideoCard(props: VideoCardProps) {
         )}
 
         {managingPassword && (
-          <div className="flex flex-col gap-2 rounded-lg border border-line bg-white/[0.02] p-2.5">
+          <div className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-2.5">
             <input
               type="password"
               autoFocus
@@ -451,7 +451,7 @@ export function VideoCard(props: VideoCardProps) {
                 }
               }}
               placeholder={isProtected ? 'New password' : 'Set a password'}
-              className="w-full rounded-lg border border-line bg-white/[0.03] px-2 py-1 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+              className="w-full rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
             />
             <div className="flex flex-wrap items-center gap-1.5">
               <button
@@ -465,7 +465,7 @@ export function VideoCard(props: VideoCardProps) {
                 <button
                   onClick={removePassword}
                   disabled={busy}
-                  className="rounded-lg border border-red-500/25 bg-red-500/10 px-2 py-1 text-xs font-medium text-red-300 transition hover:border-red-500/40 hover:bg-red-500/20 disabled:opacity-50"
+                  className="rounded-lg border border-danger/25 bg-danger/10 px-2 py-1 text-xs font-medium text-danger transition hover:border-danger/40 hover:bg-danger/20 disabled:opacity-50"
                 >
                   Remove
                 </button>

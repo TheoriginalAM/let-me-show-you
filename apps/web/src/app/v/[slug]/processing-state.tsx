@@ -12,7 +12,7 @@ import { pollShareStatus } from './actions'
 export function ProcessingState({
   slug,
   title,
-  accent = '#8b8bf6',
+  accent = '#4f3cff',
 }: {
   slug: string
   title: string

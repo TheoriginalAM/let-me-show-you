@@ -6,13 +6,31 @@ import type { BookingDetail } from '@/db/bookings'
 import { buildIcs, googleCalendarUrl, type IcsEvent } from './booking-ics'
 import { formatDuration, formatWhen } from './booking-time'
 import { sendEmail } from './email'
-import { bookingCancelledEmail, bookingConfirmedEmail, bookingHostEmail } from './email-templates'
+import { DEFAULT_ACCENT } from './brand-theme'
+import {
+  bookingCancelledEmail,
+  bookingConfirmedEmail,
+  bookingHostEmail,
+  bookingReminderEmail,
+  type EmailBrand,
+} from './email-templates'
 
 const BASE = `https://${APP_DOMAIN}`
 const FROM_EMAIL = process.env.EMAIL_FROM ?? 'noreply@letmeshowyou.com.au'
 
 export function businessName(b: BookingDetail): string {
   return b.business.brand.name || b.business.workspaceName
+}
+
+/** The business's look for emails to its clients. */
+function emailBrand(b: BookingDetail): EmailBrand {
+  const { brand } = b.business
+  return {
+    name: businessName(b),
+    logoUrl: brand.logoUrl ? `${BASE}${brand.logoUrl}` : null,
+    accent: brand.color ?? DEFAULT_ACCENT,
+    business: true,
+  }
 }
 
 export function joinUrl(b: BookingDetail): string {
@@ -88,6 +106,8 @@ export async function announceBooking(
       url: joinUrl(b),
     }),
     rescheduled: Boolean(previous),
+    message: b.confirmationMessage,
+    brand: emailBrand(b),
   })
   const sends: Promise<unknown>[] = [
     sendEmail({
@@ -108,7 +128,10 @@ export async function announceBooking(
       guestName: b.guestName,
       guestEmail: b.guestEmail,
       notes: b.guestNotes,
-      previousWhen: previous ? formatWhen(new Date(previous.startsAt).getTime(), hostZone(b), true) : null,
+      answers: b.answers,
+      previousWhen: previous
+        ? formatWhen(new Date(previous.startsAt).getTime(), hostZone(b), true)
+        : null,
       joinUrl: joinUrl(b),
       dashboardUrl: `${BASE}/dashboard/booking`,
     })
@@ -128,7 +151,8 @@ export async function announceBooking(
     )
   }
   const results = await Promise.allSettled(sends)
-  for (const r of results) if (r.status === 'rejected') console.error('[booking] notify failed:', r.reason)
+  for (const r of results)
+    if (r.status === 'rejected') console.error('[booking] notify failed:', r.reason)
 }
 
 /** Tell both sides a booking was cancelled (the canceller gets a receipt). Best-effort. */
@@ -147,6 +171,7 @@ export async function announceCancellation(b: BookingDetail): Promise<void> {
         cancelledBy: by,
         reason: b.cancelReason,
         rebookUrl: rebookUrl(b),
+        brand: emailBrand(b),
       }),
       fromName: name,
       replyTo: b.hostEmail ? { email: b.hostEmail, name: b.hostName ?? name } : undefined,
@@ -180,5 +205,30 @@ export async function announceCancellation(b: BookingDetail): Promise<void> {
     )
   }
   const results = await Promise.allSettled(sends)
-  for (const r of results) if (r.status === 'rejected') console.error('[booking] notify failed:', r.reason)
+  for (const r of results)
+    if (r.status === 'rejected') console.error('[booking] notify failed:', r.reason)
+}
+
+/** Remind the guest their call is tomorrow, or in an hour. */
+export async function sendBookingReminder(
+  b: BookingDetail,
+  soon: 'day' | 'hour',
+): Promise<boolean> {
+  const name = businessName(b)
+  const email = bookingReminderEmail({
+    guestName: b.guestName,
+    businessName: name,
+    title: b.title,
+    when: formatWhen(new Date(b.startsAt).getTime(), guestZone(b), true),
+    hostName: b.hostName,
+    joinUrl: joinUrl(b),
+    soon,
+    brand: emailBrand(b),
+  })
+  return sendEmail({
+    to: b.guestEmail,
+    ...email,
+    fromName: name,
+    replyTo: b.hostEmail ? { email: b.hostEmail, name: b.hostName ?? name } : undefined,
+  })
 }

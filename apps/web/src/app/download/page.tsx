@@ -24,12 +24,12 @@ export default async function DownloadPage() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col items-center justify-center gap-8 px-6 py-16 text-center">
-      <div className="glass rise w-full rounded-3xl p-8 shadow-[0_40px_120px_-40px_rgba(80,70,220,0.7)] sm:p-10">
+      <div className="glass rise w-full rounded-3xl border-2 border-ink p-8 shadow-[8px_8px_0_0_var(--color-ink)] sm:p-10">
         <Link href="/" className="eyebrow mx-auto justify-center transition hover:text-ink">
-          <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_2px_rgba(139,139,246,0.9)]" />
+          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
           {APP_NAME}
         </Link>
-        <h1 className="mt-5 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+        <h1 className="mt-5 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
           Download <span className="text-gradient">{APP_NAME}</span>
         </h1>
         <p className="mx-auto mt-4 max-w-sm leading-relaxed text-muted">
@@ -38,7 +38,7 @@ export default async function DownloadPage() {
         </p>
 
         {!user.approved && (
-          <p className="mx-auto mt-6 max-w-sm rounded-lg bg-amber-500/10 px-3 py-2.5 text-sm text-amber-200 ring-1 ring-inset ring-amber-500/25">
+          <p className="mx-auto mt-6 max-w-sm rounded-lg bg-amber-500/10 px-3 py-2.5 text-sm text-[#8a4b00] ring-1 ring-inset ring-hl-orange/60">
             Your account is pending approval. You can install the app now and sign in to it once
             you&rsquo;re approved.
           </p>

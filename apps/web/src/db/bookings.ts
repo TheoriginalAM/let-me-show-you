@@ -17,6 +17,12 @@ import {
   TransactionRollbackError,
 } from 'drizzle-orm'
 import { customAlphabet } from 'nanoid'
+import { cleanHex } from '@/lib/brand-theme'
+import {
+  normalizeQuestions,
+  type BookingAnswer,
+  type BookingQuestion,
+} from '@/lib/booking-questions'
 import {
   isSlotAvailable,
   isValidTimeZone,
@@ -29,6 +35,13 @@ import { pgErrorCode } from './errors'
 import { db } from './index'
 import { generateRoomSlug } from './meetings'
 import {
+  forgetRedirects,
+  lockSlugs,
+  rememberOldSlug,
+  resolveRedirect,
+  slugHeldElsewhere,
+} from './redirects'
+import {
   bookingEventTypes,
   bookingTimeOff,
   bookings,
@@ -36,7 +49,7 @@ import {
   user,
   workspaces,
 } from './schema'
-import { memberRole, type WorkspaceBrand } from './workspaces'
+import { brandColumns, memberRole, toBrand, type WorkspaceBrand } from './workspaces'
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0]
 type Executor = typeof db | Tx
@@ -68,7 +81,11 @@ export function slugify(value: string): string {
  */
 export async function ensureBookingSlug(workspaceId: string): Promise<string> {
   const rows = await db
-    .select({ slug: workspaces.bookingSlug, name: workspaces.name, brandName: workspaces.brandName })
+    .select({
+      slug: workspaces.bookingSlug,
+      name: workspaces.name,
+      brandName: workspaces.brandName,
+    })
     .from(workspaces)
     .where(eq(workspaces.id, workspaceId))
     .limit(1)
@@ -78,6 +95,8 @@ export async function ensureBookingSlug(workspaceId: string): Promise<string> {
   const base = slugify(ws.brandName || ws.name) || 'book'
   for (let attempt = 0; attempt < 6; attempt++) {
     const candidate = attempt === 0 ? base : `${base.slice(0, 42)}-${suffix()}`
+    // Another business's old address still leads to them: don't take it.
+    if (await slugHeldElsewhere('business', '', candidate, workspaceId)) continue
     try {
       const set = await db
         .update(workspaces)
@@ -109,12 +128,75 @@ export async function setBookingSlug(
   const clean = slug.trim().toLowerCase()
   if (!BOOKING_SLUG_RE.test(clean)) return 'invalid'
   try {
-    await db.update(workspaces).set({ bookingSlug: clean }).where(eq(workspaces.id, workspaceId))
-    return 'ok'
+    const taken = await db.transaction(async (tx) => {
+      const before = await tx
+        .select({ slug: workspaces.bookingSlug })
+        .from(workspaces)
+        .where(eq(workspaces.id, workspaceId))
+        .limit(1)
+      const old = before[0]?.slug
+      await lockSlugs(tx, 'business', '', old ? [old, clean] : [clean])
+      if (await slugHeldElsewhere('business', '', clean, workspaceId, tx)) return true
+      await tx.update(workspaces).set({ bookingSlug: clean }).where(eq(workspaces.id, workspaceId))
+      if (old) {
+        await rememberOldSlug(tx, {
+          kind: 'business',
+          scope: '',
+          oldSlug: old,
+          newSlug: clean,
+          targetId: workspaceId,
+          workspaceId,
+        })
+      }
+      return false
+    })
+    return taken ? 'taken' : 'ok'
   } catch (error) {
     if (pgErrorCode(error) === '23505') return 'taken'
     throw error
   }
+}
+
+/** Where a renamed booking page (and calendar) link lives now, if it moved. */
+export async function findMovedBookingLink(
+  businessSlug: string,
+  eventSlug?: string,
+): Promise<{ business: string; event?: string } | null> {
+  let ws = await db
+    .select({ id: workspaces.id, slug: workspaces.bookingSlug })
+    .from(workspaces)
+    .where(eq(workspaces.bookingSlug, businessSlug))
+    .limit(1)
+  let moved = false
+  if (!ws[0]) {
+    const target = await resolveRedirect('business', '', businessSlug)
+    if (!target) return null
+    ws = await db
+      .select({ id: workspaces.id, slug: workspaces.bookingSlug })
+      .from(workspaces)
+      .where(eq(workspaces.id, target))
+      .limit(1)
+    moved = true
+  }
+  const business = ws[0]
+  if (!business?.slug) return null
+  if (!eventSlug) return moved ? { business: business.slug } : null
+  const current = await db
+    .select({ slug: bookingEventTypes.slug })
+    .from(bookingEventTypes)
+    .where(
+      and(eq(bookingEventTypes.workspaceId, business.id), eq(bookingEventTypes.slug, eventSlug)),
+    )
+    .limit(1)
+  if (current[0]) return moved ? { business: business.slug, event: eventSlug } : null
+  const target = await resolveRedirect('calendar', business.id, eventSlug)
+  if (!target) return null
+  const ev = await db
+    .select({ slug: bookingEventTypes.slug })
+    .from(bookingEventTypes)
+    .where(eq(bookingEventTypes.id, target))
+    .limit(1)
+  return ev[0] ? { business: business.slug, event: ev[0].slug } : null
 }
 
 // ---------------------------------------------------------------------------
@@ -132,6 +214,10 @@ export interface EventTypeInput {
   maxDaysAhead: number
   timeZone: string
   weeklyHours: WeeklyHours
+  questions: BookingQuestion[]
+  confirmationMessage: string | null
+  remindersEnabled: boolean
+  color: string | null
   active: boolean
 }
 
@@ -152,13 +238,20 @@ function intIn(value: unknown, min: number, max: number): number | null {
 export function cleanEventTypeInput(
   raw: Record<string, unknown>,
 ): { ok: true; value: EventTypeInput } | { ok: false; error: string } {
-  const title = String(raw.title ?? '').trim().replace(/\s+/g, ' ').slice(0, 80)
+  const title = String(raw.title ?? '')
+    .trim()
+    .replace(/\s+/g, ' ')
+    .slice(0, 80)
   if (!title) return { ok: false, error: 'Give it a name.' }
-  const description = String(raw.description ?? '').trim().slice(0, 1000) || null
+  const description =
+    String(raw.description ?? '')
+      .trim()
+      .slice(0, 1000) || null
   const durationMinutes = intIn(raw.durationMinutes, 5, 480)
   if (durationMinutes === null) return { ok: false, error: 'Length must be 5 minutes to 8 hours.' }
   const slotStepMinutes = intIn(raw.slotStepMinutes, 5, 240)
-  if (slotStepMinutes === null) return { ok: false, error: 'Pick how often start times are offered.' }
+  if (slotStepMinutes === null)
+    return { ok: false, error: 'Pick how often start times are offered.' }
   const bufferBeforeMinutes = intIn(raw.bufferBeforeMinutes, 0, 240)
   const bufferAfterMinutes = intIn(raw.bufferAfterMinutes, 0, 240)
   if (bufferBeforeMinutes === null || bufferAfterMinutes === null) {
@@ -175,6 +268,13 @@ export function cleanEventTypeInput(
   if (weeklyHours.every((d) => d.length === 0)) {
     return { ok: false, error: 'Add some available hours on at least one day.' }
   }
+  const questions = normalizeQuestions(raw.questions)
+  if (!questions)
+    return { ok: false, error: 'Each “pick one” question needs at least two options.' }
+  const confirmationMessage =
+    String(raw.confirmationMessage ?? '')
+      .trim()
+      .slice(0, 1000) || null
   return {
     ok: true,
     value: {
@@ -188,9 +288,22 @@ export function cleanEventTypeInput(
       maxDaysAhead,
       timeZone,
       weeklyHours,
+      questions,
+      confirmationMessage,
+      remindersEnabled: raw.remindersEnabled !== false,
+      color: cleanHex(raw.color as string | null),
       active: Boolean(raw.active),
     },
   }
+}
+
+/** A calendar link from the editor: '' means "make one from the name". */
+export function cleanEventSlug(raw: unknown): string | null | 'invalid' {
+  const value = String(raw ?? '')
+    .trim()
+    .toLowerCase()
+  if (!value) return null
+  return BOOKING_SLUG_RE.test(value) ? value : 'invalid'
 }
 
 const eventTypeColumns = {
@@ -209,6 +322,10 @@ const eventTypeColumns = {
   maxDaysAhead: bookingEventTypes.maxDaysAhead,
   timeZone: bookingEventTypes.timeZone,
   weeklyHours: bookingEventTypes.weeklyHours,
+  questions: bookingEventTypes.questions,
+  confirmationMessage: bookingEventTypes.confirmationMessage,
+  remindersEnabled: bookingEventTypes.remindersEnabled,
+  color: bookingEventTypes.color,
   active: bookingEventTypes.active,
 }
 
@@ -255,8 +372,32 @@ export async function createEventType(
   userId: string,
   workspaceId: string,
   input: EventTypeInput,
-): Promise<{ id: string } | null> {
-  if (!(await memberRole(userId, workspaceId))) return null
+  customSlug: string | null = null,
+): Promise<{ ok: true; id: string } | { ok: false; reason: 'forbidden' | 'taken' }> {
+  if (!(await memberRole(userId, workspaceId))) return { ok: false, reason: 'forbidden' }
+  if (customSlug) {
+    if (await slugHeldElsewhere('calendar', workspaceId, customSlug, workspaceId))
+      return { ok: false, reason: 'taken' }
+    try {
+      const rows = await db
+        .insert(bookingEventTypes)
+        .values({ ...input, workspaceId, hostUserId: userId, slug: customSlug })
+        .returning({ id: bookingEventTypes.id })
+      const id = rows[0]!.id
+      await rememberOldSlug(db, {
+        kind: 'calendar',
+        scope: workspaceId,
+        oldSlug: customSlug,
+        newSlug: customSlug,
+        targetId: id,
+        workspaceId,
+      })
+      return { ok: true, id }
+    } catch (error) {
+      if (pgErrorCode(error) === '23505') return { ok: false, reason: 'taken' }
+      throw error
+    }
+  }
   const base = slugify(input.title) || 'meeting'
   for (let attempt = 0; attempt < 6; attempt++) {
     const slug = attempt === 0 ? base : `${base.slice(0, 42)}-${suffix()}`
@@ -265,7 +406,7 @@ export async function createEventType(
         .insert(bookingEventTypes)
         .values({ ...input, workspaceId, hostUserId: userId, slug })
         .returning({ id: bookingEventTypes.id })
-      return rows[0]!
+      return { ok: true, id: rows[0]!.id }
     } catch (error) {
       if (pgErrorCode(error) !== '23505') throw error
     }
@@ -273,15 +414,44 @@ export async function createEventType(
   throw new Error('could not pick an event slug')
 }
 
-/** Update an event type (any member of its workspace). The link (slug) stays put. */
+/**
+ * Update an event type (any member of its workspace). A new link keeps the old
+ * one working (it redirects).
+ */
 export async function updateEventType(
   userId: string,
   eventTypeId: string,
   input: EventTypeInput,
-): Promise<boolean> {
-  if (!(await getEventTypeForMember(userId, eventTypeId))) return false
+  newSlug: string | null = null,
+): Promise<'ok' | 'forbidden' | 'taken'> {
+  const current = await getEventTypeForMember(userId, eventTypeId)
+  if (!current) return 'forbidden'
+  if (newSlug && newSlug !== current.slug) {
+    if (await slugHeldElsewhere('calendar', current.workspaceId, newSlug, current.workspaceId))
+      return 'taken'
+    try {
+      await db.transaction(async (tx) => {
+        await tx
+          .update(bookingEventTypes)
+          .set({ ...input, slug: newSlug })
+          .where(eq(bookingEventTypes.id, eventTypeId))
+        await rememberOldSlug(tx, {
+          kind: 'calendar',
+          scope: current.workspaceId,
+          oldSlug: current.slug,
+          newSlug,
+          targetId: eventTypeId,
+          workspaceId: current.workspaceId,
+        })
+      })
+      return 'ok'
+    } catch (error) {
+      if (pgErrorCode(error) === '23505') return 'taken'
+      throw error
+    }
+  }
   await db.update(bookingEventTypes).set(input).where(eq(bookingEventTypes.id, eventTypeId))
-  return true
+  return 'ok'
 }
 
 /** Switch an event type on or off (off: its page stops taking bookings). */
@@ -299,6 +469,7 @@ export async function setEventTypeActive(
 export async function deleteEventType(userId: string, eventTypeId: string): Promise<boolean> {
   if (!(await getEventTypeForMember(userId, eventTypeId))) return false
   await db.delete(bookingEventTypes).where(eq(bookingEventTypes.id, eventTypeId))
+  await forgetRedirects(eventTypeId)
   return true
 }
 
@@ -323,13 +494,7 @@ async function businessBySlug(slug: string): Promise<PublicBusiness | null> {
       id: workspaces.id,
       name: workspaces.name,
       slug: workspaces.bookingSlug,
-      brandName: workspaces.brandName,
-      brandLogo: workspaces.brandLogo,
-      brandColor: workspaces.brandColor,
-      brandTagline: workspaces.brandTagline,
-      brandLogoSize: workspaces.brandLogoSize,
-      brandCtaLabel: workspaces.brandCtaLabel,
-      brandCtaUrl: workspaces.brandCtaUrl,
+      ...brandColumns,
     })
     .from(workspaces)
     .where(eq(workspaces.bookingSlug, slug))
@@ -340,15 +505,7 @@ async function businessBySlug(slug: string): Promise<PublicBusiness | null> {
     workspaceId: w.id,
     workspaceName: w.name,
     slug: w.slug,
-    brand: {
-      name: w.brandName,
-      logo: w.brandLogo,
-      color: w.brandColor,
-      tagline: w.brandTagline,
-      logoSize: w.brandLogoSize,
-      ctaLabel: w.brandCtaLabel,
-      ctaUrl: w.brandCtaUrl,
-    },
+    brand: toBrand(w, w.id),
   }
 }
 
@@ -359,7 +516,9 @@ export async function getBookingPage(
   if (!BOOKING_SLUG_RE.test(slug)) return null
   const business = await businessBySlug(slug)
   if (!business) return null
-  const eventTypes = (await listEventTypesForWorkspace(business.workspaceId)).filter((e) => e.active)
+  const eventTypes = (await listEventTypesForWorkspace(business.workspaceId)).filter(
+    (e) => e.active,
+  )
   return { business, eventTypes }
 }
 
@@ -429,7 +588,10 @@ export async function hostBusy(
     ...booked
       .filter((b) => b.id !== opts.ignoreBookingId)
       .map((b) => ({ start: new Date(b.startsAt).getTime(), end: new Date(b.endsAt).getTime() })),
-    ...away.map((a) => ({ start: new Date(a.startsAt).getTime(), end: new Date(a.endsAt).getTime() })),
+    ...away.map((a) => ({
+      start: new Date(a.startsAt).getTime(),
+      end: new Date(a.endsAt).getTime(),
+    })),
   ]
 }
 
@@ -471,6 +633,7 @@ export async function createBooking(input: {
   guestEmail: string
   guestNotes: string | null
   guestTimeZone: string | null
+  answers: BookingAnswer[]
   ipHash: string | null
   reschedule?: RescheduleFrom
 }): Promise<{ ok: true; id: string; token: string } | { ok: false; reason: 'taken' | 'gone' }> {
@@ -478,83 +641,89 @@ export async function createBooking(input: {
   const endsAt = input.startsAt + event.durationMinutes * 60_000
   const token = randomBytes(24).toString('base64url')
 
-  return db.transaction(async (tx) => {
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`booking-host:${event.hostUserId}`}))`)
-    const busy = await hostBusy(event.hostUserId, input.startsAt, endsAt, {
-      exec: tx,
-      ignoreBookingId: input.reschedule?.id,
-    })
-    if (!isSlotAvailable(slotRules(event), busy, input.startsAt, Date.now())) {
-      return { ok: false as const, reason: 'taken' as const }
-    }
+  return db
+    .transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtext(${`booking-host:${event.hostUserId}`}))`,
+      )
+      const busy = await hostBusy(event.hostUserId, input.startsAt, endsAt, {
+        exec: tx,
+        ignoreBookingId: input.reschedule?.id,
+      })
+      if (!isSlotAvailable(slotRules(event), busy, input.startsAt, Date.now())) {
+        return { ok: false as const, reason: 'taken' as const }
+      }
 
-    let roomId = input.reschedule?.meetingRoomId ?? null
-    if (roomId) {
-      const kept = await tx
-        .select({ id: meetingRooms.id })
-        .from(meetingRooms)
-        .where(eq(meetingRooms.id, roomId))
-        .limit(1)
-      if (!kept[0]) roomId = null
-    }
-    for (let attempt = 0; !roomId && attempt < 5; attempt++) {
-      const name = `${event.title} with ${input.guestName}`.replace(/\s+/g, ' ').slice(0, 80)
+      let roomId = input.reschedule?.meetingRoomId ?? null
+      if (roomId) {
+        const kept = await tx
+          .select({ id: meetingRooms.id })
+          .from(meetingRooms)
+          .where(eq(meetingRooms.id, roomId))
+          .limit(1)
+        if (!kept[0]) roomId = null
+      }
+      for (let attempt = 0; !roomId && attempt < 5; attempt++) {
+        const name = `${event.title} with ${input.guestName}`.replace(/\s+/g, ' ').slice(0, 80)
+        const rows = await tx
+          .insert(meetingRooms)
+          .values({
+            workspaceId: event.workspaceId,
+            name,
+            slug: generateRoomSlug(),
+            lobbyEnabled: true,
+            createdByUserId: event.hostUserId,
+          })
+          .onConflictDoNothing({ target: meetingRooms.slug })
+          .returning({ id: meetingRooms.id })
+        roomId = rows[0]?.id ?? null
+      }
+      if (!roomId) throw new Error('could not create a meeting room')
+
       const rows = await tx
-        .insert(meetingRooms)
+        .insert(bookings)
         .values({
           workspaceId: event.workspaceId,
-          name,
-          slug: generateRoomSlug(),
-          lobbyEnabled: true,
-          createdByUserId: event.hostUserId,
+          eventTypeId: event.id,
+          hostUserId: event.hostUserId,
+          title: event.title,
+          startsAt: new Date(input.startsAt).toISOString(),
+          endsAt: new Date(endsAt).toISOString(),
+          guestName: input.guestName,
+          guestEmail: input.guestEmail,
+          guestNotes: input.guestNotes,
+          guestTimeZone: input.guestTimeZone,
+          answers: input.answers.length ? input.answers : null,
+          meetingRoomId: roomId,
+          manageTokenHash: hashManageToken(token),
+          icsUid: input.reschedule?.icsUid ?? `${randomUUID()}@letmeshowyou.com.au`,
+          icsSequence: input.reschedule ? input.reschedule.icsSequence + 1 : 0,
+          ipHash: input.ipHash,
         })
-        .onConflictDoNothing({ target: meetingRooms.slug })
-        .returning({ id: meetingRooms.id })
-      roomId = rows[0]?.id ?? null
-    }
-    if (!roomId) throw new Error('could not create a meeting room')
-
-    const rows = await tx
-      .insert(bookings)
-      .values({
-        workspaceId: event.workspaceId,
-        eventTypeId: event.id,
-        hostUserId: event.hostUserId,
-        title: event.title,
-        startsAt: new Date(input.startsAt).toISOString(),
-        endsAt: new Date(endsAt).toISOString(),
-        guestName: input.guestName,
-        guestEmail: input.guestEmail,
-        guestNotes: input.guestNotes,
-        guestTimeZone: input.guestTimeZone,
-        meetingRoomId: roomId,
-        manageTokenHash: hashManageToken(token),
-        icsUid: input.reschedule?.icsUid ?? `${randomUUID()}@letmeshowyou.com.au`,
-        icsSequence: input.reschedule ? input.reschedule.icsSequence + 1 : 0,
-        ipHash: input.ipHash,
-      })
-      .returning({ id: bookings.id })
-
-    if (input.reschedule) {
-      const moved = await tx
-        .update(bookings)
-        .set({
-          status: 'cancelled',
-          cancelledAt: new Date().toISOString(),
-          cancelledBy: 'guest',
-          cancelReason: 'Rescheduled',
-        })
-        .where(and(eq(bookings.id, input.reschedule.id), eq(bookings.status, 'confirmed')))
         .returning({ id: bookings.id })
-      // Cancelled (or moved) meanwhile: undo the new booking too.
-      if (!moved[0]) tx.rollback()
-    }
-    return { ok: true as const, id: rows[0]!.id, token }
-  }).catch((error) => {
-    // tx.rollback() throws to abort; report it as the old booking being gone.
-    if (error instanceof TransactionRollbackError) return { ok: false as const, reason: 'gone' as const }
-    throw error
-  })
+
+      if (input.reschedule) {
+        const moved = await tx
+          .update(bookings)
+          .set({
+            status: 'cancelled',
+            cancelledAt: new Date().toISOString(),
+            cancelledBy: 'guest',
+            cancelReason: 'Rescheduled',
+          })
+          .where(and(eq(bookings.id, input.reschedule.id), eq(bookings.status, 'confirmed')))
+          .returning({ id: bookings.id })
+        // Cancelled (or moved) meanwhile: undo the new booking too.
+        if (!moved[0]) tx.rollback()
+      }
+      return { ok: true as const, id: rows[0]!.id, token }
+    })
+    .catch((error) => {
+      // tx.rollback() throws to abort; report it as the old booking being gone.
+      if (error instanceof TransactionRollbackError)
+        return { ok: false as const, reason: 'gone' as const }
+      throw error
+    })
 }
 
 export interface BookingDetail {
@@ -580,6 +749,8 @@ export interface BookingDetail {
   eventTypeId: string | null
   eventSlug: string | null
   eventTimeZone: string | null
+  answers: BookingAnswer[]
+  confirmationMessage: string | null
   business: PublicBusiness
 }
 
@@ -608,15 +779,11 @@ async function bookingDetail(where: ReturnType<typeof eq>): Promise<BookingDetai
       eventTypeId: bookings.eventTypeId,
       eventSlug: bookingEventTypes.slug,
       eventTimeZone: bookingEventTypes.timeZone,
+      answers: bookings.answers,
+      confirmationMessage: bookingEventTypes.confirmationMessage,
       workspaceName: workspaces.name,
       bookingSlug: workspaces.bookingSlug,
-      brandName: workspaces.brandName,
-      brandLogo: workspaces.brandLogo,
-      brandColor: workspaces.brandColor,
-      brandTagline: workspaces.brandTagline,
-      brandLogoSize: workspaces.brandLogoSize,
-      brandCtaLabel: workspaces.brandCtaLabel,
-      brandCtaUrl: workspaces.brandCtaUrl,
+      ...brandColumns,
     })
     .from(bookings)
     .innerJoin(workspaces, eq(bookings.workspaceId, workspaces.id))
@@ -650,19 +817,13 @@ async function bookingDetail(where: ReturnType<typeof eq>): Promise<BookingDetai
     eventTypeId: r.eventTypeId,
     eventSlug: r.eventSlug,
     eventTimeZone: r.eventTimeZone,
+    answers: r.answers ?? [],
+    confirmationMessage: r.confirmationMessage,
     business: {
       workspaceId: r.workspaceId,
       workspaceName: r.workspaceName,
       slug: r.bookingSlug ?? '',
-      brand: {
-        name: r.brandName,
-        logo: r.brandLogo,
-        color: r.brandColor,
-        tagline: r.brandTagline,
-        logoSize: r.brandLogoSize,
-        ctaLabel: r.brandCtaLabel,
-        ctaUrl: r.brandCtaUrl,
-      },
+      brand: toBrand(r, r.workspaceId),
     },
   }
 }
@@ -725,6 +886,7 @@ export async function releaseBookingRoom(roomId: string): Promise<boolean> {
       ),
     )
     .returning({ id: meetingRooms.id })
+  for (const r of rows) await forgetRedirects(r.id)
   return rows.length > 0
 }
 
@@ -736,6 +898,7 @@ export interface BookingListItem {
   guestName: string
   guestEmail: string
   guestNotes: string | null
+  answers: BookingAnswer[] | null
   status: string
   cancelledBy: string | null
   cancelReason: string | null
@@ -759,6 +922,7 @@ export async function listBookingsForWorkspace(
       guestName: bookings.guestName,
       guestEmail: bookings.guestEmail,
       guestNotes: bookings.guestNotes,
+      answers: bookings.answers,
       status: bookings.status,
       cancelledBy: bookings.cancelledBy,
       cancelReason: bookings.cancelReason,
@@ -801,7 +965,9 @@ export async function listTimeOff(userId: string): Promise<TimeOffItem[]> {
       note: bookingTimeOff.note,
     })
     .from(bookingTimeOff)
-    .where(and(eq(bookingTimeOff.userId, userId), gt(bookingTimeOff.endsAt, new Date().toISOString())))
+    .where(
+      and(eq(bookingTimeOff.userId, userId), gt(bookingTimeOff.endsAt, new Date().toISOString())),
+    )
     .orderBy(asc(bookingTimeOff.startsAt))
 }
 
@@ -825,4 +991,57 @@ export async function removeTimeOff(userId: string, id: string): Promise<boolean
     .where(and(eq(bookingTimeOff.id, id), eq(bookingTimeOff.userId, userId)))
     .returning({ id: bookingTimeOff.id })
   return rows.length > 0
+}
+
+// ---------------------------------------------------------------------------
+// Reminders
+// ---------------------------------------------------------------------------
+
+/**
+ * Claim the bookings due a reminder and mark them sent, in one statement, so
+ * two sweeps can never both send one. 'day': starting within 24 hours (but not
+ * within 2, the hour reminder covers that) and booked more than a day ahead.
+ * 'hour': starting within the hour and booked at least 2 hours ahead. Only for
+ * calendars with reminders switched on.
+ */
+export async function claimDueReminders(
+  kind: 'day' | 'hour',
+  now = Date.now(),
+): Promise<{ ids: string[]; claimedAt: string }> {
+  const sentAt = kind === 'day' ? bookings.reminderDaySentAt : bookings.reminderHourSentAt
+  const lo = new Date(now + (kind === 'day' ? 2 * 60 : 5) * 60_000).toISOString()
+  const hi = new Date(now + (kind === 'day' ? 24 * 60 : 60) * 60_000).toISOString()
+  const bookedAhead = kind === 'day' ? sql`interval '25 hours'` : sql`interval '2 hours'`
+  const rows = await db
+    .update(bookings)
+    .set(
+      kind === 'day'
+        ? { reminderDaySentAt: new Date(now).toISOString() }
+        : { reminderHourSentAt: new Date(now).toISOString() },
+    )
+    .where(
+      and(
+        eq(bookings.status, 'confirmed'),
+        isNull(sentAt),
+        gt(bookings.startsAt, lo),
+        lte(bookings.startsAt, hi),
+        sql`${bookings.createdAt} <= ${bookings.startsAt} - ${bookedAhead}`,
+        sql`exists (select 1 from ${bookingEventTypes} where ${bookingEventTypes.id} = ${bookings.eventTypeId} and ${bookingEventTypes.remindersEnabled})`,
+      ),
+    )
+    .returning({ id: bookings.id })
+  return { ids: rows.map((r) => r.id), claimedAt: new Date(now).toISOString() }
+}
+
+/** Undo a claim whose email failed, so the next sweep tries again (while it's still due). */
+export async function releaseReminderClaim(
+  kind: 'day' | 'hour',
+  id: string,
+  claimedAt: string,
+): Promise<void> {
+  const sentAt = kind === 'day' ? bookings.reminderDaySentAt : bookings.reminderHourSentAt
+  await db
+    .update(bookings)
+    .set(kind === 'day' ? { reminderDaySentAt: null } : { reminderHourSentAt: null })
+    .where(and(eq(bookings.id, id), eq(sentAt, claimedAt)))
 }

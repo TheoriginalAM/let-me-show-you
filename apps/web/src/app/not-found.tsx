@@ -5,11 +5,11 @@ export default function NotFound() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
       <span className="eyebrow rise" style={{ animationDelay: '40ms' }}>
-        <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_2px_rgba(139,139,246,0.9)]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-accent" />
         {APP_NAME}
       </span>
       <div
-        className="rise glass grid h-16 w-16 place-items-center rounded-2xl ring-1 ring-inset ring-white/10"
+        className="rise glass grid h-16 w-16 place-items-center rounded-2xl ring-1 ring-inset ring-line"
         style={{ animationDelay: '90ms' }}
       >
         <svg
@@ -26,7 +26,7 @@ export default function NotFound() {
         </svg>
       </div>
       <h1
-        className="rise font-display text-3xl font-semibold tracking-tight sm:text-4xl"
+        className="rise font-display text-3xl font-extrabold tracking-tight sm:text-4xl"
         style={{ animationDelay: '150ms' }}
       >
         This link isn’t available

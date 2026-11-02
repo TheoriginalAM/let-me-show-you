@@ -5,21 +5,31 @@ import { getCurrentUser } from '@/lib/current-user'
 import { commentCountsByVideo } from '@/db/comments'
 import { approvalCountsByVideo } from '@/db/approvals'
 import { listVideosByWorkspaceWithViews } from '@/db/queries'
-import { getActiveWorkspaceId, getWorkspaceForMember, listWorkspacesForUser } from '@/db/workspaces'
-import { NotificationsBell } from '@/components/notifications-bell'
-import { SignOutButton } from '@/components/sign-out-button'
+import { getActiveWorkspaceId, listWorkspacesForUser } from '@/db/workspaces'
+import { Icon } from '@/components/brand/icons'
+import { Scribble } from '@/components/brand/scribble'
 import { VideoCard } from '@/components/video-card'
-import { WorkspaceSwitcher } from './workspace-switcher'
+import { PageHeader } from './page-header'
 
 // The session lookup reads request headers, so this route is always dynamic.
 export const dynamic = 'force-dynamic'
 
+const FIRST_STEPS = [
+  { title: 'Get the app', body: 'Download Let Me Show You for Mac or Windows and sign in.' },
+  {
+    title: 'Record and talk',
+    body: 'Pick a screen or window and explain it out loud, like you would in the room.',
+  },
+  {
+    title: 'Paste the link',
+    body: 'Stop, and the link is on your clipboard. It plays in any browser.',
+  },
+]
+
 export default async function DashboardPage() {
-  // Middleware gates /dashboard on the cookie; this validates the session and
-  // enforces the invite gate.
+  // The layout gates sign-in and approval; this still needs the user for data.
   const user = await getCurrentUser()
   if (!user) redirect('/login')
-  if (!user.approved) redirect('/pending')
 
   const workspaces = await listWorkspacesForUser(user.id)
   const activeId = await getActiveWorkspaceId(user.id)
@@ -27,57 +37,85 @@ export default async function DashboardPage() {
 
   const videos = active ? await listVideosByWorkspaceWithViews(active.id) : []
   const videoIds = videos.map((v) => v.id)
-  const commentCounts = await commentCountsByVideo(videoIds)
-  const approvalCounts = await approvalCountsByVideo(videoIds)
-  // The active workspace's branding flows into the dashboard (logo + accent).
-  const activeWs = active ? await getWorkspaceForMember(user.id, active.id) : null
+  const [commentCounts, approvalCounts] = await Promise.all([
+    commentCountsByVideo(videoIds),
+    approvalCountsByVideo(videoIds),
+  ])
   const now = Date.now()
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:px-6">
-      <header className="rise flex flex-wrap items-center justify-between gap-4">
-        <WorkspaceSwitcher
-          workspaces={workspaces}
-          activeId={active?.id ?? null}
-          activeLogo={activeWs?.brand.logo ?? null}
-          activeColor={activeWs?.brand.color ?? null}
-        />
-        <div className="flex items-center gap-2">
-          <NotificationsBell userId={user.id} />
-          <Link href="/dashboard/rooms" className="btn-ghost px-3 py-1.5 text-sm">
-            Meetings
+    <div className="flex w-full max-w-6xl flex-col gap-8">
+      <PageHeader
+        section="recordings"
+        title="Recordings"
+        description={
+          videos.length === 0
+            ? `Walkthroughs you record for ${active?.name ?? 'this business'} land here, ready to share.`
+            : `${videos.length} recording${videos.length === 1 ? '' : 's'} in ${active?.name ?? 'this business'}.`
+        }
+        actions={
+          <Link href="/download" className="btn-ghost px-4 py-2 text-sm">
+            <Icon name="download" className="h-4 w-4" strokeWidth={2.1} />
+            Get the app
           </Link>
-          <Link href="/dashboard/booking" className="btn-ghost px-3 py-1.5 text-sm">
-            Booking
-          </Link>
-          <Link href="/dashboard/settings" className="btn-ghost px-3 py-1.5 text-sm">
-            Settings
-          </Link>
-          {user.role === 'admin' && (
-            <Link href="/admin" className="btn-ghost px-3 py-1.5 text-sm">
-              Admin
-            </Link>
-          )}
-          <SignOutButton />
-        </div>
-      </header>
-
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-sm text-muted">
-          {videos.length} recording{videos.length === 1 ? '' : 's'} in this workspace
-        </p>
-        <p className="text-sm text-faint">Signed in as {user.name}</p>
-      </div>
+        }
+      />
 
       {videos.length === 0 ? (
-        <div className="glass rise rounded-2xl border-dashed p-12 text-center">
-          <h2 className="font-display text-lg font-semibold tracking-tight">No recordings yet</h2>
-          <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
-            Record your screen from the desktop app and it will appear here, ready to share.
-          </p>
-        </div>
+        <section className="card relative overflow-hidden rounded-3xl p-8 sm:p-10">
+          <div className="grid items-center gap-10 xl:grid-cols-[1fr_18rem]">
+            <div>
+              <h2 className="max-w-md font-display text-2xl font-extrabold tracking-tight text-ink">
+                Your first recording is three steps away
+              </h2>
+              <ol className="mt-6 flex max-w-lg flex-col gap-4">
+                {FIRST_STEPS.map((step, i) => (
+                  <li key={step.title} className="flex gap-4">
+                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-ink font-display text-sm font-extrabold text-canvas">
+                      {i + 1}
+                    </span>
+                    <span className="flex flex-col gap-0.5 pt-0.5">
+                      <span className="font-semibold text-ink">{step.title}</span>
+                      <span className="text-sm leading-relaxed text-muted">{step.body}</span>
+                    </span>
+                  </li>
+                ))}
+              </ol>
+              <Link href="/download" className="btn-primary mt-8 px-5 py-3 text-sm">
+                Download the app
+              </Link>
+            </div>
+            {/* A little screen with the pen already on it. */}
+            <div className="relative mx-auto hidden w-full max-w-[18rem] xl:block" aria-hidden>
+              <div className="rotate-2 rounded-2xl border-2 border-ink bg-surface p-2 shadow-[6px_6px_0_0_var(--color-ink)]">
+                <div className="flex gap-1.5 px-1 pb-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-hl-pink" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-hl-yellow" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-hl-green" />
+                </div>
+                <div className="relative grid aspect-video place-items-center rounded-xl bg-canvas-2">
+                  <span className="grid h-12 w-12 place-items-center rounded-full bg-accent text-on-accent">
+                    <svg viewBox="0 0 24 24" className="ml-0.5 h-5 w-5 fill-current">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </span>
+                  <Scribble
+                    kind="circle"
+                    className="absolute inset-x-6 inset-y-5"
+                    color="var(--color-hl-pink)"
+                    width={4}
+                    delay={0.4}
+                  />
+                </div>
+              </div>
+              <span className="absolute -bottom-7 right-0 -rotate-6 font-hand text-2xl text-accent-ink">
+                your link, ready!
+              </span>
+            </div>
+          </div>
+        </section>
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {videos.map((video) => (
             <VideoCard
               key={video.id}
@@ -108,12 +146,6 @@ export default async function DashboardPage() {
           ))}
         </div>
       )}
-
-      <footer className="mt-auto border-t border-line pt-6 text-sm text-faint">
-        <Link href="/" className="transition hover:text-ink">
-          ← Back to {`letmeshowyou.com.au`}
-        </Link>
-      </footer>
-    </main>
+    </div>
   )
 }

@@ -90,7 +90,7 @@ export function Members({
   return (
     <section className="flex flex-col gap-4">
       <div>
-        <h2 className="font-display text-lg font-semibold tracking-tight text-ink">Members</h2>
+        <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">Members</h2>
         <p className="mt-1 text-sm text-muted">
           Invite people by email. They can view and add recordings in this workspace.
         </p>
@@ -102,12 +102,12 @@ export function Members({
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="teammate@company.com"
-          className="min-w-0 flex-1 rounded-lg border border-line bg-white/[0.03] px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+          className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
         />
         <select
           value={role}
           onChange={(e) => setRole(e.target.value as 'owner' | 'member')}
-          className="rounded-lg border border-line bg-white/[0.03] px-3 py-2 text-sm text-ink focus:border-line-strong focus:outline-none"
+          className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-line-strong focus:outline-none"
         >
           <option value="member">Member</option>
           <option value="owner">Owner</option>
@@ -120,13 +120,13 @@ export function Members({
           Send invite
         </button>
       </form>
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       {notice && (
-        <div className="flex flex-col gap-2 rounded-xl border border-line bg-white/[0.02] p-3">
+        <div className="flex flex-col gap-2 rounded-xl border border-line bg-surface p-3">
           <p className="text-sm text-muted">{notice}</p>
           {inviteLink && (
             <div className="flex items-center gap-2">
-              <code className="min-w-0 flex-1 truncate rounded-lg bg-white/[0.04] px-2.5 py-2 text-xs text-ink">
+              <code className="min-w-0 flex-1 truncate rounded-lg bg-surface px-2.5 py-2 text-xs text-ink">
                 {inviteLink}
               </code>
               <button
@@ -148,9 +148,9 @@ export function Members({
           return (
             <li
               key={m.userId}
-              className="flex items-center gap-3 rounded-xl border border-line bg-white/[0.02] px-4 py-3"
+              className="flex items-center gap-3 rounded-xl border border-line bg-surface px-4 py-3"
             >
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/5 text-xs font-bold text-ink">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-surface-2 text-xs font-bold text-ink">
                 {(m.name || m.email).charAt(0).toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">
@@ -164,7 +164,7 @@ export function Members({
                 <button
                   onClick={() => remove(m.userId)}
                   disabled={pending}
-                  className="text-xs text-faint transition hover:text-red-300 disabled:opacity-50"
+                  className="text-xs text-faint transition hover:text-danger disabled:opacity-50"
                 >
                   Remove
                 </button>
@@ -190,7 +190,7 @@ export function Members({
                 <button
                   onClick={() => revoke(inv.id)}
                   disabled={pending}
-                  className="text-xs text-faint transition hover:text-red-300 disabled:opacity-50"
+                  className="text-xs text-faint transition hover:text-danger disabled:opacity-50"
                 >
                   Revoke
                 </button>

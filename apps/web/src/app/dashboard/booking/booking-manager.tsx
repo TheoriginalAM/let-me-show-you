@@ -17,6 +17,7 @@ interface Props {
   domain: string
   pageSlug: string
   isOwner: boolean
+  accent: string | null
   meId: string
   eventTypes: EventTypeItem[]
   upcoming: BookingListItem[]
@@ -65,26 +66,41 @@ export function BookingManager(props: Props) {
 
       <section className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-display text-xl font-semibold tracking-tight text-ink">What people can book</h2>
+          <h2 className="font-display text-xl font-extrabold tracking-tight text-ink">Calendars</h2>
           {editing !== 'new' && (
             <button className="btn-primary px-4 py-2 text-sm" onClick={() => setEditing('new')}>
-              New booking type
+              New calendar
             </button>
           )}
         </div>
-        {editing === 'new' && <EventTypeEditor initial={null} onDone={() => setEditing(null)} />}
+        {editing === 'new' && (
+          <EventTypeEditor
+            initial={null}
+            pageUrl={pageUrl}
+            brandColor={props.accent}
+            onDone={() => setEditing(null)}
+          />
+        )}
         {props.eventTypes.length === 0 && editing !== 'new' && (
-          <div className="glass rounded-2xl border-dashed p-8 text-center text-sm text-muted">
-            Nothing to book yet. Create a booking type (say, a 30 minute intro call) and share the link.
+          <div className="card rounded-2xl border-2 border-dashed p-8 text-center text-sm text-muted">
+            No calendars yet. Make one for each kind of call you take (say, a 30 minute intro call
+            and a 1 hour strategy session), give it a name and link, and share it.
           </div>
         )}
         {props.eventTypes.map((e) =>
           editing === e.id ? (
-            <EventTypeEditor key={e.id} initial={e} onDone={() => setEditing(null)} />
+            <EventTypeEditor
+              key={e.id}
+              initial={e}
+              pageUrl={pageUrl}
+              brandColor={props.accent}
+              onDone={() => setEditing(null)}
+            />
           ) : (
             <EventTypeCard
               key={e.id}
               event={e}
+              brandColor={props.accent}
               url={`${pageUrl}/${e.slug}`}
               isMine={e.hostUserId === props.meId}
               copied={copied === e.id}
@@ -96,9 +112,11 @@ export function BookingManager(props: Props) {
       </section>
 
       <section className="flex flex-col gap-3">
-        <h2 className="font-display text-xl font-semibold tracking-tight text-ink">Upcoming</h2>
+        <h2 className="font-display text-xl font-extrabold tracking-tight text-ink">Coming up</h2>
         {props.upcoming.length === 0 ? (
-          <p className="text-sm text-muted">No upcoming bookings.</p>
+          <p className="text-sm text-muted">
+            Nothing booked yet. Share a calendar link and bookings land here.
+          </p>
         ) : (
           <BookingList items={props.upcoming} tz={tz} cancellable />
         )}
@@ -108,7 +126,7 @@ export function BookingManager(props: Props) {
 
       {props.past.length > 0 && (
         <details className="group">
-          <summary className="cursor-pointer font-display text-lg font-semibold tracking-tight text-muted">
+          <summary className="cursor-pointer font-display text-lg font-extrabold tracking-tight text-muted">
             Past bookings
           </summary>
           <div className="mt-3">
@@ -136,15 +154,18 @@ function PageLinkCard(p: {
   function save(): void {
     setError(null)
     startTransition(async () => {
-      const res = await setBookingSlugAction(slug).catch(() => ({ ok: false as const, error: 'Try again.' }))
+      const res = await setBookingSlugAction(slug).catch(() => ({
+        ok: false as const,
+        error: 'Try again.',
+      }))
       if (res.ok) setEditing(false)
       else setError(res.error)
     })
   }
 
   return (
-    <div className="glass rise rounded-2xl p-5">
-      <p className="text-sm text-muted">Your booking page</p>
+    <div className="relative overflow-hidden rounded-2xl border-2 border-ink bg-surface p-5 shadow-[5px_5px_0_0_var(--color-hl-green)]">
+      <p className="text-sm font-semibold text-ink">Your booking page</p>
       {editing ? (
         <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
           <span className="shrink-0 font-mono text-sm text-faint">{p.domain}/book/</span>
@@ -155,7 +176,11 @@ function PageLinkCard(p: {
             className={`${inputCls} font-mono`}
             autoFocus
           />
-          <button className="btn-primary shrink-0 px-4 py-2 text-sm" disabled={pending} onClick={save}>
+          <button
+            className="btn-primary shrink-0 px-4 py-2 text-sm"
+            disabled={pending}
+            onClick={save}
+          >
             Save
           </button>
           <button
@@ -169,20 +194,33 @@ function PageLinkCard(p: {
           </button>
         </div>
       ) : (
-        <p className="mt-1 break-all font-mono text-lg text-ink">{p.url.replace('https://', '')}</p>
+        <p className="mt-1 break-all font-display text-xl font-extrabold tracking-tight text-ink">
+          {p.url.replace('https://', '').replace(`/book/${p.slug}`, '/book/')}
+          <span className="mark [--hl:var(--color-hl-green)]">{p.slug}</span>
+        </p>
       )}
-      {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
+      {editing && (
+        <p className="mt-2 text-xs text-muted">
+          The old link keeps working and sends people to the new one.
+        </p>
+      )}
       {!editing && (
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="btn-ghost px-3 py-1.5 text-sm" onClick={p.onCopy}>
             {p.copied ? 'Copied' : 'Copy link'}
           </button>
-          <a href={`/book/${p.slug}`} target="_blank" rel="noopener noreferrer" className="btn-ghost px-3 py-1.5 text-sm">
+          <a
+            href={`/book/${p.slug}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn-ghost px-3 py-1.5 text-sm"
+          >
             Open
           </a>
           {p.isOwner && (
             <button className="btn-ghost px-3 py-1.5 text-sm" onClick={() => setEditing(true)}>
-              Change address
+              Change link
             </button>
           )}
         </div>
@@ -200,6 +238,7 @@ function hoursSummary(e: EventTypeItem): string {
 
 function EventTypeCard(p: {
   event: EventTypeItem
+  brandColor: string | null
   url: string
   isMine: boolean
   copied: boolean
@@ -226,32 +265,60 @@ function EventTypeCard(p: {
   }
 
   return (
-    <div className={`glass rise rounded-2xl p-5 ${e.active ? '' : 'opacity-70'}`}>
+    <div
+      className={`card relative overflow-hidden rounded-2xl p-5 pl-6 ${e.active ? '' : 'opacity-70'}`}
+    >
+      <span
+        className="absolute inset-y-0 left-0 w-1.5"
+        style={{ background: e.color ?? p.brandColor ?? 'var(--color-accent)' }}
+        aria-hidden
+      />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className="truncate font-display text-lg font-semibold tracking-tight text-ink">{e.title}</h3>
+          <h3 className="truncate font-display text-lg font-extrabold tracking-tight text-ink">
+            {e.title}
+          </h3>
           <p className="mt-0.5 text-sm text-muted">
-            {formatDuration(e.durationMinutes)} · {hoursSummary(e)} · {e.timeZone.replace(/_/g, ' ')}
-            {!p.isMine && ` · hosted by ${e.hostName}`}
+            {formatDuration(e.durationMinutes)}, {hoursSummary(e)}, {e.timeZone.replace(/_/g, ' ')}
+            {!p.isMine && `, hosted by ${e.hostName}`}
           </p>
-          <p className="mt-1 truncate font-mono text-xs text-faint">{p.url.replace('https://', '')}</p>
+          <p className="mt-1.5 flex flex-wrap gap-1.5 text-xs">
+            <span className="truncate rounded-md bg-surface-2 px-2 py-0.5 font-mono text-muted">
+              {p.url.replace('https://', '')}
+            </span>
+            {e.questions.length > 0 && (
+              <span className="rounded-md bg-surface-2 px-2 py-0.5 text-muted">
+                {e.questions.length} question{e.questions.length === 1 ? '' : 's'}
+              </span>
+            )}
+            {e.remindersEnabled && (
+              <span className="rounded-md bg-surface-2 px-2 py-0.5 text-muted">Reminders on</span>
+            )}
+          </p>
         </div>
-        <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-muted">
+        <label className="flex cursor-pointer select-none items-center gap-2.5 text-sm font-medium text-muted">
           <input
             type="checkbox"
+            role="switch"
             checked={e.active}
             disabled={pending}
             onChange={(ev) => run(() => setEventTypeActiveAction(e.id, ev.target.checked))}
-            className="h-4 w-4 accent-[#8b8bf6]"
+            className="peer sr-only"
           />
-          {e.active ? 'Taking bookings' : 'Off'}
+          <span className="relative h-6 w-11 rounded-full bg-line-strong transition peer-checked:bg-hl-green peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-accent-ink after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5" />
+          {e.active ? 'Taking bookings' : 'Paused'}
         </label>
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button className="btn-ghost px-3 py-1.5 text-sm" onClick={p.onCopy}>
           {p.copied ? 'Copied' : 'Copy link'}
         </button>
-        <a href={p.url.replace(/^https:\/\/[^/]+/, '')} target="_blank" rel="noopener noreferrer" className="btn-ghost px-3 py-1.5 text-sm">
+        <a
+          href={p.url.replace(/^https:\/\/[^/]+/, '')}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-ghost px-3 py-1.5 text-sm"
+        >
           Preview
         </a>
         <button className="btn-ghost px-3 py-1.5 text-sm" onClick={p.onEdit}>
@@ -259,10 +326,12 @@ function EventTypeCard(p: {
         </button>
         <button
           className={`ml-auto rounded-lg px-3 py-1.5 text-sm transition ${
-            confirmDelete ? 'bg-red-500/20 text-red-200' : 'text-faint hover:text-red-300'
+            confirmDelete ? 'bg-danger text-white' : 'text-faint hover:text-danger'
           }`}
           disabled={pending}
-          onClick={() => (confirmDelete ? run(() => deleteEventTypeAction(e.id)) : setConfirmDelete(true))}
+          onClick={() =>
+            confirmDelete ? run(() => deleteEventTypeAction(e.id)) : setConfirmDelete(true)
+          }
         >
           {confirmDelete ? 'Confirm delete' : 'Delete'}
         </button>
@@ -270,12 +339,20 @@ function EventTypeCard(p: {
       {confirmDelete && (
         <p className="mt-2 text-xs text-faint">Bookings already made stay on your calendar.</p>
       )}
-      {note && <p className="mt-2 text-sm text-red-300">{note}</p>}
+      {note && <p className="mt-2 text-sm text-danger">{note}</p>}
     </div>
   )
 }
 
-function BookingList({ items, tz, cancellable = false }: { items: BookingListItem[]; tz: string; cancellable?: boolean }) {
+function BookingList({
+  items,
+  tz,
+  cancellable = false,
+}: {
+  items: BookingListItem[]
+  tz: string
+  cancellable?: boolean
+}) {
   // Group by day in the viewer's zone.
   const groups = useMemo(() => {
     const out: { day: string; label: string; items: BookingListItem[] }[] = []
@@ -306,7 +383,7 @@ function BookingList({ items, tz, cancellable = false }: { items: BookingListIte
     <div className="flex flex-col gap-4">
       {groups.map((g) => (
         <div key={g.day} className="flex flex-col gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wider text-faint">{g.label}</p>
+          <p className="text-sm font-bold text-ink">{g.label}</p>
           {g.items.map((b) => (
             <BookingRow key={b.id} b={b} tz={tz} cancellable={cancellable} />
           ))}
@@ -316,7 +393,15 @@ function BookingList({ items, tz, cancellable = false }: { items: BookingListIte
   )
 }
 
-function BookingRow({ b, tz, cancellable }: { b: BookingListItem; tz: string; cancellable: boolean }) {
+function BookingRow({
+  b,
+  tz,
+  cancellable,
+}: {
+  b: BookingListItem
+  tz: string
+  cancellable: boolean
+}) {
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -328,13 +413,16 @@ function BookingRow({ b, tz, cancellable }: { b: BookingListItem; tz: string; ca
   function cancel(): void {
     setError(null)
     startTransition(async () => {
-      const res = await cancelBookingAction(b.id, reason).catch(() => ({ ok: false as const, error: 'Try again.' }))
+      const res = await cancelBookingAction(b.id, reason).catch(() => ({
+        ok: false as const,
+        error: 'Try again.',
+      }))
       if (!res.ok) setError(res.error)
     })
   }
 
   return (
-    <div className={`glass rounded-xl p-4 ${cancelled ? 'opacity-60' : ''}`}>
+    <div className={`card rounded-xl p-4 ${cancelled ? 'opacity-60' : ''}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-ink">
@@ -343,14 +431,32 @@ function BookingRow({ b, tz, cancellable }: { b: BookingListItem; tz: string; ca
           </p>
           <p className="text-sm text-muted">
             {b.guestName}{' '}
-            <a href={`mailto:${b.guestEmail}`} className="text-faint underline-offset-2 hover:underline">
+            <a
+              href={`mailto:${b.guestEmail}`}
+              className="text-faint underline-offset-2 hover:underline"
+            >
               {b.guestEmail}
             </a>
             {b.hostName && <span className="text-faint"> · with {b.hostName}</span>}
           </p>
-          {b.guestNotes && <p className="mt-1 whitespace-pre-line text-sm text-faint">“{b.guestNotes}”</p>}
+          {b.guestNotes && (
+            <p className="mt-1 whitespace-pre-line text-sm text-faint">“{b.guestNotes}”</p>
+          )}
+          {b.answers && b.answers.length > 0 && (
+            <details className="mt-1.5 text-sm">
+              <summary className="cursor-pointer text-accent-ink">Their answers</summary>
+              <dl className="mt-2 flex flex-col gap-2 rounded-lg bg-surface-2 p-3">
+                {b.answers.map((a) => (
+                  <div key={a.label}>
+                    <dt className="text-xs text-muted">{a.label}</dt>
+                    <dd className="whitespace-pre-line break-words text-ink">{a.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </details>
+          )}
           {cancelled && (
-            <p className="mt-1 text-xs text-red-300">
+            <p className="mt-1 text-xs text-danger">
               Cancelled by {b.cancelledBy === 'host' ? 'you' : 'the guest'}
               {b.cancelReason ? `: ${b.cancelReason}` : ''}
             </p>
@@ -359,13 +465,18 @@ function BookingRow({ b, tz, cancellable }: { b: BookingListItem; tz: string; ca
         {!cancelled && (
           <div className="flex shrink-0 gap-2">
             {b.roomSlug && (
-              <a href={`/m/${b.roomSlug}`} target="_blank" rel="noopener noreferrer" className="btn-ghost px-3 py-1.5 text-sm">
+              <a
+                href={`/m/${b.roomSlug}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-ghost px-3 py-1.5 text-sm"
+              >
                 Open room
               </a>
             )}
             {cancellable && (
               <button
-                className="rounded-lg px-3 py-1.5 text-sm text-faint transition hover:text-red-300"
+                className="rounded-lg px-3 py-1.5 text-sm text-faint transition hover:text-danger"
                 onClick={() => setOpen((o) => !o)}
               >
                 Cancel
@@ -384,7 +495,7 @@ function BookingRow({ b, tz, cancellable }: { b: BookingListItem; tz: string; ca
             className={inputCls}
           />
           <button
-            className="shrink-0 rounded-lg bg-red-500/80 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-500 disabled:opacity-60"
+            className="shrink-0 rounded-xl bg-danger px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-60"
             disabled={pending}
             onClick={cancel}
           >
@@ -392,7 +503,7 @@ function BookingRow({ b, tz, cancellable }: { b: BookingListItem; tz: string; ca
           </button>
         </div>
       )}
-      {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
+      {error && <p className="mt-2 text-sm text-danger">{error}</p>}
     </div>
   )
 }
@@ -428,8 +539,10 @@ function TimeOffSection({ items, tz }: { items: TimeOffItem[]; tz: string }) {
   return (
     <section className="flex flex-col gap-3">
       <div>
-        <h2 className="font-display text-xl font-semibold tracking-tight text-ink">Time off</h2>
-        <p className="text-sm text-muted">Days you can&rsquo;t be booked, for every business you run.</p>
+        <h2 className="font-display text-xl font-extrabold tracking-tight text-ink">Time off</h2>
+        <p className="text-sm text-muted">
+          Days you can&rsquo;t be booked, for every business you run.
+        </p>
       </div>
       {items.length > 0 && (
         <ul className="flex flex-col gap-2">
@@ -438,14 +551,17 @@ function TimeOffSection({ items, tz }: { items: TimeOffItem[]; tz: string }) {
             // Stored end is exclusive (midnight after the last day).
             const e = new Date(t.endsAt).getTime() - 1
             return (
-              <li key={t.id} className="glass flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm">
+              <li
+                key={t.id}
+                className="card flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm"
+              >
                 <span className="text-ink">
                   {formatDay(s, tz)}
                   {zonedParts(s, tz).date !== zonedParts(e, tz).date && ` to ${formatDay(e, tz)}`}
                   {t.note && <span className="text-muted"> · {t.note}</span>}
                 </span>
                 <button
-                  className="text-faint transition hover:text-red-300"
+                  className="text-faint transition hover:text-danger"
                   disabled={pending}
                   onClick={() => remove(t.id)}
                 >
@@ -456,14 +572,25 @@ function TimeOffSection({ items, tz }: { items: TimeOffItem[]; tz: string }) {
           })}
         </ul>
       )}
-      <div className="glass flex flex-col gap-2 rounded-2xl p-4 sm:flex-row sm:items-end">
+      <div className="card flex flex-col gap-2 rounded-2xl p-4 sm:flex-row sm:items-end">
         <label className="flex flex-col gap-1 text-sm text-muted">
           From
-          <input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className={inputCls} />
+          <input
+            type="date"
+            value={from}
+            onChange={(e) => setFrom(e.target.value)}
+            className={inputCls}
+          />
         </label>
         <label className="flex flex-col gap-1 text-sm text-muted">
           To
-          <input type="date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} className={inputCls} />
+          <input
+            type="date"
+            value={to}
+            min={from || undefined}
+            onChange={(e) => setTo(e.target.value)}
+            className={inputCls}
+          />
         </label>
         <label className="flex flex-1 flex-col gap-1 text-sm text-muted">
           Note <span className="sr-only">(optional)</span>
@@ -475,11 +602,15 @@ function TimeOffSection({ items, tz }: { items: TimeOffItem[]; tz: string }) {
             className={inputCls}
           />
         </label>
-        <button className="btn-primary shrink-0 px-4 py-2.5 text-sm" disabled={pending || !from} onClick={add}>
+        <button
+          className="btn-primary shrink-0 px-4 py-2.5 text-sm"
+          disabled={pending || !from}
+          onClick={add}
+        >
           Block days
         </button>
       </div>
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </section>
   )
 }

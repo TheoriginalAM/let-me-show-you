@@ -23,15 +23,15 @@ export default async function AdminPage() {
       <header className="rise flex flex-wrap items-end justify-between gap-4">
         <div>
           <span className="eyebrow">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_2px_rgba(139,139,246,0.9)]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
             Admin
           </span>
-          <h1 className="mt-3 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+          <h1 className="mt-3 font-display text-4xl font-extrabold tracking-tight sm:text-5xl">
             Users
           </h1>
           <p className="mt-2 text-sm text-muted">
             {pendingCount > 0 ? (
-              <span className="font-medium text-amber-300">{pendingCount} awaiting approval</span>
+              <span className="font-medium text-[#8a4b00]">{pendingCount} awaiting approval</span>
             ) : (
               'Nobody awaiting approval'
             )}{' '}
@@ -50,7 +50,7 @@ export default async function AdminPage() {
         {sorted.map((u) => (
           <li
             key={u.id}
-            className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-white/[0.02]"
+            className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 transition-colors hover:bg-surface"
           >
             <div className="min-w-0">
               <p className="flex items-center gap-2 truncate font-medium text-ink">
@@ -66,7 +66,7 @@ export default async function AdminPage() {
             <div className="flex items-center gap-2">
               {u.approved ? (
                 <>
-                  <span className="rounded-full bg-green-500/15 px-2.5 py-0.5 text-xs font-medium text-green-300 ring-1 ring-inset ring-green-500/25">
+                  <span className="rounded-full bg-success/15 px-2.5 py-0.5 text-xs font-medium text-success ring-1 ring-inset ring-success/25">
                     Approved
                   </span>
                   {u.role !== 'admin' && (
@@ -79,7 +79,7 @@ export default async function AdminPage() {
                 </>
               ) : (
                 <>
-                  <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-amber-300 ring-1 ring-inset ring-amber-500/25">
+                  <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-medium text-[#8a4b00] ring-1 ring-inset ring-hl-orange/60">
                     Pending
                   </span>
                   <form action={approveUserAction.bind(null, u.id)}>

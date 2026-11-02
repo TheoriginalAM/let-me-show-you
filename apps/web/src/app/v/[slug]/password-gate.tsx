@@ -38,7 +38,7 @@ export function PasswordGate({ slug, accent }: { slug: string; accent: string })
         style={{ background: `radial-gradient(60% 60% at 50% 20%, ${accent}47, transparent 70%)` }}
       />
       <div className="glass flex flex-col items-center gap-5 rounded-2xl px-6 py-14 text-center shadow-[0_40px_120px_-40px_rgba(80,70,220,0.7)]">
-        <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/5 ring-1 ring-white/10">
+        <span className="grid h-14 w-14 place-items-center rounded-2xl bg-surface-2 ring-1 ring-line">
           <svg
             viewBox="0 0 24 24"
             fill="none"
@@ -55,7 +55,7 @@ export function PasswordGate({ slug, accent }: { slug: string; accent: string })
         </span>
 
         <div>
-          <h1 className="font-display text-xl font-semibold tracking-tight text-ink sm:text-2xl">
+          <h1 className="font-display text-xl font-extrabold tracking-tight text-ink sm:text-2xl">
             This recording is protected
           </h1>
           <p className="mx-auto mt-2 max-w-sm text-sm text-muted">
@@ -71,9 +71,9 @@ export function PasswordGate({ slug, accent }: { slug: string; accent: string })
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Password"
             aria-label="Password"
-            className="w-full rounded-lg border border-line bg-white/[0.03] px-3 py-2.5 text-center text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+            className="w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-center text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
           />
-          {error && <p className="text-xs text-red-300">{error}</p>}
+          {error && <p className="text-xs text-danger">{error}</p>}
           <button
             type="submit"
             disabled={pending || !password}

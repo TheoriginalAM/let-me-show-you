@@ -19,10 +19,10 @@ export default async function DevicePage({
       <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
         <div className="glass rise flex flex-col items-center gap-5 rounded-2xl p-8 text-center">
           <span className="eyebrow">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_2px_rgba(139,139,246,0.9)]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
             Desktop app
           </span>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">
+          <h1 className="font-display text-3xl font-extrabold tracking-tight">
             Connect your desktop app
           </h1>
           <p className="text-sm leading-relaxed text-muted">Sign in to approve this device.</p>

@@ -60,20 +60,25 @@ export function AccountSettings({ name, email }: { name: string; email: string }
   }
 
   const inputCls =
-    'w-full rounded-lg border border-line bg-white/[0.03] px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none'
+    'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none'
 
   return (
     <div className="flex flex-col gap-10">
       {/* Profile */}
       <section className="flex flex-col gap-4">
         <div>
-          <h2 className="font-display text-xl font-semibold tracking-tight text-ink">Profile</h2>
+          <h2 className="font-display text-xl font-extrabold tracking-tight text-ink">Profile</h2>
           <p className="mt-1 text-sm text-muted">Your name and account email.</p>
         </div>
         <form onSubmit={saveName} className="flex flex-col gap-3">
           <div>
             <label className="mb-1.5 block text-sm font-medium text-muted">Name</label>
-            <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} maxLength={80} className={inputCls} />
+            <input
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              maxLength={80}
+              className={inputCls}
+            />
           </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-muted">Email</label>
@@ -95,7 +100,7 @@ export function AccountSettings({ name, email }: { name: string; email: string }
       {/* Password */}
       <section className="flex flex-col gap-4">
         <div>
-          <h2 className="font-display text-xl font-semibold tracking-tight text-ink">Password</h2>
+          <h2 className="font-display text-xl font-extrabold tracking-tight text-ink">Password</h2>
           <p className="mt-1 text-sm text-muted">Change the password you use to sign in.</p>
         </div>
         <form onSubmit={changePw} className="flex flex-col gap-3">
@@ -123,8 +128,8 @@ export function AccountSettings({ name, email }: { name: string; email: string }
             onChange={(e) => setConfirm(e.target.value)}
             className={inputCls}
           />
-          {pwErr && <p className="text-sm text-red-300">{pwErr}</p>}
-          {pwMsg && <p className="text-sm text-green-300">{pwMsg}</p>}
+          {pwErr && <p className="text-sm text-danger">{pwErr}</p>}
+          {pwMsg && <p className="text-sm text-success">{pwMsg}</p>}
           <div className="flex flex-wrap items-center gap-3">
             <button
               type="submit"
@@ -133,7 +138,10 @@ export function AccountSettings({ name, email }: { name: string; email: string }
             >
               {pwPending ? 'Updating…' : 'Update password'}
             </button>
-            <Link href="/forgot-password" className="text-sm text-faint transition hover:text-muted">
+            <Link
+              href="/forgot-password"
+              className="text-sm text-faint transition hover:text-muted"
+            >
               Forgot your current password?
             </Link>
           </div>

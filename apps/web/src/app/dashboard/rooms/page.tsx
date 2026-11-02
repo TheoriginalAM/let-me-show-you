@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { APP_DOMAIN } from '@lmsy/shared'
 import { ensureDefaultRoom, listStandingRoomsForWorkspace } from '@/db/meetings'
@@ -7,6 +6,7 @@ import { getCurrentUser } from '@/lib/current-user'
 import { meetingsConfigured } from '@/lib/livekit'
 import { reconcileWorkspaceRecordings } from '@/lib/meeting-recording'
 import { RoomsManager } from './rooms-manager'
+import { PageHeader } from '../page-header'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,23 +26,22 @@ export default async function RoomsPage() {
   const rooms = await listStandingRoomsForWorkspace(workspaceId)
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-6 px-4 py-10 sm:px-6">
-      <header className="rise flex flex-col gap-2">
-        <Link href="/dashboard" className="text-sm text-faint transition hover:text-ink">
-          ← Back to recordings
-        </Link>
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
-          Meeting rooms
-        </h1>
-        <p className="max-w-2xl text-muted">
-          Live video calls for <span className="text-ink">{ws.name}</span>. Share a room link and
-          clients join in their browser, with your branding. Anyone in this workspace can host, and
-          recordings land here alongside your other videos.
-        </p>
-      </header>
+    <div className="flex w-full max-w-4xl flex-col gap-8">
+      <PageHeader
+        section="meetings"
+        title="Meeting rooms"
+        description={
+          <>
+            Video calls for{' '}
+            <span className="font-semibold text-ink">{ws.brand.name || ws.name}</span>. Share a
+            room&rsquo;s link and clients join in their browser, in your colours. Anyone in this
+            business can host.
+          </>
+        }
+      />
 
       {!configured && (
-        <div className="glass rounded-2xl border-amber-500/30 p-5 text-sm text-amber-200">
+        <div className="rounded-2xl border-2 border-hl-orange bg-hl-orange/10 p-5 text-sm text-ink">
           Meetings aren't switched on yet. Rooms work as soon as the LiveKit keys are added to the
           server.
         </div>
@@ -50,13 +49,18 @@ export default async function RoomsPage() {
 
       <RoomsManager
         domain={APP_DOMAIN}
+        brand={{ name: ws.brand.name || ws.name, logo: ws.brand.logo, color: ws.brand.color }}
         rooms={rooms.map((r) => ({
           id: r.id,
           name: r.name,
           slug: r.slug,
           lobbyEnabled: r.lobbyEnabled,
+          welcomeMessage: r.welcomeMessage,
+          accentColor: r.accentColor,
+          background: r.background,
+          backgroundImageUrl: r.backgroundImageUrl,
         }))}
       />
-    </main>
+    </div>
   )
 }

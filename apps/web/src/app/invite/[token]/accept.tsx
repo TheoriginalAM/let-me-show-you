@@ -31,7 +31,7 @@ export function AcceptInvite({ token }: { token: string }) {
       >
         {pending ? 'Joining…' : 'Accept invite'}
       </button>
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
     </div>
   )
 }

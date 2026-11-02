@@ -5,6 +5,8 @@ export interface MeetingBrand {
   name: string
   logo: string | null
   accent: string
+  /** The room's welcome line on the join screen. */
+  welcome?: string | null
 }
 
 type RGB = [number, number, number]

@@ -109,7 +109,7 @@ export function Comments({
     comments.filter((c) => c.parentId === id).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 
   const inputCls =
-    'w-full rounded-lg border border-line bg-white/[0.03] px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none'
+    'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none'
 
   function CommentRow({ c, isReply }: { c: ThreadComment; isReply: boolean }) {
     return (
@@ -121,7 +121,7 @@ export function Comments({
         >
           {initial(c.authorName)}
         </span>
-        <div className="min-w-0 flex-1 rounded-2xl border border-line bg-white/[0.02] px-4 py-3">
+        <div className="min-w-0 flex-1 rounded-2xl border border-line bg-surface px-4 py-3">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
             <span className="truncate text-sm font-semibold text-ink">{c.authorName}</span>
             {isOwner && c.authorEmail && (
@@ -144,7 +144,7 @@ export function Comments({
                 <button
                   onClick={() => remove(c.id)}
                   disabled={pending}
-                  className="text-xs text-faint transition hover:text-red-300 disabled:opacity-50"
+                  className="text-xs text-faint transition hover:text-danger disabled:opacity-50"
                 >
                   Delete
                 </button>
@@ -159,7 +159,7 @@ export function Comments({
 
   return (
     <section className="rise flex flex-col gap-5" style={{ animationDelay: '220ms' }}>
-      <h2 className="font-display text-lg font-semibold tracking-tight text-ink">
+      <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">
         {comments.length > 0 ? `Comments (${comments.length})` : 'Comments'}
       </h2>
 
@@ -207,7 +207,7 @@ export function Comments({
           aria-hidden="true"
           className="hidden"
         />
-        {error && <p className="text-xs text-red-300">{error}</p>}
+        {error && <p className="text-xs text-danger">{error}</p>}
         <div className="flex items-center justify-between gap-3">
           <span className="text-xs text-faint">
             Your name is shown publicly. Your email is private and used for reply notifications.

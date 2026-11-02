@@ -1,7 +1,8 @@
 import 'server-only'
 
 import { randomBytes } from 'node:crypto'
-import { and, asc, count, eq, gt, isNull } from 'drizzle-orm'
+import { and, asc, count, eq, gt, isNull, sql } from 'drizzle-orm'
+import { brandFont, brandTheme, type BrandFont, type BrandTheme } from '../lib/brand-theme'
 import { getMux } from '../lib/mux'
 import { createNotifications, ownerIdsForWorkspace } from './app-notifications'
 import { db } from './index'
@@ -128,9 +129,7 @@ export async function createWorkspace(userId: string, name: string): Promise<{ i
     .insert(workspaces)
     .values({ name: cleanName, createdByUserId: userId })
     .returning({ id: workspaces.id })
-  await db
-    .insert(workspaceMembers)
-    .values({ workspaceId: ws!.id, userId, role: 'owner' })
+  await db.insert(workspaceMembers).values({ workspaceId: ws!.id, userId, role: 'owner' })
   await db.update(user).set({ activeWorkspaceId: ws!.id }).where(eq(user.id, userId))
   return { id: ws!.id }
 }
@@ -196,6 +195,60 @@ export interface WorkspaceBrand {
   logoSize: string | null
   ctaLabel: string | null
   ctaUrl: string | null
+  theme: BrandTheme
+  font: BrandFont
+  /** Served from /api/img (the photos are too big to inline in every page). */
+  coverUrl: string | null
+  photoUrl: string | null
+  /** The logo as a real image URL, for emails (they can't show inline data). */
+  logoUrl: string | null
+  bio: string | null
+}
+
+/** What an owner saves. For cover/photo: a data URL, null to remove, undefined to keep. */
+export type BrandInput = Omit<WorkspaceBrand, 'coverUrl' | 'photoUrl' | 'logoUrl'> & {
+  cover?: string | null
+  photo?: string | null
+}
+
+/**
+ * Select these alongside `workspaces.id` and pass the row to `toBrand`. The
+ * photos come back as a short content hash (for cache-busting URLs), not the data.
+ */
+export const brandColumns = {
+  brandName: workspaces.brandName,
+  brandLogo: workspaces.brandLogo,
+  brandColor: workspaces.brandColor,
+  brandTagline: workspaces.brandTagline,
+  brandLogoSize: workspaces.brandLogoSize,
+  brandCtaLabel: workspaces.brandCtaLabel,
+  brandCtaUrl: workspaces.brandCtaUrl,
+  brandTheme: workspaces.brandTheme,
+  brandFont: workspaces.brandFont,
+  brandBio: workspaces.brandBio,
+  brandCoverV: sql<string | null>`left(md5(${workspaces.brandCover}), 12)`,
+  brandPhotoV: sql<string | null>`left(md5(${workspaces.brandPhoto}), 12)`,
+  brandLogoV: sql<string | null>`left(md5(${workspaces.brandLogo}), 12)`,
+}
+
+type BrandRow = { [K in keyof typeof brandColumns]: string | null }
+
+export function toBrand(r: BrandRow, workspaceId: string): WorkspaceBrand {
+  return {
+    name: r.brandName,
+    logo: r.brandLogo,
+    color: r.brandColor,
+    tagline: r.brandTagline,
+    logoSize: r.brandLogoSize,
+    ctaLabel: r.brandCtaLabel,
+    ctaUrl: r.brandCtaUrl,
+    theme: brandTheme(r.brandTheme),
+    font: brandFont(r.brandFont),
+    coverUrl: r.brandCoverV ? `/api/img/cover/${workspaceId}?v=${r.brandCoverV}` : null,
+    photoUrl: r.brandPhotoV ? `/api/img/photo/${workspaceId}?v=${r.brandPhotoV}` : null,
+    logoUrl: r.brandLogoV ? `/api/img/logo/${workspaceId}?v=${r.brandLogoV}` : null,
+    bio: r.brandBio,
+  }
 }
 
 export interface WorkspaceMeta {
@@ -212,43 +265,20 @@ export async function getWorkspaceForMember(
   const role = await memberRole(userId, workspaceId)
   if (!role) return null
   const rows = await db
-    .select({
-      id: workspaces.id,
-      name: workspaces.name,
-      brandName: workspaces.brandName,
-      brandLogo: workspaces.brandLogo,
-      brandColor: workspaces.brandColor,
-      brandTagline: workspaces.brandTagline,
-      brandLogoSize: workspaces.brandLogoSize,
-      brandCtaLabel: workspaces.brandCtaLabel,
-      brandCtaUrl: workspaces.brandCtaUrl,
-    })
+    .select({ id: workspaces.id, name: workspaces.name, ...brandColumns })
     .from(workspaces)
     .where(eq(workspaces.id, workspaceId))
     .limit(1)
   const w = rows[0]
   if (!w) return null
-  return {
-    id: w.id,
-    name: w.name,
-    role,
-    brand: {
-      name: w.brandName,
-      logo: w.brandLogo,
-      color: w.brandColor,
-      tagline: w.brandTagline,
-      logoSize: w.brandLogoSize,
-      ctaLabel: w.brandCtaLabel,
-      ctaUrl: w.brandCtaUrl,
-    },
-  }
+  return { id: w.id, name: w.name, role, brand: toBrand(w, w.id) }
 }
 
 /** Set a workspace's branding (pass nulls to clear). Owner-only. */
 export async function setWorkspaceBrand(
   userId: string,
   workspaceId: string,
-  brand: WorkspaceBrand,
+  brand: BrandInput,
 ): Promise<boolean> {
   if ((await memberRole(userId, workspaceId)) !== 'owner') return false
   await db
@@ -261,9 +291,33 @@ export async function setWorkspaceBrand(
       brandLogoSize: brand.logoSize,
       brandCtaLabel: brand.ctaLabel,
       brandCtaUrl: brand.ctaUrl,
+      brandTheme: brand.theme === 'dark' ? 'dark' : null,
+      brandFont: brand.font === 'modern' ? null : brand.font,
+      brandBio: brand.bio,
+      ...(brand.cover !== undefined ? { brandCover: brand.cover } : {}),
+      ...(brand.photo !== undefined ? { brandPhoto: brand.photo } : {}),
     })
     .where(eq(workspaces.id, workspaceId))
   return true
+}
+
+/** A workspace photo's raw data URL, for the image route. */
+export async function workspaceImage(
+  workspaceId: string,
+  kind: 'cover' | 'photo' | 'logo',
+): Promise<string | null> {
+  const column =
+    kind === 'cover'
+      ? workspaces.brandCover
+      : kind === 'photo'
+        ? workspaces.brandPhoto
+        : workspaces.brandLogo
+  const rows = await db
+    .select({ v: column })
+    .from(workspaces)
+    .where(eq(workspaces.id, workspaceId))
+    .limit(1)
+  return rows[0]?.v ?? null
 }
 
 // ---------------------------------------------------------------------------
@@ -446,7 +500,10 @@ export async function acceptInvite(
   const invite = await getInviteByToken(token)
   if (!invite) return { ok: false, error: 'This invite is invalid or has expired.' }
   if (invite.email !== userEmail.trim().toLowerCase()) {
-    return { ok: false, error: `This invite was sent to ${invite.email}. Sign in with that email to accept.` }
+    return {
+      ok: false,
+      error: `This invite was sent to ${invite.email}. Sign in with that email to accept.`,
+    }
   }
   // Add membership if not already present.
   const alreadyMember = Boolean(await memberRole(userId, invite.workspaceId))

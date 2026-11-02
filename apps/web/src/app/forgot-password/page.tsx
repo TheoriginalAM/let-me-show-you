@@ -1,5 +1,6 @@
 'use client'
 
+import { LogoMark } from '@/components/brand/logo'
 import { useState } from 'react'
 import Link from 'next/link'
 import { authClient } from '@/lib/auth-client'
@@ -29,14 +30,12 @@ export default function ForgotPasswordPage() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center px-6 py-16">
-      <div className="rise glass rounded-2xl p-8 shadow-[0_40px_120px_-40px_rgba(80,70,220,0.7)]">
-        <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-b from-[#8281ff] to-accent-strong text-sm text-white shadow-[0_6px_16px_-6px_rgba(109,109,245,0.9)]">
-          ▶
-        </span>
-        <h1 className="mt-6 font-display text-3xl font-semibold tracking-tight">Reset password</h1>
+      <div className="rise glass rounded-3xl border-2 border-ink p-8 shadow-[8px_8px_0_0_var(--color-ink)]">
+        <LogoMark className="h-11 w-11" />
+        <h1 className="mt-6 font-display text-3xl font-extrabold tracking-tight">Reset password</h1>
 
         {sent ? (
-          <p className="mt-4 rounded-lg bg-green-500/10 px-3 py-2.5 text-sm text-green-300 ring-1 ring-inset ring-green-500/25">
+          <p className="mt-4 rounded-lg bg-success/10 px-3 py-2.5 text-sm text-success ring-1 ring-inset ring-success/25">
             If an account exists for {email}, a reset link is on its way. Check your inbox.
           </p>
         ) : (
@@ -45,7 +44,7 @@ export default function ForgotPasswordPage() {
               Enter your email and we&rsquo;ll send you a link to set a new password.
             </p>
             {error && (
-              <p className="mt-4 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300 ring-1 ring-inset ring-red-500/25">
+              <p className="mt-4 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger ring-1 ring-inset ring-danger/25">
                 {error}
               </p>
             )}
@@ -57,7 +56,7 @@ export default function ForgotPasswordPage() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="rounded-lg border border-line bg-white/[0.03] px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+                className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
               />
               <button
                 type="submit"

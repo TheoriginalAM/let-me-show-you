@@ -44,7 +44,12 @@ export function ApprovalWidget({
     if (!e) return setError('Please add your email.')
     setError(null)
     startTransition(async () => {
-      const res = await postApproval(slug, { name: n, email: e, status, note: note.trim() || undefined })
+      const res = await postApproval(slug, {
+        name: n,
+        email: e,
+        status,
+        note: note.trim() || undefined,
+      })
       if (res.ok) {
         try {
           localStorage.setItem(NAME_KEY, n)
@@ -60,7 +65,7 @@ export function ApprovalWidget({
   }
 
   const inputCls =
-    'w-full rounded-lg border border-line bg-white/[0.03] px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none'
+    'w-full rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none'
 
   if (done) {
     return (
@@ -84,7 +89,9 @@ export function ApprovalWidget({
   return (
     <section className="rise glass flex flex-col gap-3 rounded-2xl p-4">
       <div>
-        <h3 className="font-display text-base font-semibold tracking-tight text-ink">Your review</h3>
+        <h3 className="font-display text-base font-extrabold tracking-tight text-ink">
+          Your review
+        </h3>
         <p className="mt-1 text-sm text-muted">
           Approve this recording or request changes. The owner is notified either way.
         </p>
@@ -114,19 +121,19 @@ export function ApprovalWidget({
         placeholder="Optional note (e.g. what to change)"
         className={`${inputCls} resize-y`}
       />
-      {error && <p className="text-xs text-red-300">{error}</p>}
+      {error && <p className="text-xs text-danger">{error}</p>}
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => submit('approved')}
           disabled={pending}
-          className="rounded-lg bg-green-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-400 disabled:opacity-50"
+          className="rounded-lg bg-success px-4 py-2 text-sm font-semibold text-white transition hover:opacity-90 disabled:opacity-50"
         >
           {pending ? 'Sending…' : '✓ Approve'}
         </button>
         <button
           onClick={() => submit('changes')}
           disabled={pending}
-          className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-amber-200 transition hover:bg-amber-500/20 disabled:opacity-50"
+          className="rounded-lg border border-hl-orange/60 bg-amber-500/10 px-4 py-2 text-sm font-semibold text-[#8a4b00] transition hover:bg-amber-500/20 disabled:opacity-50"
         >
           Request changes
         </button>

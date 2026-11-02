@@ -4,6 +4,7 @@ import { and, count, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 import type { PublicVideo, Video } from '@lmsy/shared'
 import { pgErrorCode } from './errors'
 import { db } from './index'
+import { brandColumns, toBrand, type WorkspaceBrand } from './workspaces'
 import { user, videos, videoViews, workspaceMembers, workspaces } from './schema'
 
 /**
@@ -41,15 +42,7 @@ export type ShareableVideo = PublicVideo & {
   /** Whether the Approve / Request-changes control is shown on the share page. */
   approvalEnabled: boolean
   /** Workspace branding for the public share page (null fields → LMSY branding). */
-  brand: {
-    name: string | null
-    logo: string | null
-    color: string | null
-    tagline: string | null
-    logoSize: string | null
-    ctaLabel: string | null
-    ctaUrl: string | null
-  }
+  brand: WorkspaceBrand
 }
 
 /**
@@ -177,13 +170,8 @@ export async function getShareableVideoBySlug(slug: string): Promise<ShareableVi
       createdAt: videos.createdAt,
       passwordHash: videos.passwordHash,
       // Branding now comes from the video's workspace, not the uploader.
-      brandName: workspaces.brandName,
-      brandLogo: workspaces.brandLogo,
-      brandColor: workspaces.brandColor,
-      brandTagline: workspaces.brandTagline,
-      brandLogoSize: workspaces.brandLogoSize,
-      brandCtaLabel: workspaces.brandCtaLabel,
-      brandCtaUrl: workspaces.brandCtaUrl,
+      brandWorkspaceId: workspaces.id,
+      ...brandColumns,
     })
     .from(videos)
     .innerJoin(user, eq(videos.ownerId, user.id))
@@ -199,6 +187,7 @@ export async function getShareableVideoBySlug(slug: string): Promise<ShareableVi
   const row = rows[0]
   if (!row) return null
   const {
+    brandWorkspaceId,
     brandName,
     brandLogo,
     brandColor,
@@ -206,19 +195,34 @@ export async function getShareableVideoBySlug(slug: string): Promise<ShareableVi
     brandLogoSize,
     brandCtaLabel,
     brandCtaUrl,
+    brandTheme,
+    brandFont,
+    brandBio,
+    brandCoverV,
+    brandPhotoV,
+    brandLogoV,
     ...video
   } = row
   return {
     ...video,
-    brand: {
-      name: brandName,
-      logo: brandLogo,
-      color: brandColor,
-      tagline: brandTagline,
-      logoSize: brandLogoSize,
-      ctaLabel: brandCtaLabel,
-      ctaUrl: brandCtaUrl,
-    },
+    brand: toBrand(
+      {
+        brandName,
+        brandLogo,
+        brandColor,
+        brandTagline,
+        brandLogoSize,
+        brandCtaLabel,
+        brandCtaUrl,
+        brandTheme,
+        brandFont,
+        brandBio,
+        brandCoverV,
+        brandPhotoV,
+        brandLogoV,
+      },
+      brandWorkspaceId,
+    ),
   }
 }
 

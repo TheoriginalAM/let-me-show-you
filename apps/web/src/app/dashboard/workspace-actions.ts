@@ -9,7 +9,7 @@ export async function switchWorkspaceAction(workspaceId: string): Promise<{ ok: 
   const me = await getCurrentUser()
   if (!me) return { ok: false }
   const ok = await setActiveWorkspace(me.id, workspaceId)
-  if (ok) revalidatePath('/dashboard')
+  if (ok) revalidatePath('/dashboard', 'layout')
   return { ok }
 }
 
@@ -22,6 +22,6 @@ export async function createWorkspaceAction(
   const clean = name.trim()
   if (!clean) return { ok: false, error: 'Enter a workspace name.' }
   const { id } = await createWorkspace(me.id, clean)
-  revalidatePath('/dashboard')
+  revalidatePath('/dashboard', 'layout')
   return { ok: true, id }
 }

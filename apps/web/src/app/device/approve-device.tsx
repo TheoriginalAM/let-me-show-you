@@ -31,10 +31,10 @@ export function ApproveDevice({ initialCode, account }: { initialCode: string; a
     return (
       <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-6">
         <div className="glass rise flex flex-col items-center gap-4 rounded-2xl p-8 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500/15 text-2xl text-green-300 ring-1 ring-inset ring-green-500/25 shadow-[0_0_30px_-6px_rgba(52,211,153,0.5)]">
+          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-success/15 text-2xl text-success ring-1 ring-inset ring-success/25 shadow-[0_0_30px_-6px_rgba(52,211,153,0.5)]">
             ✓
           </div>
-          <h1 className="font-display text-3xl font-semibold tracking-tight">Device connected</h1>
+          <h1 className="font-display text-3xl font-extrabold tracking-tight">Device connected</h1>
           <p className="text-sm leading-relaxed text-muted">
             You can return to the desktop app — you’re signed in.
           </p>
@@ -48,10 +48,10 @@ export function ApproveDevice({ initialCode, account }: { initialCode: string; a
       <div className="glass rise flex flex-col gap-5 rounded-2xl p-8">
         <div className="text-center">
           <span className="eyebrow">
-            <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_2px_rgba(139,139,246,0.9)]" />
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
             Desktop app
           </span>
-          <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight">
+          <h1 className="mt-3 font-display text-3xl font-extrabold tracking-tight">
             Connect your desktop app
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-muted">
@@ -61,7 +61,7 @@ export function ApproveDevice({ initialCode, account }: { initialCode: string; a
         </div>
 
         {error && (
-          <p className="rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300 ring-1 ring-inset ring-red-500/25">
+          <p className="rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger ring-1 ring-inset ring-danger/25">
             {error}
           </p>
         )}
@@ -72,7 +72,7 @@ export function ApproveDevice({ initialCode, account }: { initialCode: string; a
             onChange={(e) => setCode(e.target.value.toUpperCase())}
             placeholder="WXYZ-2345"
             autoCapitalize="characters"
-            className="rounded-lg border border-line bg-white/[0.03] px-3 py-3 text-center font-mono text-lg tracking-[0.3em] text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
+            className="rounded-lg border border-line bg-surface px-3 py-3 text-center font-mono text-lg tracking-[0.3em] text-ink placeholder:text-faint focus:border-line-strong focus:outline-none"
           />
           <button
             type="submit"

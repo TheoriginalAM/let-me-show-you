@@ -1,20 +1,119 @@
 'use client'
 
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { inviteToRoom } from '@/app/m/[slug]/actions'
-import { createRoomAction, deleteRoomAction, renameRoomAction, setLobbyAction } from './actions'
+import { DEFAULT_ACCENT, onColor } from '@/lib/brand-theme'
+import { resizeImage } from '@/lib/image-resize'
+import { ROOM_BACKGROUNDS, roomBackgroundCss } from '@/lib/room-backgrounds'
+import { Icon } from '@/components/brand/icons'
+import { createRoomAction, deleteRoomAction, setLobbyAction, updateRoomAction } from './actions'
 
 interface RoomItem {
   id: string
   name: string
   slug: string
   lobbyEnabled: boolean
+  welcomeMessage: string | null
+  accentColor: string | null
+  background: string | null
+  backgroundImageUrl: string | null
+}
+
+interface Brand {
+  name: string
+  logo: string | null
+  color: string | null
 }
 
 const inputCls =
-  'w-full rounded-lg border border-line bg-white/[0.03] px-3 py-2.5 text-sm text-ink placeholder:text-faint focus:border-line-strong focus:outline-none'
+  'w-full rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 text-sm text-ink placeholder:text-faint focus:border-ink focus:outline-none'
+const ROOM_COLORS = ['#4f3cff', '#ff5fa2', '#ff8f2e', '#ffd23f', '#2fd98a', '#0ea5e9', '#e11d48']
 
-export function RoomsManager({ rooms, domain }: { rooms: RoomItem[]; domain: string }) {
+function slugFrom(value: string): string {
+  return value
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+/, '')
+    .slice(0, 50)
+    .replace(/-+$/, '')
+}
+
+/** What a guest sees before they join: the backdrop, logo, room name and welcome line. */
+function WaitingPreview({
+  brand,
+  name,
+  welcome,
+  accent,
+  background,
+  imageUrl,
+  size = 'lg',
+}: {
+  brand: Brand
+  name: string
+  welcome: string | null
+  accent: string
+  background: string | null
+  imageUrl: string | null
+  size?: 'sm' | 'lg'
+}) {
+  const bg = roomBackgroundCss(background, imageUrl)
+  if (size === 'sm') {
+    return (
+      <div
+        className="relative grid aspect-[4/3] w-28 shrink-0 place-items-center overflow-hidden rounded-xl"
+        style={{ background: bg }}
+      >
+        <span className="h-7 w-10 rounded-md bg-black/35 ring-1 ring-white/20 backdrop-blur" />
+        <span className="absolute bottom-2 h-2 w-9 rounded-full" style={{ background: accent }} />
+      </div>
+    )
+  }
+  return (
+    <div
+      className="relative grid aspect-[16/10] w-full place-items-center overflow-hidden rounded-2xl p-5"
+      style={{ background: bg }}
+    >
+      <div className="flex w-full max-w-[17rem] flex-col items-center gap-2.5 rounded-2xl bg-[#12101f]/75 p-4 text-center text-white ring-1 ring-white/10 backdrop-blur">
+        {brand.logo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={brand.logo} alt="" className="h-7 w-auto max-w-[8rem] object-contain" />
+        ) : (
+          <span
+            className="grid h-8 w-8 place-items-center rounded-lg text-sm font-bold"
+            style={{ background: accent, color: onColor(accent) }}
+          >
+            {brand.name.charAt(0).toUpperCase()}
+          </span>
+        )}
+        <span className="font-display text-sm font-extrabold leading-tight">
+          {name || 'Meeting room'}
+        </span>
+        {welcome && (
+          <span className="line-clamp-3 text-[0.7rem] leading-snug text-white/75">{welcome}</span>
+        )}
+        <span className="mt-1 h-16 w-full rounded-lg bg-white/10" aria-hidden />
+        <span
+          className="w-full rounded-lg py-1.5 text-[0.72rem] font-bold"
+          style={{ background: accent, color: onColor(accent) }}
+        >
+          Ask to join
+        </span>
+      </div>
+    </div>
+  )
+}
+
+export function RoomsManager({
+  rooms,
+  domain,
+  brand,
+}: {
+  rooms: RoomItem[]
+  domain: string
+  brand: Brand
+}) {
   const [name, setName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
@@ -32,38 +131,43 @@ export function RoomsManager({ rooms, domain }: { rooms: RoomItem[]; domain: str
   return (
     <div className="flex flex-col gap-4">
       {rooms.map((room) => (
-        <RoomCard key={room.id} room={room} domain={domain} />
+        <RoomCard key={room.id} room={room} domain={domain} brand={brand} />
       ))}
 
-      <div className="glass rounded-2xl p-5">
-        <h2 className="font-display text-base font-semibold tracking-tight text-ink">New room</h2>
+      <div className="card rounded-2xl border-2 border-dashed p-5">
+        <h2 className="font-display text-lg font-extrabold tracking-tight text-ink">New room</h2>
         <p className="mt-1 text-sm text-muted">
-          Handy for a standing client call or a team room. Each room keeps its own link.
+          One for each client, a weekly check-in, or your team. Each room has its own link and look.
         </p>
         <div className="mt-3 flex flex-col gap-2 sm:flex-row">
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={80}
-            placeholder="e.g. Weekly client check-in"
+            placeholder="Acme weekly check-in"
+            aria-label="Room name"
             className={inputCls}
             onKeyDown={(e) => e.key === 'Enter' && create()}
           />
-          <button className="btn-primary shrink-0 px-5 py-2.5 text-sm" disabled={pending} onClick={create}>
+          <button
+            className="btn-primary shrink-0 px-5 py-2.5 text-sm"
+            disabled={pending}
+            onClick={create}
+          >
             {pending ? 'Creating…' : 'Create room'}
           </button>
         </div>
-        {error && <p className="mt-2 text-sm text-red-300">{error}</p>}
+        {error && <p className="mt-2 text-sm text-danger">{error}</p>}
       </div>
     </div>
   )
 }
 
-function RoomCard({ room, domain }: { room: RoomItem; domain: string }) {
+function RoomCard({ room, domain, brand }: { room: RoomItem; domain: string; brand: Brand }) {
   const link = `https://${domain}/m/${room.slug}`
+  const accent = room.accentColor ?? brand.color ?? DEFAULT_ACCENT
   const [copied, setCopied] = useState(false)
-  const [renaming, setRenaming] = useState(false)
-  const [title, setTitle] = useState(room.name)
+  const [editing, setEditing] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [emails, setEmails] = useState('')
   const [note, setNote] = useState<string | null>(null)
@@ -112,36 +216,32 @@ function RoomCard({ room, domain }: { room: RoomItem; domain: string }) {
     })
   }
 
+  if (editing) {
+    return <RoomEditor room={room} domain={domain} brand={brand} onDone={() => setEditing(false)} />
+  }
+
   return (
-    <div className="glass rise rounded-2xl p-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+    <div className="card rounded-2xl p-5">
+      <div className="flex flex-wrap items-center gap-4">
+        <WaitingPreview
+          brand={brand}
+          name={room.name}
+          welcome={room.welcomeMessage}
+          accent={accent}
+          background={room.background}
+          imageUrl={room.backgroundImageUrl}
+          size="sm"
+        />
         <div className="min-w-0 flex-1">
-          {renaming ? (
-            <div className="flex gap-2">
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={80}
-                className={inputCls}
-                autoFocus
-              />
-              <button
-                className="btn-ghost shrink-0 px-3 py-2 text-sm"
-                disabled={pending}
-                onClick={() => {
-                  run(() => renameRoomAction(room.id, title))
-                  setRenaming(false)
-                }}
-              >
-                Save
-              </button>
-            </div>
-          ) : (
-            <h2 className="truncate font-display text-lg font-semibold tracking-tight text-ink">
-              {room.name}
-            </h2>
+          <h2 className="truncate font-display text-lg font-extrabold tracking-tight text-ink">
+            {room.name}
+          </h2>
+          <p className="mt-1 truncate font-mono text-sm text-muted">
+            {link.replace('https://', '')}
+          </p>
+          {room.welcomeMessage && (
+            <p className="mt-1 line-clamp-1 text-sm text-faint">“{room.welcomeMessage}”</p>
           )}
-          <p className="mt-1 truncate font-mono text-sm text-muted">{link.replace('https://', '')}</p>
         </div>
         <a
           href={`/m/${room.slug}`}
@@ -155,27 +255,31 @@ function RoomCard({ room, domain }: { room: RoomItem; domain: string }) {
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button className="btn-ghost px-3 py-1.5 text-sm" onClick={() => void copy()}>
+          <Icon name={copied ? 'check' : 'copy'} className="h-4 w-4" />
           {copied ? 'Copied' : 'Copy link'}
         </button>
         <button className="btn-ghost px-3 py-1.5 text-sm" onClick={() => setInviteOpen((o) => !o)}>
           Email invite
         </button>
-        <button className="btn-ghost px-3 py-1.5 text-sm" onClick={() => setRenaming((r) => !r)}>
-          Rename
+        <button className="btn-ghost px-3 py-1.5 text-sm" onClick={() => setEditing(true)}>
+          <Icon name="branding" className="h-4 w-4" />
+          Name, link and look
         </button>
-        <label className="ml-1 flex cursor-pointer select-none items-center gap-2 text-sm text-muted">
+        <label className="ml-1 flex cursor-pointer select-none items-center gap-2.5 text-sm text-muted">
           <input
             type="checkbox"
+            role="switch"
             checked={room.lobbyEnabled}
             disabled={pending}
             onChange={(e) => run(() => setLobbyAction(room.id, e.target.checked))}
-            className="h-4 w-4 accent-[#8b8bf6]"
+            className="peer sr-only"
           />
+          <span className="relative h-6 w-11 rounded-full bg-line-strong transition peer-checked:bg-hl-sky peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-accent-ink after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow after:transition peer-checked:after:translate-x-5" />
           Guests wait in a lobby
         </label>
         <button
           className={`ml-auto rounded-lg px-3 py-1.5 text-sm transition ${
-            confirmDelete ? 'bg-red-500/20 text-red-200' : 'text-faint hover:text-red-300'
+            confirmDelete ? 'bg-danger text-white' : 'text-faint hover:text-danger'
           }`}
           disabled={pending}
           onClick={() =>
@@ -192,6 +296,7 @@ function RoomCard({ room, domain }: { room: RoomItem; domain: string }) {
             value={emails}
             onChange={(e) => setEmails(e.target.value)}
             placeholder="client@company.com, colleague@company.com"
+            aria-label="Email addresses"
             className={inputCls}
           />
           <button
@@ -204,6 +309,237 @@ function RoomCard({ room, domain }: { room: RoomItem; domain: string }) {
         </div>
       )}
       {note && <p className="mt-3 text-sm text-muted">{note}</p>}
+    </div>
+  )
+}
+
+function RoomEditor({
+  room,
+  domain,
+  brand,
+  onDone,
+}: {
+  room: RoomItem
+  domain: string
+  brand: Brand
+  onDone: () => void
+}) {
+  const [name, setName] = useState(room.name)
+  const [slug, setSlug] = useState(room.slug)
+  const [welcome, setWelcome] = useState(room.welcomeMessage ?? '')
+  const [color, setColor] = useState<string | null>(room.accentColor)
+  const [background, setBackground] = useState<string>(room.background ?? 'midnight')
+  const [imageUrl, setImageUrl] = useState<string | null>(room.backgroundImageUrl)
+  const [imageEdit, setImageEdit] = useState<string | null | undefined>(undefined)
+  const [error, setError] = useState<string | null>(null)
+  const [pending, startTransition] = useTransition()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const accent = color ?? brand.color ?? DEFAULT_ACCENT
+  const suggested = useMemo(() => slugFrom(name), [name])
+
+  async function pickImage(file: File): Promise<void> {
+    setError(null)
+    try {
+      const url = await resizeImage(file, { maxWidth: 1920, maxHeight: 1080, quality: 0.8 })
+      setImageUrl(url)
+      setImageEdit(url)
+      setBackground('image')
+    } catch {
+      setError('Could not read that image. Try a PNG or JPEG.')
+    }
+  }
+
+  function save(): void {
+    setError(null)
+    startTransition(async () => {
+      const res = await updateRoomAction(room.id, {
+        name,
+        slug,
+        welcomeMessage: welcome,
+        accentColor: color,
+        background: background === 'image' && !imageUrl ? 'midnight' : background,
+        backgroundImage: imageEdit,
+      }).catch(() => ({ ok: false as const, error: 'Could not save. Try again.' }))
+      if (res.ok) onDone()
+      else setError(res.error)
+    })
+  }
+
+  return (
+    <div className="card grid gap-6 rounded-2xl border-2 border-ink p-5 sm:p-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
+      <div className="flex min-w-0 flex-col gap-4">
+        <h2 className="font-display text-xl font-extrabold tracking-tight text-ink">
+          Name, link and look
+        </h2>
+        <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
+          Room name
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={80}
+            className={inputCls}
+          />
+        </label>
+        <label className="flex min-w-0 flex-col gap-1.5 text-sm font-medium text-ink">
+          Link
+          <span className="flex min-w-0 items-center overflow-hidden rounded-xl border border-line-strong bg-surface focus-within:border-ink">
+            <span
+              className="max-w-[55%] shrink-0 truncate bg-surface-2 px-3 py-2.5 font-mono text-xs text-faint"
+              dir="rtl"
+            >
+              <bdi dir="ltr">{domain}/m/</bdi>
+            </span>
+            <input
+              value={slug}
+              onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+              maxLength={50}
+              aria-label="Room link"
+              className="min-w-0 flex-1 bg-transparent px-3 py-2.5 font-mono text-sm text-ink focus:outline-none"
+            />
+          </span>
+          <span className="flex flex-wrap gap-x-3 text-xs font-normal text-faint">
+            {suggested.length >= 3 && suggested !== slug && (
+              <button
+                type="button"
+                className="text-accent-ink hover:underline"
+                onClick={() => setSlug(suggested)}
+              >
+                Use “{suggested}”
+              </button>
+            )}
+            {slug !== room.slug && <span>The old link keeps working.</span>}
+            <span>A named link is easier to guess, so keep the lobby on.</span>
+          </span>
+        </label>
+        <label className="flex flex-col gap-1.5 text-sm font-medium text-ink">
+          Welcome message
+          <textarea
+            value={welcome}
+            onChange={(e) => setWelcome(e.target.value)}
+            maxLength={280}
+            rows={2}
+            placeholder="Hi! Grab a coffee, I’ll let you in in a moment."
+            className={inputCls}
+          />
+        </label>
+        <fieldset className="flex flex-col gap-2 text-sm font-medium text-ink">
+          <legend className="mb-1.5">Colour</legend>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setColor(null)}
+              aria-pressed={color === null}
+              className={`h-8 rounded-full px-3 text-xs font-medium transition ${
+                color === null
+                  ? 'bg-ink text-canvas'
+                  : 'border border-line-strong text-muted hover:text-ink'
+              }`}
+            >
+              Brand
+            </button>
+            {ROOM_COLORS.map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => setColor(c)}
+                aria-label={`Colour ${c}`}
+                aria-pressed={color === c}
+                className={`h-8 w-8 rounded-full transition hover:scale-110 ${color === c ? 'ring-[3px] ring-ink ring-offset-2 ring-offset-[var(--color-surface)]' : ''}`}
+                style={{ background: c }}
+              />
+            ))}
+          </div>
+        </fieldset>
+        <fieldset className="flex flex-col gap-2 text-sm font-medium text-ink">
+          <legend className="mb-1.5">Backdrop</legend>
+          <div className="grid grid-cols-4 gap-2 sm:grid-cols-8">
+            {ROOM_BACKGROUNDS.map((b) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => setBackground(b.id)}
+                aria-pressed={background === b.id}
+                aria-label={b.label}
+                title={b.label}
+                className={`aspect-square rounded-xl transition hover:scale-105 ${
+                  background === b.id
+                    ? 'ring-[3px] ring-ink ring-offset-2 ring-offset-[var(--color-surface)]'
+                    : ''
+                }`}
+                style={{ background: b.css }}
+              />
+            ))}
+            <button
+              type="button"
+              onClick={() => (imageUrl ? setBackground('image') : fileRef.current?.click())}
+              aria-pressed={background === 'image'}
+              aria-label="Your photo"
+              title="Your photo"
+              className={`grid aspect-square place-items-center overflow-hidden rounded-xl border-2 border-dashed border-line-strong bg-surface-2 bg-cover bg-center text-faint transition hover:scale-105 ${
+                background === 'image'
+                  ? 'ring-[3px] ring-ink ring-offset-2 ring-offset-[var(--color-surface)]'
+                  : ''
+              }`}
+              style={imageUrl ? { backgroundImage: `url("${imageUrl}")` } : undefined}
+            >
+              {!imageUrl && <Icon name="plus" className="h-5 w-5" />}
+            </button>
+          </div>
+          <span className="flex gap-3 text-xs font-normal">
+            <button
+              type="button"
+              className="text-accent-ink hover:underline"
+              onClick={() => fileRef.current?.click()}
+            >
+              {imageUrl ? 'Upload a different photo' : 'Upload your own photo'}
+            </button>
+            {imageUrl && (
+              <button
+                type="button"
+                className="text-muted hover:text-danger"
+                onClick={() => {
+                  setImageUrl(null)
+                  setImageEdit(null)
+                  if (background === 'image') setBackground('midnight')
+                }}
+              >
+                Remove photo
+              </button>
+            )}
+          </span>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              e.target.value = ''
+              if (f) void pickImage(f)
+            }}
+          />
+        </fieldset>
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <div className="flex gap-2">
+          <button className="btn-primary px-5 py-2.5 text-sm" disabled={pending} onClick={save}>
+            {pending ? 'Saving…' : 'Save room'}
+          </button>
+          <button className="btn-ghost px-4 py-2.5 text-sm" disabled={pending} onClick={onDone}>
+            Cancel
+          </button>
+        </div>
+      </div>
+      <div className="order-first flex flex-col gap-2 xl:order-none">
+        <span className="text-sm font-semibold text-ink">What guests see</span>
+        <WaitingPreview
+          brand={brand}
+          name={name}
+          welcome={welcome.trim() || null}
+          accent={accent}
+          background={background}
+          imageUrl={imageUrl}
+        />
+      </div>
     </div>
   )
 }

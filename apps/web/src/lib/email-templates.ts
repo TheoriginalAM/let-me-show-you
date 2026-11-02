@@ -1,18 +1,37 @@
 import { APP_DOMAIN, APP_NAME } from '@lmsy/shared'
+import { onColor, pressedEdge, readableOnWhite } from './brand-theme'
 
-// Palette mirrors the site (near-black canvas, violet accent, muted text).
-const CANVAS = '#08080c'
-const CARD = '#101019'
-const HEADER = '#0c0c14'
-const BORDER = 'rgba(255,255,255,0.08)'
-const BORDER_SOFT = 'rgba(255,255,255,0.06)'
-const INK = '#f6f6fb'
-const MUTED = '#9c9cb4'
-const FAINT = '#6a6a80'
-const ACCENT = '#6d6df5'
-const ACCENT_LINK = '#8b8bf6'
+// Palette mirrors the site: a light lilac canvas, white card with an ink
+// outline, ink text, one electric blue-violet.
+const CANVAS = '#f4f3fb'
+const CARD = '#ffffff'
+const HEADER = '#f6f5fc' // quote boxes and soft panels
+const OUTLINE = '#17132b'
+const BORDER_SOFT = '#e3e0f0'
+const INK = '#17132b'
+const MUTED = '#5d5873'
+const FAINT = '#8a85a0'
+const ACCENT = '#4f3cff'
+const ACCENT_LINK = '#3a27f0'
 const FONT =
   "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif,'Apple Color Emoji','Segoe UI Emoji'"
+
+/** Whose email this is: Let Me Show You, or a business (booking emails). */
+export interface EmailBrand {
+  name: string
+  /** An absolute image URL (emails can't show inline data). */
+  logoUrl: string | null
+  accent: string
+  /** Business emails say who sent them on their behalf. */
+  business: boolean
+}
+
+export const LMSY_EMAIL_BRAND: EmailBrand = {
+  name: APP_NAME,
+  logoUrl: `https://${APP_DOMAIN}/brand/mark.png`,
+  accent: ACCENT,
+  business: false,
+}
 
 function escapeHtml(s: string): string {
   return s
@@ -27,47 +46,59 @@ function firstName(name: string): string {
   return name.trim().split(/\s+/)[0] || name
 }
 
-/** Dark, brand-matched, email-client-safe layout (table + inline styles). */
+function brandHeader(brand: EmailBrand): string {
+  const name = escapeHtml(brand.name)
+  if (brand.business && brand.logoUrl) {
+    return `<img src="${escapeHtml(brand.logoUrl)}" alt="${name}" height="40" style="display:block;height:40px;width:auto;max-width:220px;border:0;">`
+  }
+  const mark = brand.logoUrl
+    ? `<img src="${escapeHtml(brand.logoUrl)}" alt="" width="30" height="30" style="display:block;width:30px;height:30px;border:0;border-radius:8px;">`
+    : `<div style="width:30px;height:30px;border-radius:8px;background:${brand.accent};color:${onColor(brand.accent) === '#ffffff' ? '#ffffff' : INK};font-family:${FONT};font-size:14px;font-weight:800;text-align:center;line-height:30px;">${escapeHtml(brand.name.charAt(0).toUpperCase())}</div>`
+  return `<table role="presentation" cellpadding="0" cellspacing="0"><tr>
+    <td style="padding-right:10px;vertical-align:middle;">${mark}</td>
+    <td style="vertical-align:middle;color:${INK};font-family:${FONT};font-size:16px;font-weight:800;letter-spacing:-0.01em;">${name}</td>
+  </tr></table>`
+}
+
+/** Light, brand-matched, email-client-safe layout (table + inline styles). */
 function layout(opts: {
   preview: string
   heading: string
   body: string
   cta?: { label: string; url: string }
   footNote?: string
+  brand?: EmailBrand
 }): string {
+  const brand = opts.brand ?? LMSY_EMAIL_BRAND
+  const button = brand.accent
+  const buttonText = onColor(button) === '#ffffff' ? '#ffffff' : INK
+  const footer = brand.business
+    ? `Sent for ${escapeHtml(brand.name)} by ${APP_NAME}`
+    : `${APP_NAME} &middot; <a href="https://${APP_DOMAIN}" style="color:${ACCENT_LINK};text-decoration:none;">${APP_DOMAIN}</a>`
   return `<!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light"></head>
 <body style="margin:0;padding:0;background:${CANVAS};">
   <div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(opts.preview)}</div>
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${CANVAS};">
     <tr><td align="center" style="padding:36px 16px;">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:${CARD};border:1px solid ${BORDER};border-radius:16px;overflow:hidden;">
-        <tr><td style="padding:24px 30px;background:${HEADER};border-bottom:1px solid ${BORDER_SOFT};">
-          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-            <td style="padding-right:10px;vertical-align:middle;">
-              <div style="width:26px;height:26px;border-radius:7px;background:${ACCENT};color:#ffffff;font-size:11px;text-align:center;line-height:26px;">&#9654;</div>
-            </td>
-            <td style="vertical-align:middle;color:${INK};font-family:${FONT};font-size:15px;font-weight:700;letter-spacing:0.01em;">${APP_NAME}</td>
-          </tr></table>
-        </td></tr>
-        <tr><td style="padding:36px 30px;font-family:${FONT};">
-          <h1 style="margin:0 0 14px;color:${INK};font-size:21px;font-weight:700;letter-spacing:-0.01em;line-height:1.25;">${opts.heading}</h1>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:500px;background:${CARD};border:2px solid ${OUTLINE};border-radius:18px;overflow:hidden;">
+        <tr><td style="padding:22px 30px;border-bottom:1px solid ${BORDER_SOFT};">${brandHeader(brand)}</td></tr>
+        <tr><td style="padding:32px 30px 34px;font-family:${FONT};">
+          <h1 style="margin:0 0 14px;color:${INK};font-size:23px;font-weight:800;letter-spacing:-0.02em;line-height:1.2;">${opts.heading}</h1>
           <div style="color:${MUTED};font-size:15px;line-height:1.62;">${opts.body}</div>
           ${
             opts.cta
-              ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0 4px;"><tr><td style="border-radius:11px;background:${ACCENT};box-shadow:0 8px 24px -8px rgba(109,109,245,0.7);">
-                  <a href="${opts.cta.url}" style="display:inline-block;padding:13px 28px;color:#ffffff;font-family:${FONT};font-size:15px;font-weight:600;text-decoration:none;border-radius:11px;">${opts.cta.label}</a>
+              ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:28px 0 4px;"><tr><td style="border-radius:12px;background:${button};border-bottom:3px solid ${pressedEdge(button)};">
+                  <a href="${opts.cta.url}" style="display:inline-block;padding:13px 28px;color:${buttonText};font-family:${FONT};font-size:15px;font-weight:700;text-decoration:none;border-radius:12px;">${opts.cta.label}</a>
                 </td></tr></table>`
               : ''
           }
           ${opts.footNote ? `<p style="margin:24px 0 0;color:${FAINT};font-size:12.5px;line-height:1.5;">${opts.footNote}</p>` : ''}
         </td></tr>
-        <tr><td style="padding:18px 30px;border-top:1px solid ${BORDER_SOFT};font-family:${FONT};font-size:12px;color:${FAINT};">
-          ${APP_NAME} &middot; <a href="https://${APP_DOMAIN}" style="color:${ACCENT_LINK};text-decoration:none;">${APP_DOMAIN}</a>
-        </td></tr>
+        <tr><td style="padding:16px 30px;background:${HEADER};border-top:1px solid ${BORDER_SOFT};font-family:${FONT};font-size:12px;color:${FAINT};">${footer}</td></tr>
       </table>
-      <p style="margin:16px 0 0;color:${FAINT};font-family:${FONT};font-size:11px;letter-spacing:0.02em;">Show, don&rsquo;t tell.</p>
+      ${brand.business ? '' : `<p style="margin:16px 0 0;color:${FAINT};font-family:${FONT};font-size:11px;">Show, don&rsquo;t tell.</p>`}
     </td></tr>
   </table>
 </body>
@@ -259,6 +290,8 @@ export function bookingConfirmedEmail(opts: {
   manageUrl: string
   googleUrl: string
   rescheduled: boolean
+  message: string | null
+  brand: EmailBrand
 }) {
   const rows: [string, string | null][] = [
     ['What', opts.title],
@@ -273,16 +306,22 @@ export function bookingConfirmedEmail(opts: {
     ['Where', 'Video call in your browser (link below)'],
   ]
   const verb = opts.rescheduled ? 'moved' : 'booked'
+  const link = readableOnWhite(opts.brand.accent)
+  const note = opts.message
+    ? `<div style="margin:18px 0 0;padding:14px 16px;background:${HEADER};border-left:4px solid ${opts.brand.accent};border-radius:10px;color:${INK};font-size:14.5px;line-height:1.55;white-space:pre-wrap;">${escapeHtml(opts.message)}</div>`
+    : ''
   return {
     subject: `${opts.rescheduled ? 'Updated' : 'Confirmed'}: ${opts.title} with ${opts.businessName}`,
     html: layout({
       preview: `${opts.when}. ${opts.title} with ${opts.businessName}.`,
       heading: `You're ${verb}, ${escapeHtml(firstName(opts.guestName))}`,
-      body: `Your ${escapeHtml(opts.title)} with <strong style="color:${INK};">${escapeHtml(opts.businessName)}</strong> is ${opts.rescheduled ? 'now' : 'confirmed'}. A calendar invite is attached.${detailRows(rows)}<p style="margin:18px 0 0;font-size:13.5px;"><a href="${escapeHtml(opts.googleUrl)}" style="color:${ACCENT_LINK};text-decoration:none;">Add to Google Calendar</a> &middot; <a href="${opts.manageUrl}" style="color:${ACCENT_LINK};text-decoration:none;">Reschedule or cancel</a></p>`,
+      body: `Your ${escapeHtml(opts.title)} with <strong style="color:${INK};">${escapeHtml(opts.businessName)}</strong> is ${opts.rescheduled ? 'now' : 'confirmed'}. A calendar invite is attached.${note}${detailRows(rows)}<p style="margin:18px 0 0;font-size:13.5px;"><a href="${escapeHtml(opts.googleUrl)}" style="color:${link};text-decoration:none;font-weight:600;">Add to Google Calendar</a> &middot; <a href="${opts.manageUrl}" style="color:${link};text-decoration:none;font-weight:600;">Reschedule or cancel</a></p>`,
       cta: { label: 'Join the call', url: opts.joinUrl },
-      footNote: 'Open the join link at meeting time. It runs in your browser, so there is nothing to install. The host will let you in.',
+      brand: opts.brand,
+      footNote:
+        'Open the join link at meeting time. It runs in your browser, so there is nothing to install. The host will let you in.',
     }),
-    text: `You're ${verb}, ${firstName(opts.guestName)}.\n\n${textRows(rows)}\n\nJoin: ${opts.joinUrl}\nReschedule or cancel: ${opts.manageUrl}`,
+    text: `You're ${verb}, ${firstName(opts.guestName)}.${opts.message ? `\n\n${opts.message}` : ''}\n\n${textRows(rows)}\n\nJoin: ${opts.joinUrl}\nReschedule or cancel: ${opts.manageUrl}`,
   }
 }
 
@@ -295,6 +334,7 @@ export function bookingHostEmail(opts: {
   guestName: string
   guestEmail: string
   notes: string | null
+  answers: { label: string; value: string }[]
   previousWhen: string | null
   joinUrl: string
   dashboardUrl: string
@@ -305,6 +345,7 @@ export function bookingHostEmail(opts: {
     ['Was', opts.previousWhen],
     ['Who', `${opts.guestName} (${opts.guestEmail})`],
     ['Notes', opts.notes],
+    ...opts.answers.map((a): [string, string] => [a.label, a.value]),
     ['Business', opts.businessName],
   ]
   const moved = Boolean(opts.previousWhen)
@@ -312,7 +353,9 @@ export function bookingHostEmail(opts: {
     subject: `${moved ? 'Rescheduled' : 'New booking'}: ${opts.guestName}, ${opts.when}`,
     html: layout({
       preview: `${opts.guestName} ${moved ? 'moved' : 'booked'} ${opts.title}.`,
-      heading: moved ? `${escapeHtml(opts.guestName)} moved their booking` : `New booking from ${escapeHtml(opts.guestName)}`,
+      heading: moved
+        ? `${escapeHtml(opts.guestName)} moved their booking`
+        : `New booking from ${escapeHtml(opts.guestName)}`,
       body: `Hi ${escapeHtml(firstName(opts.hostName))}, ${moved ? 'a booking has a new time' : 'you have a new booking'}. A calendar invite is attached.${detailRows(rows)}<p style="margin:18px 0 0;font-size:13.5px;"><a href="${opts.dashboardUrl}" style="color:${ACCENT_LINK};text-decoration:none;">See all bookings</a></p>`,
       cta: { label: 'Open the meeting room', url: opts.joinUrl },
       footNote: 'Reply to this email to reach them directly.',
@@ -330,6 +373,8 @@ export function bookingCancelledEmail(opts: {
   cancelledBy: string
   reason: string | null
   rebookUrl: string | null
+  /** The business's look when emailing its client; Let Me Show You's for the host. */
+  brand?: EmailBrand
 }) {
   const rows: [string, string | null][] = [
     ['What', opts.title],
@@ -344,7 +389,45 @@ export function bookingCancelledEmail(opts: {
       heading: 'Booking cancelled',
       body: `Hi ${escapeHtml(firstName(opts.recipientName))}, this booking with <strong style="color:${INK};">${escapeHtml(opts.businessName)}</strong> has been cancelled, and the meeting link no longer works.${detailRows(rows)}`,
       cta: opts.rebookUrl ? { label: 'Book a new time', url: opts.rebookUrl } : undefined,
+      brand: opts.brand,
     }),
     text: `Booking cancelled.\n\n${textRows(rows)}${opts.rebookUrl ? `\n\nBook a new time: ${opts.rebookUrl}` : ''}`,
+  }
+}
+
+/** To the client: their call is tomorrow, or in an hour. */
+export function bookingReminderEmail(opts: {
+  guestName: string
+  businessName: string
+  title: string
+  when: string
+  hostName: string | null
+  joinUrl: string
+  soon: 'day' | 'hour'
+  brand: EmailBrand
+}) {
+  const lead = opts.soon === 'hour' ? 'starts in about an hour' : 'is coming up tomorrow'
+  const rows: [string, string | null][] = [
+    ['What', opts.title],
+    ['When', opts.when],
+    [
+      'With',
+      opts.hostName && opts.hostName !== opts.businessName
+        ? `${opts.hostName}, ${opts.businessName}`
+        : opts.businessName,
+    ],
+  ]
+  return {
+    subject: `${opts.soon === 'hour' ? 'In an hour' : 'Tomorrow'}: ${opts.title} with ${opts.businessName}`,
+    html: layout({
+      preview: `Your ${opts.title} ${lead}. ${opts.when}.`,
+      heading: `See you ${opts.soon === 'hour' ? 'soon' : 'tomorrow'}, ${escapeHtml(firstName(opts.guestName))}`,
+      body: `Your ${escapeHtml(opts.title)} with <strong style="color:${INK};">${escapeHtml(opts.businessName)}</strong> ${lead}.${detailRows(rows)}<p style="margin:18px 0 0;font-size:13.5px;">Can&rsquo;t make it? Use the reschedule link in your booking confirmation email.</p>`,
+      cta: { label: 'Join the call', url: opts.joinUrl },
+      footNote:
+        'The link opens in your browser, so there is nothing to install. The host will let you in.',
+      brand: opts.brand,
+    }),
+    text: `Your ${opts.title} with ${opts.businessName} ${lead}.\n\n${textRows(rows)}\n\nJoin: ${opts.joinUrl}\nTo reschedule or cancel, use the link in your booking confirmation email.`,
   }
 }

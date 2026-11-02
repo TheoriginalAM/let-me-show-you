@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { APP_DOMAIN } from '@lmsy/shared'
 import {
@@ -10,6 +9,7 @@ import {
 import { getActiveWorkspaceId, getWorkspaceForMember } from '@/db/workspaces'
 import { getCurrentUser } from '@/lib/current-user'
 import { BookingManager } from './booking-manager'
+import { PageHeader } from '../page-header'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,24 +31,25 @@ export default async function BookingDashboardPage() {
   ])
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col gap-6 px-4 py-10 sm:px-6">
-      <header className="rise flex flex-col gap-2">
-        <Link href="/dashboard" className="text-sm text-faint transition hover:text-ink">
-          ← Back to recordings
-        </Link>
-        <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">Booking</h1>
-        <p className="max-w-2xl text-muted">
-          Let clients of <span className="text-ink">{ws.brand.name || ws.name}</span> book a video call
-          with you. Each booking gets its own private meeting room and a calendar invite. Times you&rsquo;re
-          booked in any of your workspaces are blocked everywhere. Switch workspace on the dashboard to set
-          up another business.
-        </p>
-      </header>
+    <div className="flex w-full max-w-4xl flex-col gap-8">
+      <PageHeader
+        section="booking"
+        title="Booking"
+        description={
+          <>
+            Let clients of{' '}
+            <span className="font-semibold text-ink">{ws.brand.name || ws.name}</span> pick a time
+            with you. Each booking gets its own private room and a calendar invite, and a time
+            booked in any of your businesses is blocked in all of them.
+          </>
+        }
+      />
 
       <BookingManager
         domain={APP_DOMAIN}
         pageSlug={slug}
         isOwner={ws.role === 'owner'}
+        accent={ws.brand.color}
         meId={user.id}
         eventTypes={eventTypes.map((e) => ({
           id: e.id,
@@ -63,6 +64,10 @@ export default async function BookingDashboardPage() {
           maxDaysAhead: e.maxDaysAhead,
           timeZone: e.timeZone,
           weeklyHours: e.weeklyHours,
+          questions: e.questions,
+          confirmationMessage: e.confirmationMessage,
+          remindersEnabled: e.remindersEnabled,
+          color: e.color,
           active: e.active,
           hostUserId: e.hostUserId,
           hostName: e.hostName,
@@ -71,6 +76,6 @@ export default async function BookingDashboardPage() {
         past={past}
         timeOff={timeOff}
       />
-    </main>
+    </div>
   )
 }

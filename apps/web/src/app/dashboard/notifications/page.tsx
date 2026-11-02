@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import { formatRelativeDate } from '@lmsy/shared'
 import { getCurrentUser } from '@/lib/current-user'
 import { listNotifications, markAllNotificationsRead } from '@/db/app-notifications'
+import { PageHeader } from '../page-header'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Notifications' }
@@ -19,13 +20,11 @@ export default async function NotificationsPage() {
   await markAllNotificationsRead(user.id)
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-8 px-4 py-10 sm:px-6">
-      <header className="rise flex flex-col gap-3">
-        <Link href="/dashboard" className="text-sm text-faint transition hover:text-ink">
-          ← Your recordings
-        </Link>
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Notifications</h1>
-      </header>
+    <div className="flex w-full max-w-2xl flex-col gap-8">
+      <PageHeader
+        title="Notifications"
+        description="Comments, approvals, bookings and people waiting to join your calls."
+      />
 
       {items.length === 0 ? (
         <div className="glass rise rounded-2xl border-dashed p-12 text-center">
@@ -37,9 +36,7 @@ export default async function NotificationsPage() {
             const inner = (
               <div
                 className={`flex items-start gap-3 rounded-xl border px-4 py-3 transition ${
-                  n.read
-                    ? 'border-line bg-white/[0.02]'
-                    : 'border-accent/25 bg-accent-strong/[0.06]'
+                  n.read ? 'border-line bg-surface' : 'border-accent/25 bg-accent-strong/[0.06]'
                 } ${n.linkPath ? 'hover:border-line-strong' : ''}`}
               >
                 <span
@@ -55,9 +52,7 @@ export default async function NotificationsPage() {
                       {formatRelativeDate(n.createdAt)}
                     </span>
                   </div>
-                  {n.body && (
-                    <p className="mt-0.5 truncate text-sm text-muted">{n.body}</p>
-                  )}
+                  {n.body && <p className="mt-0.5 truncate text-sm text-muted">{n.body}</p>}
                 </div>
               </div>
             )
@@ -75,6 +70,6 @@ export default async function NotificationsPage() {
           })}
         </ul>
       )}
-    </main>
+    </div>
   )
 }

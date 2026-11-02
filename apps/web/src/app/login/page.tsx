@@ -1,5 +1,6 @@
 'use client'
 
+import { LogoMark } from '@/components/brand/logo'
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -51,25 +52,23 @@ function LoginForm() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-sm flex-col justify-center px-6 py-16">
-      <div className="rise glass rounded-2xl p-8 shadow-[0_40px_120px_-40px_rgba(80,70,220,0.7)]">
+      <div className="rise glass rounded-3xl border-2 border-ink p-8 shadow-[8px_8px_0_0_var(--color-ink)]">
         <div className="flex flex-col items-start gap-6">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-gradient-to-b from-[#8281ff] to-accent-strong text-sm text-white shadow-[0_6px_16px_-6px_rgba(109,109,245,0.9)]">
-            ▶
-          </span>
+          <LogoMark className="h-11 w-11" />
           <div>
-            <h1 className="font-display text-3xl font-semibold tracking-tight">Log in</h1>
+            <h1 className="font-display text-3xl font-extrabold tracking-tight">Log in</h1>
             <p className="mt-1.5 text-sm text-muted">Welcome back to Let Me Show You.</p>
           </div>
         </div>
 
         {error && (
-          <p className="mt-6 rounded-lg bg-red-500/10 px-3 py-2 text-sm text-red-300 ring-1 ring-inset ring-red-500/25">
+          <p className="mt-6 rounded-lg bg-danger/10 px-3 py-2 text-sm text-danger ring-1 ring-inset ring-danger/25">
             {error}
           </p>
         )}
 
         {magicSent ? (
-          <p className="mt-6 rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-300 ring-1 ring-inset ring-green-500/25">
+          <p className="mt-6 rounded-lg bg-success/10 px-3 py-2 text-sm text-success ring-1 ring-inset ring-success/25">
             Magic link sent — check your email (or the server console in dev).
           </p>
         ) : (
@@ -80,7 +79,7 @@ function LoginForm() {
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="rounded-lg border border-line bg-white/[0.03] px-3 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-line-strong focus:outline-none"
+              className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-line-strong focus:outline-none"
             />
             <input
               type="password"
@@ -88,7 +87,7 @@ function LoginForm() {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded-lg border border-line bg-white/[0.03] px-3 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-line-strong focus:outline-none"
+              className="rounded-lg border border-line bg-surface px-3 py-2.5 text-sm text-ink placeholder:text-faint transition-colors focus:border-line-strong focus:outline-none"
             />
             <button
               type="submit"

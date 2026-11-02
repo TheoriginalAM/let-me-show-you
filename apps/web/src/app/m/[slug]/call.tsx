@@ -74,7 +74,8 @@ function createRoom(): Room {
   const q = QUALITY[prefs.quality]
   let audioOutput: { deviceId: string } | undefined
   try {
-    if (prefs.audioOutputId && supportsAudioOutputSelection()) audioOutput = { deviceId: prefs.audioOutputId }
+    if (prefs.audioOutputId && supportsAudioOutputSelection())
+      audioOutput = { deviceId: prefs.audioOutputId }
   } catch {
     // not supported
   }
@@ -172,11 +173,14 @@ export function CallRoot({
     (error: Error) => {
       if (deviceFailed.current || isDeviceError(error)) {
         deviceFailed.current = false
-        setNotice("We couldn't start your camera or microphone. Check your browser's permissions or close other apps using it.")
+        setNotice(
+          "We couldn't start your camera or microphone. Check your browser's permissions or close other apps using it.",
+        )
         return
       }
       // Connecting was cancelled because we're leaving (e.g. unmounting): not a failure.
-      if (error instanceof ConnectionError && error.reason === ConnectionErrorReason.Cancelled) return
+      if (error instanceof ConnectionError && error.reason === ConnectionErrorReason.Cancelled)
+        return
       if (error instanceof ConnectionError || error.name === 'ConnectionError') end('lost')
       else console.error('[meeting] room error:', error)
     },
@@ -199,7 +203,7 @@ export function CallRoot({
       onDisconnected={onDisconnected}
       onError={onError}
       onMediaDeviceFailure={onDeviceFailure}
-      className="h-dvh"
+      className="h-dvh bg-[#12101f]"
       style={brandVars(brand.accent)}
       data-meeting-call=""
     >
@@ -269,8 +273,18 @@ function CallView({
   blurredJoin: boolean
 }) {
   const call = useCall()
-  const { brand, roomName, role, slug, notices, dismiss, notify, panel, setLobbyEnabled, setSettingsOpen } =
-    call
+  const {
+    brand,
+    roomName,
+    role,
+    slug,
+    notices,
+    dismiss,
+    notify,
+    panel,
+    setLobbyEnabled,
+    setSettingsOpen,
+  } = call
   const isHost = role === 'host'
   const room = useRoomContext()
   const participants = useParticipants()
@@ -284,7 +298,9 @@ function CallView({
   const now = useNow()
 
   useJoinMedia(tracks, blurredJoin)
-  useCallBlur(() => notify("Background blur couldn't start on this device, so it's been turned off.", 'warn'))
+  useCallBlur(() =>
+    notify("Background blur couldn't start on this device, so it's been turned off.", 'warn'),
+  )
   useCallNoise()
   useShortcuts()
   useBackGuard()
@@ -352,18 +368,30 @@ function CallView({
         <BrandMark brand={brand} size="sm" showName={false} />
         <span className="min-w-0 truncate text-[15px] font-semibold">{roomName}</span>
         {call.lobbyEnabled && isHost && (
-          <LockIcon size={14} className="shrink-0 text-faint" aria-label="Guests must ask to join" />
+          <LockIcon
+            size={14}
+            className="shrink-0 text-faint"
+            aria-label="Guests must ask to join"
+          />
         )}
         <div className="ml-auto flex items-center gap-2 sm:gap-3">
           {isRecording && (
             <span className="flex items-center gap-1.5 rounded-full bg-red-500/15 px-2.5 py-1 text-xs font-semibold text-red-200 ring-1 ring-inset ring-red-500/30">
-              <span className="h-2 w-2 rounded-full bg-red-500 motion-safe:animate-pulse" aria-hidden />
+              <span
+                className="h-2 w-2 rounded-full bg-red-500 motion-safe:animate-pulse"
+                aria-hidden
+              />
               Recording
-              {recSince && <span className="tabular-nums text-red-200/80">{formatClock(now - recSince)}</span>}
+              {recSince && (
+                <span className="tabular-nums text-red-200/80">{formatClock(now - recSince)}</span>
+              )}
             </span>
           )}
           {startedAt && (
-            <span className="hidden text-sm tabular-nums text-muted sm:inline" aria-label="Call length">
+            <span
+              className="hidden text-sm tabular-nums text-muted sm:inline"
+              aria-label="Call length"
+            >
               {formatClock(now - startedAt)}
             </span>
           )}
@@ -393,7 +421,9 @@ function CallView({
 
       {/* Stage + side panel */}
       <main className="relative flex min-h-0 flex-1 gap-3 px-3 sm:px-5">
-        <div className={cx('relative min-w-0 flex-1 transition-opacity', reconnecting && 'opacity-60')}>
+        <div
+          className={cx('relative min-w-0 flex-1 transition-opacity', reconnecting && 'opacity-60')}
+        >
           <Stage />
           {participants.length === 1 && (
             <AloneHint
@@ -417,7 +447,9 @@ function CallView({
       <div
         className={cx(
           'pointer-events-none absolute right-[calc(0.75rem+env(safe-area-inset-right))] z-50 flex w-[min(22rem,calc(100vw-1.5rem))] flex-col gap-2',
-          compactScreen ? 'top-[calc(0.5rem+env(safe-area-inset-top))]' : 'top-[calc(4rem+env(safe-area-inset-top))]',
+          compactScreen
+            ? 'top-[calc(0.5rem+env(safe-area-inset-top))]'
+            : 'top-[calc(4rem+env(safe-area-inset-top))]',
           // Keep clear of the side panel (22rem + the stage's gap and padding).
           panel
             ? 'panel-column:right-[24.75rem] panel-column:w-[min(22rem,calc(100vw-26.25rem))]'
@@ -452,7 +484,8 @@ function CallView({
               'pointer-events-auto flex items-start gap-3 rounded-2xl border px-4 py-3 text-sm shadow-2xl backdrop-blur-xl',
               n.tone === 'error' && 'border-red-500/30 bg-red-950/80 text-red-100',
               n.tone === 'warn' && 'border-amber-400/30 bg-[#1b170c]/95 text-amber-100',
-              (n.tone === 'info' || n.tone === 'success') && 'border-white/10 bg-[#15151f]/95 text-ink',
+              (n.tone === 'info' || n.tone === 'success') &&
+                'border-white/10 bg-[#15151f]/95 text-ink',
             )}
           >
             <span className="min-w-0 flex-1">{n.text}</span>
@@ -479,7 +512,10 @@ function CallView({
           role="alert"
         >
           <div className="flex items-center gap-3 rounded-full border border-white/10 bg-[#15151f]/95 px-5 py-2.5 text-sm shadow-2xl">
-            <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white motion-reduce:animate-none" aria-hidden />
+            <span
+              className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white motion-reduce:animate-none"
+              aria-hidden
+            />
             Reconnecting…
           </div>
         </div>
@@ -638,7 +674,9 @@ function useJoinMedia(tracks: JoinTracks, blurredCamera: boolean): void {
     const publish = async (): Promise<void> => {
       if (tracks.audio) {
         try {
-          await room.localParticipant.publishTrack(tracks.audio, { source: Track.Source.Microphone })
+          await room.localParticipant.publishTrack(tracks.audio, {
+            source: Track.Source.Microphone,
+          })
         } catch (error) {
           console.error('[meeting] could not publish microphone:', error)
           tracks.audio.stop()
@@ -712,7 +750,8 @@ function useShortcuts(): void {
       } else {
         run(async () => {
           try {
-            if ((await setCameraOn(room, !lp.isCameraEnabled)) === 'blur-failed') notify(BLUR_FAILED_COPY, 'warn')
+            if ((await setCameraOn(room, !lp.isCameraEnabled)) === 'blur-failed')
+              notify(BLUR_FAILED_COPY, 'warn')
           } catch {
             notify(CAMERA_FAILED_COPY, 'error')
           }
@@ -727,7 +766,8 @@ function useShortcuts(): void {
 type NavigationLike = { currentEntry?: { key: string } | null }
 const navigationApi = (): NavigationLike | undefined =>
   (window as unknown as { navigation?: NavigationLike }).navigation
-const isStandIn = (): boolean => (window.history.state as { lmsyCall?: boolean } | null)?.lmsyCall === true
+const isStandIn = (): boolean =>
+  (window.history.state as { lmsyCall?: boolean } | null)?.lmsyCall === true
 
 // The stand-in history entry (see useBackGuard) is shared across mounts, so a
 // call that remounts straight away (React dev mode, a quick rejoin) reuses it
@@ -834,10 +874,14 @@ function useChatToasts(): void {
     if (!last) return
     const text = typeof last.message === 'string' ? last.message.replace(/\s+/g, ' ').trim() : ''
     if (!text) return
-    notify(`${last.from?.name || 'Guest'}: ${text.length > 90 ? `${text.slice(0, 90)}…` : text}`, 'info', {
-      label: 'Reply',
-      run: () => setPanel('chat'),
-    })
+    notify(
+      `${last.from?.name || 'Guest'}: ${text.length > 90 ? `${text.slice(0, 90)}…` : text}`,
+      'info',
+      {
+        label: 'Reply',
+        run: () => setPanel('chat'),
+      },
+    )
   }, [chat.messages, panel, notify, setPanel])
 }
 

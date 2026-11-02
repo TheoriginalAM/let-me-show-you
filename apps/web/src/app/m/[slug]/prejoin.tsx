@@ -356,11 +356,21 @@ export function PreJoinScreen({
   }, [joinAudio, joinVideo, media.audioTrack, media.videoTrack, onMediaChange])
 
   const activeMicId =
-    prefs.audioInputId ?? (media.audioTrack && sourceTrack(media.audioTrack).getSettings().deviceId) ?? ''
+    prefs.audioInputId ??
+    (media.audioTrack && sourceTrack(media.audioTrack).getSettings().deviceId) ??
+    ''
   const activeCamId =
-    prefs.videoInputId ?? (media.videoTrack && sourceTrack(media.videoTrack).getSettings().deviceId) ?? ''
-  const micIndex = Math.max(0, mics.findIndex((d) => d.deviceId === activeMicId))
-  const camIndex = Math.max(0, cams.findIndex((d) => d.deviceId === activeCamId))
+    prefs.videoInputId ??
+    (media.videoTrack && sourceTrack(media.videoTrack).getSettings().deviceId) ??
+    ''
+  const micIndex = Math.max(
+    0,
+    mics.findIndex((d) => d.deviceId === activeMicId),
+  )
+  const camIndex = Math.max(
+    0,
+    cams.findIndex((d) => d.deviceId === activeCamId),
+  )
   // A saved speaker that's no longer plugged in falls back to the system default.
   const savedSpeaker = speakers.find((d) => d.deviceId === prefs.audioOutputId)
   const speakerId = savedSpeaker?.deviceId ?? null
@@ -374,7 +384,10 @@ export function PreJoinScreen({
 
   const [previewRatio, setPreviewRatio] = useState<number | null>(null)
   const portraitPreview = videoOn && !!media.videoTrack && previewRatio !== null && previewRatio < 1
-  const problem = mediaProblemCopy(videoOn ? media.videoError : null, audioOn ? media.audioError : null)
+  const problem = mediaProblemCopy(
+    videoOn ? media.videoError : null,
+    audioOn ? media.audioError : null,
+  )
   const nameOk = name.trim().length > 0
   const emailOk = isHost || EMAIL_RE.test(email.trim())
   const canSubmit = nameOk && emailOk && !busy
@@ -448,7 +461,11 @@ export function PreJoinScreen({
             }
           >
             {videoOn && media.videoTrack ? (
-              <PreviewVideo track={media.videoTrack} mirror={prefs.mirror} onRatio={setPreviewRatio} />
+              <PreviewVideo
+                track={media.videoTrack}
+                mirror={prefs.mirror}
+                onRatio={setPreviewRatio}
+              />
             ) : (
               <div className="grid h-full place-items-center">
                 <span className="grid h-20 w-20 place-items-center rounded-full bg-[var(--room-accent-soft)] font-display text-3xl font-semibold text-ink">
@@ -517,13 +534,17 @@ export function PreJoinScreen({
           <div className="mt-4 flex flex-wrap gap-2">
             <Chip
               icon={<MicIcon size={16} />}
-              label={mics.length ? deviceLabel(mics[micIndex], micIndex, 'Microphone') : 'Microphone'}
+              label={
+                mics.length ? deviceLabel(mics[micIndex], micIndex, 'Microphone') : 'Microphone'
+              }
               menuLabel="Choose a microphone"
             >
               {(close) => (
                 <>
                   <MenuLabel>Microphone</MenuLabel>
-                  {mics.length === 0 && <p className="px-3 py-2 text-faint">No microphones found</p>}
+                  {mics.length === 0 && (
+                    <p className="px-3 py-2 text-faint">No microphones found</p>
+                  )}
                   {mics.map((d, i) => (
                     <MenuItem
                       key={d.deviceId}
@@ -634,8 +655,8 @@ export function PreJoinScreen({
           </div>
           {!speakerSelectable && (
             <p className="mt-3 text-xs text-faint">
-              Sound plays through your device&apos;s current output. You can change it in your system
-              settings.
+              Sound plays through your device&apos;s current output. You can change it in your
+              system settings.
             </p>
           )}
           {testError && <p className="mt-2 text-xs text-amber-200">{testError}</p>}
@@ -643,10 +664,17 @@ export function PreJoinScreen({
 
         {/* Details / lobby */}
         <section className="rise min-w-0" style={{ animationDelay: '80ms' }}>
-          <p className="eyebrow">{isHost ? "You're hosting" : `Video call with ${brand.name}`}</p>
-          <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+          <p className="text-sm font-semibold text-[var(--room-accent-text)]">
+            {isHost ? "You're hosting" : `Video call with ${brand.name}`}
+          </p>
+          <h1 className="mt-2 font-display text-3xl font-extrabold leading-tight tracking-tight text-ink sm:text-4xl">
             {roomName}
           </h1>
+          {brand.welcome && (
+            <p className="mt-3 max-w-md whitespace-pre-line text-lg leading-relaxed text-ink/85">
+              {brand.welcome}
+            </p>
+          )}
 
           {phase === 'waiting' ? (
             <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
@@ -658,8 +686,8 @@ export function PreJoinScreen({
                 <p className="font-medium text-ink">Asking to join…</p>
               </div>
               <p className="mt-2 text-sm text-muted">
-                The host will let you in soon. Keep this page open; you can check your camera and mic
-                while you wait.
+                The host will let you in soon. Keep this page open; you can check your camera and
+                mic while you wait.
               </p>
               <button
                 type="button"
@@ -720,7 +748,9 @@ export function PreJoinScreen({
                       placeholder="you@company.com"
                       className="w-full rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-3 text-base text-ink placeholder:text-faint focus:border-[var(--room-accent-ring)] focus:outline-none sm:text-sm"
                     />
-                    <span className="mt-1.5 block text-xs text-faint">Only the host sees your email.</span>
+                    <span className="mt-1.5 block text-xs text-faint">
+                      Only the host sees your email.
+                    </span>
                   </label>
                 )}
                 <input

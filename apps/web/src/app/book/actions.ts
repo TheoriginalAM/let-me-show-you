@@ -12,6 +12,7 @@ import {
 } from '@/db/bookings'
 import { announceBooking } from '@/lib/booking-emails'
 import { cancelAndNotify } from '@/lib/booking-flow'
+import { collectAnswers, type BookingAnswer } from '@/lib/booking-questions'
 import { availableSlots, isValidTimeZone } from '@/lib/booking-time'
 import { clientIpHash } from '@/lib/client-ip'
 
@@ -59,9 +60,7 @@ async function reschedulable(token: string, eventTypeId: string): Promise<Bookin
   return b
 }
 
-export type BookResult =
-  | { ok: true; token: string }
-  | { ok: false; error: string; taken?: boolean }
+export type BookResult = { ok: true; token: string } | { ok: false; error: string; taken?: boolean }
 
 /** Book a time (or move an existing booking to it when `rescheduleToken` is given). */
 export async function bookSlot(
@@ -73,6 +72,7 @@ export async function bookSlot(
     email: string
     notes?: string
     timeZone?: string
+    answers?: Record<string, string>
     rescheduleToken?: string
   },
 ): Promise<BookResult> {
@@ -82,7 +82,10 @@ export async function bookSlot(
   if (!Number.isFinite(startsAt)) return { ok: false, error: 'Pick a time.' }
   const name = clean(input.name, 80)
   const email = clean(input.email, 254).toLowerCase()
-  const notes = String(input.notes ?? '').trim().slice(0, 1000) || null
+  const notes =
+    String(input.notes ?? '')
+      .trim()
+      .slice(0, 1000) || null
   const timeZone = isValidTimeZone(String(input.timeZone ?? '')) ? String(input.timeZone) : null
   if (!name) return { ok: false, error: 'Please add your name.' }
   if (!EMAIL_RE.test(email)) return { ok: false, error: 'Please add a valid email.' }
@@ -90,7 +93,15 @@ export async function bookSlot(
   let previous: BookingDetail | null = null
   if (input.rescheduleToken) {
     previous = await reschedulable(String(input.rescheduleToken), event.id)
-    if (!previous) return { ok: false, error: 'That booking can no longer be moved. Book a new time instead.' }
+    if (!previous)
+      return { ok: false, error: 'That booking can no longer be moved. Book a new time instead.' }
+  }
+  // A moved booking keeps the answers given the first time.
+  let answers: BookingAnswer[] = previous?.answers ?? []
+  if (!previous) {
+    const checked = collectAnswers(event.questions, input.answers)
+    if (!checked.ok) return { ok: false, error: checked.error }
+    answers = checked.answers
   }
 
   const ipHash = await clientIpHash()
@@ -105,6 +116,7 @@ export async function bookSlot(
     guestEmail: email,
     guestNotes: notes,
     guestTimeZone: timeZone,
+    answers,
     ipHash,
     reschedule: previous
       ? {
@@ -133,7 +145,14 @@ export async function cancelByGuest(
   const b = await getBookingByToken(String(token))
   if (!b) return { ok: false, error: 'Booking not found.' }
   if (b.status !== 'confirmed') return { ok: false, error: 'This booking is already cancelled.' }
-  if (new Date(b.endsAt).getTime() <= Date.now()) return { ok: false, error: 'This booking has already happened.' }
-  const done = await cancelAndNotify(b.id, 'guest', String(reason ?? '').trim().slice(0, 500) || null)
+  if (new Date(b.endsAt).getTime() <= Date.now())
+    return { ok: false, error: 'This booking has already happened.' }
+  const done = await cancelAndNotify(
+    b.id,
+    'guest',
+    String(reason ?? '')
+      .trim()
+      .slice(0, 500) || null,
+  )
   return done ? { ok: true } : { ok: false, error: 'This booking is already cancelled.' }
 }

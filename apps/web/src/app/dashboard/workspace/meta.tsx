@@ -34,7 +34,7 @@ export function RenameWorkspace({ name }: { name: string }) {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         maxLength={80}
-        className="min-w-0 flex-1 rounded-lg border border-line bg-white/[0.03] px-3 py-2 text-sm text-ink focus:border-line-strong focus:outline-none"
+        className="min-w-0 flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink focus:border-line-strong focus:outline-none"
       />
       <button
         type="submit"
@@ -43,7 +43,7 @@ export function RenameWorkspace({ name }: { name: string }) {
       >
         {saved ? 'Saved' : 'Rename'}
       </button>
-      {error && <p className="w-full text-sm text-red-300">{error}</p>}
+      {error && <p className="w-full text-sm text-danger">{error}</p>}
     </form>
   )
 }
@@ -68,19 +68,19 @@ export function DeleteWorkspace({ canDelete }: { canDelete: boolean }) {
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-xl border border-red-500/20 bg-red-500/[0.04] p-4">
+    <div className="flex flex-col gap-2 rounded-xl border border-danger/20 bg-danger/[0.04] p-4">
       <h3 className="text-sm font-semibold text-ink">Delete this workspace</h3>
       <p className="text-sm text-muted">
         Permanently deletes the workspace and all of its recordings. This cannot be undone.
         {!canDelete && ' You must keep at least one workspace.'}
       </p>
-      {error && <p className="text-sm text-red-300">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
       {confirming ? (
         <div className="flex items-center gap-2">
           <button
             onClick={del}
             disabled={pending}
-            className="rounded-lg bg-red-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-400 disabled:opacity-50"
+            className="rounded-lg bg-danger px-3 py-1.5 text-sm font-medium text-white transition hover:opacity-90 disabled:opacity-50"
           >
             {pending ? 'Deleting…' : 'Yes, delete everything'}
           </button>
@@ -96,7 +96,7 @@ export function DeleteWorkspace({ canDelete }: { canDelete: boolean }) {
         <button
           onClick={() => setConfirming(true)}
           disabled={!canDelete}
-          className="w-fit rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-1.5 text-sm font-medium text-red-300 transition hover:border-red-500/40 hover:bg-red-500/20 disabled:opacity-40"
+          className="w-fit rounded-lg border border-danger/25 bg-danger/10 px-3 py-1.5 text-sm font-medium text-danger transition hover:border-danger/40 hover:bg-danger/20 disabled:opacity-40"
         >
           Delete workspace
         </button>

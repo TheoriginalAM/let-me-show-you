@@ -16,17 +16,17 @@ export default async function PendingPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
       <span className="eyebrow rise" style={{ animationDelay: '40ms' }}>
-        <span className="h-1.5 w-1.5 rounded-full bg-accent shadow-[0_0_10px_2px_rgba(139,139,246,0.9)]" />
+        <span className="h-1.5 w-1.5 rounded-full bg-accent" />
         {APP_NAME}
       </span>
       <div
-        className="rise glass grid h-16 w-16 place-items-center rounded-2xl text-2xl ring-1 ring-inset ring-amber-500/25"
+        className="rise glass grid h-16 w-16 place-items-center rounded-2xl text-2xl ring-1 ring-inset ring-hl-orange/60"
         style={{ animationDelay: '90ms' }}
       >
         ⏳
       </div>
       <h1
-        className="rise font-display text-3xl font-semibold tracking-tight sm:text-4xl"
+        className="rise font-display text-3xl font-extrabold tracking-tight sm:text-4xl"
         style={{ animationDelay: '150ms' }}
       >
         Your account is pending approval

@@ -13,6 +13,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 import { VIDEO_STATUSES } from '@lmsy/shared'
+import type { BookingAnswer, BookingQuestion } from '../lib/booking-questions'
 import type { WeeklyHours } from '../lib/booking-time'
 
 // Better Auth's generated tables (user, session, account, verification).
@@ -32,17 +33,20 @@ export const workspaces = pgTable('workspaces', {
   // Branding for this workspace's public share pages (moved off `user`).
   brandName: text('brand_name'),
   brandLogo: text('brand_logo'), // data URL (resized client-side)
-  brandColor: text('brand_color'), // accent hex, e.g. #8b8bf6
+  brandColor: text('brand_color'), // accent hex, e.g. #4f3cff
   brandTagline: text('brand_tagline'), // short line shown under the brand name
   brandLogoSize: text('brand_logo_size'), // 'small' | 'medium' | 'large' (null = medium)
   brandCtaLabel: text('brand_cta_label'), // optional call-to-action button label
   brandCtaUrl: text('brand_cta_url'), // optional call-to-action button URL
+  brandTheme: text('brand_theme'), // public pages: 'light' | 'dark' (null = light)
+  brandFont: text('brand_font'), // headings: 'modern' | 'classic' | 'friendly' | 'bold' (null = modern)
+  brandCover: text('brand_cover'), // wide cover photo for the booking page (data URL)
+  brandPhoto: text('brand_photo'), // the person behind the business (data URL)
+  brandBio: text('brand_bio'), // a few lines about them, on the booking page
   // Public booking page: /book/<booking_slug>. Set the first time it's opened.
   bookingSlug: text('booking_slug').unique(),
   createdByUserId: text('created_by_user_id').references(() => user.id, { onDelete: 'set null' }),
-  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
-    .notNull()
-    .defaultNow(),
+  createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
 })
 
 /** Workspace roles: an owner manages the workspace + members; members record/upload. */
@@ -229,6 +233,11 @@ export const meetingRooms = pgTable(
     name: text('name').notNull(),
     slug: text('slug').notNull().unique(),
     lobbyEnabled: boolean('lobby_enabled').notNull().default(true),
+    // What guests see before they join: a welcome line, a colour and a backdrop.
+    welcomeMessage: text('welcome_message'),
+    accentColor: text('accent_color'), // overrides the workspace accent in this room
+    background: text('background'), // a preset key (see lib/room-backgrounds), or 'image'
+    backgroundImage: text('background_image'), // data URL when background = 'image'
     createdByUserId: text('created_by_user_id').references(() => user.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
       .notNull()
@@ -336,6 +345,12 @@ export const bookingEventTypes = pgTable(
     maxDaysAhead: integer('max_days_ahead').notNull().default(60),
     timeZone: text('time_zone').notNull(),
     weeklyHours: jsonb('weekly_hours').$type<WeeklyHours>().notNull(),
+    // Extra questions on the booking form, the message shown once booked, and
+    // whether guests get reminder emails (a day and an hour before).
+    questions: jsonb('questions').$type<BookingQuestion[]>().notNull().default([]),
+    confirmationMessage: text('confirmation_message'),
+    remindersEnabled: boolean('reminders_enabled').notNull().default(true),
+    color: text('color'), // the calendar's own colour on the booking page (null = brand accent)
     active: boolean('active').notNull().default(true),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
       .notNull()
@@ -389,6 +404,7 @@ export const bookings = pgTable(
     guestEmail: text('guest_email').notNull(),
     guestNotes: text('guest_notes'),
     guestTimeZone: text('guest_time_zone'),
+    answers: jsonb('answers').$type<BookingAnswer[]>(),
     status: text('status').notNull().default('confirmed'),
     meetingRoomId: uuid('meeting_room_id').references(() => meetingRooms.id, {
       onDelete: 'set null',
@@ -402,6 +418,9 @@ export const bookings = pgTable(
     cancelledAt: timestamp('cancelled_at', { withTimezone: true, mode: 'string' }),
     cancelledBy: text('cancelled_by'),
     cancelReason: text('cancel_reason'),
+    // Set (compare-and-set) as each reminder email is claimed, so it goes once.
+    reminderDaySentAt: timestamp('reminder_day_sent_at', { withTimezone: true, mode: 'string' }),
+    reminderHourSentAt: timestamp('reminder_hour_sent_at', { withTimezone: true, mode: 'string' }),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
       .notNull()
       .defaultNow(),
@@ -412,6 +431,34 @@ export const bookings = pgTable(
     index('bookings_workspace_starts_idx').on(table.workspaceId, table.startsAt),
     index('bookings_meeting_room_idx').on(table.meetingRoomId),
     index('bookings_ip_created_idx').on(table.ipHash, table.createdAt),
+    // The reminder sweep: confirmed bookings starting soon.
+    index('bookings_status_starts_idx').on(table.status, table.startsAt),
+  ],
+)
+
+/**
+ * Old public addresses that still work after someone renames a link, so links
+ * already sent to clients keep landing. kind: 'room' | 'calendar' | 'business'.
+ * scope is the workspace id for calendars (their slugs are per business), else ''.
+ */
+export const slugRedirects = pgTable(
+  'slug_redirects',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    kind: text('kind').notNull(),
+    scope: text('scope').notNull().default(''),
+    oldSlug: text('old_slug').notNull(),
+    targetId: uuid('target_id').notNull(),
+    workspaceId: uuid('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('slug_redirects_kind_scope_slug_idx').on(table.kind, table.scope, table.oldSlug),
+    index('slug_redirects_target_idx').on(table.targetId),
   ],
 )
 
