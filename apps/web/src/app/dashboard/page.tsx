@@ -134,6 +134,7 @@ export default async function DashboardPage() {
               commentCount={commentCounts[video.id] ?? 0}
               description={video.description}
               approvalEnabled={video.approvalEnabled}
+              expiresAt={video.expiresAt}
               approvalCounts={approvalCounts[video.id] ?? { approved: 0, changes: 0 }}
               createdLabel={formatRelativeDate(video.createdAt, now)}
               thumbnailUrl={

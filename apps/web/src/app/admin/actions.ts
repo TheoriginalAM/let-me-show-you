@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/current-user'
 import { getUserContact, setUserApproved } from '@/db/users'
+import { makeReportedVideoPrivate, resolveReport } from '@/db/reports'
 import { notifyUserApproved } from '@/lib/notifications'
 
 async function requireAdmin(): Promise<void> {
@@ -30,5 +31,19 @@ export async function approveUserAction(userId: string): Promise<void> {
 export async function revokeUserAction(userId: string): Promise<void> {
   await requireAdmin()
   await setUserApproved(userId, false)
+  revalidatePath('/admin')
+}
+
+/** Take a reported link down: make the video private and close its reports (admin only). */
+export async function makeReportedVideoPrivateAction(reportId: string): Promise<void> {
+  await requireAdmin()
+  await makeReportedVideoPrivate(String(reportId))
+  revalidatePath('/admin')
+}
+
+/** Close a report without changing the video (admin only). */
+export async function dismissReportAction(reportId: string): Promise<void> {
+  await requireAdmin()
+  await resolveReport(String(reportId))
   revalidatePath('/admin')
 }

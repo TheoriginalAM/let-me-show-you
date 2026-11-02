@@ -1,15 +1,26 @@
 'use client'
 
-import { useRef, useState, useTransition } from 'react'
+import { useEffect, useId, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatDuration, type VideoStatus } from '@lmsy/shared'
 import {
   renameVideoAction,
   setApprovalEnabledAction,
   setDescriptionAction,
+  setVideoExpiryAction,
   setVideoPasswordAction,
   setVisibilityAction,
+  type ExpiryChoice,
 } from '@/app/dashboard/actions'
+import {
+  EXPIRY_PRESET_DAYS,
+  EXPIRY_REMINDER_LEAD_MS,
+  MAX_EXPIRY_DAYS,
+  expiryProblem,
+  formatExpiryDate,
+  isLinkExpired,
+  type ExpiryPresetDays,
+} from '@/lib/link-expiry'
 
 // Pills sit on the thumbnail, so they're solid dark with white text whatever
 // the page theme; the dot carries the colour.
@@ -21,6 +32,34 @@ const STATUS: Record<VideoStatus, { label: string; dot: string }> = {
 }
 
 const NETWORK_HINT = 'Check your connection and try again.'
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** "Never", one of the presets ("7", "30", "90"), or a picked date. */
+type ExpiryOption = 'never' | `${(typeof EXPIRY_PRESET_DAYS)[number]}` | 'date'
+
+/** A local calendar date as the YYYY-MM-DD a date input uses. */
+function toDateInput(d: Date): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+}
+
+/** The last second of a YYYY-MM-DD day in the browser's time zone (epoch ms, NaN if blank). */
+function endOfLocalDay(value: string): number {
+  const [y, m, d] = value.split('-').map(Number)
+  if (!y || !m || !d) return NaN
+  return new Date(y, m - 1, d, 23, 59, 59).getTime()
+}
+
+/**
+ * Dates are shown in the viewer's own time zone. The server doesn't know it, so
+ * the first render uses the business's zone and the browser takes over after.
+ */
+function useDisplayZone(): string | undefined {
+  const [zone, setZone] = useState<string | undefined>('Australia/Sydney')
+  useEffect(() => setZone(undefined), [])
+  return zone
+}
 
 export type VideoCardProps = {
   id: string
@@ -36,6 +75,8 @@ export type VideoCardProps = {
   description: string | null
   approvalEnabled: boolean
   approvalCounts: { approved: number; changes: number }
+  /** When the share link stops working for viewers (null = never). */
+  expiresAt: string | null
   createdLabel: string
   thumbnailUrl: string | null
 }
@@ -58,11 +99,27 @@ export function VideoCard(props: VideoCardProps) {
   const [managingDescription, setManagingDescription] = useState(false)
   const [descDraft, setDescDraft] = useState(props.description ?? '')
   const [approvalOn, setApprovalOn] = useState(props.approvalEnabled)
+  const [expiresAt, setExpiresAt] = useState(props.expiresAt)
+  const [managingExpiry, setManagingExpiry] = useState(false)
+  const [expiryOption, setExpiryOption] = useState<ExpiryOption>('never')
+  const [expiryDate, setExpiryDate] = useState('')
+  const [expiryRange, setExpiryRange] = useState({ min: '', max: '' })
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const busy = pending || deleting
+  const expiryId = useId()
+  const expiryButtonRef = useRef<HTMLButtonElement>(null)
+  const zone = useDisplayZone()
+  const expired = isLinkExpired(expiresAt)
+  const expiresSoon =
+    !expired && expiresAt !== null && Date.parse(expiresAt) - Date.now() <= EXPIRY_REMINDER_LEAD_MS
+  const expiryState = expired
+    ? 'Expired'
+    : expiresAt
+      ? `Expires ${formatExpiryDate(expiresAt, zone)}`
+      : 'Never expires'
 
   async function copyLink() {
     try {
@@ -176,6 +233,64 @@ export function VideoCard(props: VideoCardProps) {
       if (!result.ok) {
         setApprovalOn(!next)
         setError(result.error ?? `Couldn't turn approval ${next ? 'on' : 'off'}. ${NETWORK_HINT}`)
+      }
+    })
+  }
+
+  // Closing the panel puts focus back on the button that opened it.
+  function closeExpiryPanel() {
+    setManagingExpiry(false)
+    requestAnimationFrame(() => expiryButtonRef.current?.focus())
+  }
+
+  function toggleExpiryPanel() {
+    if (managingExpiry) {
+      setManagingExpiry(false)
+      return
+    }
+    const now = Date.now()
+    setExpiryRange({
+      min: toDateInput(new Date(now)),
+      max: toDateInput(new Date(now + MAX_EXPIRY_DAYS * DAY_MS)),
+    })
+    // Start from the current setting, so Save without changes keeps it.
+    if (expiresAt && !expired) {
+      setExpiryOption('date')
+      setExpiryDate(toDateInput(new Date(expiresAt)))
+    } else {
+      setExpiryOption('never')
+      setExpiryDate('')
+    }
+    setManagingExpiry(true)
+  }
+
+  function saveExpiry() {
+    let choice: ExpiryChoice
+    if (expiryOption === 'never') {
+      choice = { kind: 'never' }
+    } else if (expiryOption === 'date') {
+      const at = endOfLocalDay(expiryDate)
+      const problem = expiryProblem(at)
+      if (problem) {
+        setError(problem)
+        return
+      }
+      choice = { kind: 'date', at: new Date(at).toISOString() }
+    } else {
+      choice = { kind: 'days', days: Number(expiryOption) as ExpiryPresetDays }
+    }
+    setError(null)
+    startTransition(async () => {
+      const result = await setVideoExpiryAction(props.id, choice).catch(() => ({
+        ok: false,
+        error: undefined,
+        expiresAt: undefined,
+      }))
+      if (result.ok) {
+        setExpiresAt(result.expiresAt ?? null)
+        closeExpiryPanel()
+      } else {
+        setError(result.error ?? `Couldn't change when the link expires. ${NETWORK_HINT}`)
       }
     })
   }
@@ -329,6 +444,23 @@ export function VideoCard(props: VideoCardProps) {
               <span className="font-medium text-accent-ink">Protected</span>
             </>
           )}
+          {expired ? (
+            <>
+              <span aria-hidden>·</span>
+              <span className="rounded-full bg-danger/10 px-2 py-0.5 font-medium text-danger ring-1 ring-inset ring-danger/25">
+                Expired
+              </span>
+            </>
+          ) : (
+            expiresAt && (
+              <>
+                <span aria-hidden>·</span>
+                <span className={expiresSoon ? 'font-medium text-warning' : undefined}>
+                  {expiryState}
+                </span>
+              </>
+            )
+          )}
         </div>
 
         {error && (
@@ -401,6 +533,20 @@ export function VideoCard(props: VideoCardProps) {
             title="Show Approve and Request changes buttons on the share page"
           >
             Ask for approval{approvalOn && <span aria-hidden> ✓</span>}
+          </button>
+          <button
+            ref={expiryButtonRef}
+            onClick={toggleExpiryPanel}
+            disabled={busy}
+            aria-expanded={managingExpiry}
+            aria-controls={managingExpiry ? expiryId : undefined}
+            className={`px-2 py-1 text-xs disabled:opacity-50 ${
+              expiresAt
+                ? 'rounded-lg border border-accent/30 bg-accent-strong/15 font-medium text-accent-ink transition hover:bg-accent-strong/25'
+                : 'btn-ghost'
+            }`}
+          >
+            Link expires
           </button>
 
           {confirmingDelete ? (
@@ -516,6 +662,89 @@ export function VideoCard(props: VideoCardProps) {
             </div>
             <p className="text-xs text-faint">
               Anyone with the link must enter this password to watch.
+            </p>
+          </div>
+        )}
+
+        {managingExpiry && (
+          <div
+            id={expiryId}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') {
+                e.preventDefault()
+                closeExpiryPanel()
+              }
+            }}
+            className="flex flex-col gap-2 rounded-lg border border-line bg-surface p-2.5"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor={`${expiryId}-choice`} className="text-xs font-semibold text-ink">
+                Link expires
+              </label>
+              <span
+                id={`${expiryId}-state`}
+                className={
+                  expired
+                    ? 'rounded-full bg-danger/10 px-2 py-0.5 text-xs font-medium text-danger ring-1 ring-inset ring-danger/25'
+                    : 'text-xs text-faint'
+                }
+              >
+                {expiryState}
+              </span>
+            </div>
+            <select
+              id={`${expiryId}-choice`}
+              autoFocus
+              aria-describedby={`${expiryId}-state`}
+              value={expiryOption}
+              onChange={(e) => setExpiryOption(e.target.value as ExpiryOption)}
+              className="w-full rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink focus:border-ink focus:outline-none"
+            >
+              <option value="never">Never</option>
+              {EXPIRY_PRESET_DAYS.map((days) => (
+                <option key={days} value={String(days)}>
+                  In {days} days
+                </option>
+              ))}
+              <option value="date">On a date</option>
+            </select>
+            {expiryOption === 'date' && (
+              <input
+                type="date"
+                aria-label="Expiry date"
+                required
+                min={expiryRange.min}
+                max={expiryRange.max}
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    saveExpiry()
+                  }
+                }}
+                className="w-full rounded-lg border border-line bg-surface px-2 py-1 text-sm text-ink focus:border-ink focus:outline-none"
+              />
+            )}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <button
+                onClick={saveExpiry}
+                disabled={busy || (expiryOption === 'date' && !expiryDate)}
+                className="btn-primary px-2.5 py-1 text-xs disabled:opacity-50"
+              >
+                Save
+              </button>
+              <button
+                onClick={closeExpiryPanel}
+                disabled={busy}
+                className="btn-ghost px-2 py-1 text-xs disabled:opacity-50"
+              >
+                Cancel
+              </button>
+            </div>
+            <p className="text-xs text-faint">
+              After it expires, viewers can&rsquo;t watch. You and your team still can, and you can
+              change it any time.
             </p>
           </div>
         )}

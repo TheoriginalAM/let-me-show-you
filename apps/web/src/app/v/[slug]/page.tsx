@@ -11,14 +11,23 @@ import {
   muxThumbnailUrl,
 } from '@lmsy/shared'
 import { listVideoComments } from '@/db/comments'
+import { getVideoReactions } from '@/db/reactions'
+import { listVideoDocuments } from '@/db/video-notes'
 import { getPublicVideoViewCount, getShareableVideoBySlug } from '@/db/queries'
 import { userCanAccessVideo } from '@/db/workspaces'
+import { aiConfigured } from '@/lib/ai-notes'
 import { getCurrentUser } from '@/lib/current-user'
 import { unlockCookieName, verifyUnlockToken } from '@/lib/share-password'
 import { ApprovalWidget } from './approval'
 import { Comments } from './comments'
+import { ExpiredBanner, LinkExpired } from './expired'
+import { ReportLink } from './report-link'
+import { isLinkExpired } from '@/lib/link-expiry'
+import { VideoNotes } from './notes'
 import { PasswordGate } from './password-gate'
+import { PlayerProvider } from './player-context'
 import { ProcessingState } from './processing-state'
+import { Reactions } from './reactions'
 import { ShareView } from './share-view'
 import { BrandedPage, BrandHeader } from '../../book/brand-header'
 import { DEFAULT_ACCENT } from '@/lib/brand-theme'
@@ -55,6 +64,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const brandName = video.brand.name ?? APP_NAME
+
+  // An expired link shows viewers nothing, so its unfurl mustn't show the title
+  // or thumbnail either (the business still sees the page itself).
+  if (isLinkExpired(video.expiresAt)) {
+    return {
+      title: 'Expired link',
+      description: `A recording shared on ${brandName}. This link has expired.`,
+      robots: { index: false },
+    }
+  }
 
   // A protected recording must not leak its title, byline, or thumbnail into
   // social unfurls or search results. Advertise nothing but the lock.
@@ -115,24 +134,38 @@ export default async function SharePage({ params }: PageProps) {
   const video = await loadVideo(slug)
   if (!video) notFound()
 
+  const currentUser = await getCurrentUser()
+  // Any member of the video's workspace can moderate its thread + see emails.
+  const isOwner = Boolean(currentUser && (await userCanAccessVideo(currentUser.id, video.id)))
+  // An expired link stops working for everyone but the business itself.
+  const expired = Boolean(video.expiresAt && Date.parse(video.expiresAt) <= Date.now())
+  const shutOut = expired && !isOwner
+
   // Password-protected: show only the lock screen until the viewer proves the
   // password (verified server-side; the cookie never carries the password).
-  const locked = video.passwordHash ? !(await hasUnlocked(video.id, video.passwordHash)) : false
+  const locked =
+    !shutOut && video.passwordHash ? !(await hasUnlocked(video.id, video.passwordHash)) : false
+  const hidden = shutOut || locked
 
   const isReady = video.status === 'ready' && Boolean(video.muxPlaybackId)
-  const viewCount = !locked && isReady ? await getPublicVideoViewCount(video.id) : 0
+  const viewCount = !hidden && isReady ? await getPublicVideoViewCount(video.id) : 0
   // Public comment thread — only loaded (and only rendered) once unlocked, so a
   // protected recording never leaks its discussion. The owner (if signed in)
   // gets moderation controls.
-  const comments = locked ? [] : await listVideoComments(video.id)
-  const currentUser = locked ? null : await getCurrentUser()
-  // Any member of the video's workspace can moderate its thread + see emails.
-  const isOwner = Boolean(currentUser && (await userCanAccessVideo(currentUser.id, video.id)))
+  const comments = hidden ? [] : await listVideoComments(video.id)
+  // Write-ups: the business sees drafts too; viewers only what's published.
+  const documents = hidden ? [] : await listVideoDocuments(video.id, { drafts: isOwner })
   // Commenter emails are only ever sent to the owner/members, never the public.
   const commentsForClient = comments.map((c) => ({
     ...c,
     authorEmail: isOwner ? c.authorEmail : null,
   }))
+  // Reactions + the moments top-level comments point at, for the row and strip
+  // under the player.
+  const reactions = !hidden && isReady ? await getVideoReactions(video.id) : null
+  const commentTimes = comments.flatMap((c) =>
+    !c.parentId && c.atSeconds != null ? [c.atSeconds] : [],
+  )
   const poster = video.muxPlaybackId
     ? muxThumbnailUrl(video.muxPlaybackId, { width: 1280, fitMode: 'preserve' })
     : ''
@@ -154,10 +187,14 @@ export default async function SharePage({ params }: PageProps) {
           </Link>
         )}
 
-        {locked ? (
+        {expired && isOwner && video.expiresAt && <ExpiredBanner expiresAt={video.expiresAt} />}
+
+        {shutOut ? (
+          <LinkExpired businessName={brand.name || video.ownerName} />
+        ) : locked ? (
           <PasswordGate slug={slug} accent={accent} />
         ) : (
-          <>
+          <PlayerProvider>
             {isReady && video.muxPlaybackId ? (
               <div className="rise relative" style={{ animationDelay: '80ms' }}>
                 <div className="card overflow-hidden rounded-3xl p-2">
@@ -167,11 +204,21 @@ export default async function SharePage({ params }: PageProps) {
                     title={video.title}
                     poster={poster}
                     accentColor={accent}
+                    chapters={video.chapters}
                   />
                 </div>
               </div>
             ) : (
               <ProcessingState slug={slug} title={video.title} accent={accent} />
+            )}
+
+            {isReady && reactions && (
+              <Reactions
+                slug={slug}
+                initialCounts={reactions.counts}
+                initialMoments={reactions.moments}
+                commentTimes={commentTimes}
+              />
             )}
 
             <div className="rise flex flex-col gap-2" style={{ animationDelay: '150ms' }}>
@@ -202,6 +249,21 @@ export default async function SharePage({ params }: PageProps) {
               )}
             </div>
 
+            {isReady && (
+              <VideoNotes
+                slug={slug}
+                playbackId={video.muxPlaybackId}
+                isOwner={isOwner}
+                aiReady={aiConfigured()}
+                transcriptStatus={video.transcriptStatus}
+                transcript={video.transcript}
+                summary={video.summary}
+                chapters={video.chapters}
+                notesStatus={video.notesStatus}
+                documents={documents}
+              />
+            )}
+
             {video.approvalEnabled && isReady && (
               <ApprovalWidget
                 slug={slug}
@@ -217,7 +279,7 @@ export default async function SharePage({ params }: PageProps) {
               defaultName={currentUser?.name ?? ''}
               defaultEmail={currentUser?.email ?? ''}
             />
-          </>
+          </PlayerProvider>
         )}
 
         <footer className="mt-auto border-t border-line pt-6 text-sm text-faint">
@@ -234,6 +296,14 @@ export default async function SharePage({ params }: PageProps) {
               <Link href="/" className="font-medium text-accent-ink transition hover:opacity-80">
                 Make your own
               </Link>
+            </>
+          )}
+          {!isOwner && (
+            <>
+              <span aria-hidden className="mx-2">
+                ·
+              </span>
+              <ReportLink slug={slug} />
             </>
           )}
         </footer>

@@ -379,6 +379,35 @@ body:has([data-meeting-call]) .atmosphere {
   animation: reaction-float 2.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
+/* "Save as PDF" on a write-up prints just that write-up, in the light theme. */
+@media print {
+  html[data-printing] body * {
+    visibility: hidden;
+  }
+  html[data-printing] [data-print-target],
+  html[data-printing] [data-print-target] * {
+    visibility: visible;
+  }
+  html[data-printing] [data-print-target] {
+    --color-ink: #17132b;
+    --color-muted: #524d69;
+    --color-faint: #696482;
+    --color-line: #e3e0f0;
+    --color-accent-ink: #3a27f0;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    border: none;
+    background: #ffffff;
+    box-shadow: none;
+    color: #17132b;
+  }
+  html[data-printing] [data-print-hide] {
+    display: none !important;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .reaction-float {
     animation: none;

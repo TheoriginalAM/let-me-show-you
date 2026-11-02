@@ -10,6 +10,13 @@ import {
   setOwnedVideoVisibility,
 } from '@/db/queries'
 import { setVideoApprovalEnabled } from '@/db/approvals'
+import { setOwnedVideoExpiry } from '@/db/video-expiry'
+import {
+  EXPIRY_PRESET_DAYS,
+  EXPIRY_REMINDER_LEAD_MS,
+  expiryProblem,
+  type ExpiryPresetDays,
+} from '@/lib/link-expiry'
 import { hashSharePassword } from '@/lib/share-password'
 
 type ActionResult = { ok: boolean; error?: string }
@@ -88,4 +95,46 @@ export async function setVideoPasswordAction(
   const ok = await setOwnedVideoPassword(userId, videoId, hash)
   revalidatePath('/dashboard')
   return { ok, error: ok ? undefined : NOT_FOUND }
+}
+
+/** What the dashboard's "Link expires" control asks for. */
+export type ExpiryChoice =
+  | { kind: 'never' }
+  | { kind: 'days'; days: ExpiryPresetDays }
+  /** `at` is the end of the chosen day in the person's own time zone. */
+  | { kind: 'date'; at: string }
+
+/**
+ * Set when a video's share link stops working for viewers (or make it never
+ * expire). Workspace-membership scoped. A new date gets a fresh reminder email,
+ * unless it's already inside the reminder window: the person just chose it.
+ */
+export async function setVideoExpiryAction(
+  videoId: string,
+  choice: ExpiryChoice,
+): Promise<ActionResult & { expiresAt?: string | null }> {
+  const userId = await requireUserId()
+  const now = Date.now()
+  let at: number | null
+  if (choice?.kind === 'never') {
+    at = null
+  } else if (choice?.kind === 'days') {
+    if (!EXPIRY_PRESET_DAYS.includes(choice.days)) {
+      return { ok: false, error: 'Choose how long the link should work.' }
+    }
+    at = now + choice.days * 24 * 60 * 60 * 1000
+  } else if (choice?.kind === 'date') {
+    at = Date.parse(String(choice.at ?? ''))
+    const problem = expiryProblem(at, now)
+    if (problem) return { ok: false, error: problem }
+  } else {
+    return { ok: false, error: 'Choose how long the link should work.' }
+  }
+
+  const expiresAt = at === null ? null : new Date(at).toISOString()
+  const reminderSentAt =
+    at !== null && at - now <= EXPIRY_REMINDER_LEAD_MS ? new Date(now).toISOString() : null
+  const ok = await setOwnedVideoExpiry(userId, videoId, expiresAt, reminderSentAt)
+  revalidatePath('/dashboard')
+  return ok ? { ok, expiresAt } : { ok, error: NOT_FOUND }
 }

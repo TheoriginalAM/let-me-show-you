@@ -13,6 +13,8 @@ export interface PublicComment {
   authorName: string
   authorEmail: string | null
   body: string
+  /** The moment in the video it's about (whole seconds); null for a general comment. */
+  atSeconds: number | null
   parentId: string | null
   createdAt: string
 }
@@ -25,6 +27,7 @@ export async function listVideoComments(videoId: string): Promise<PublicComment[
       authorName: videoComments.authorName,
       authorEmail: videoComments.authorEmail,
       body: videoComments.body,
+      atSeconds: videoComments.atSeconds,
       parentId: videoComments.parentId,
       createdAt: videoComments.createdAt,
     })
@@ -39,6 +42,7 @@ export async function addVideoComment(input: {
   authorName: string
   authorEmail: string | null
   body: string
+  atSeconds: number | null
   parentId: string | null
   ipHash: string | null
 }): Promise<PublicComment> {
@@ -49,6 +53,7 @@ export async function addVideoComment(input: {
       authorName: input.authorName,
       authorEmail: input.authorEmail,
       body: input.body,
+      atSeconds: input.atSeconds,
       parentId: input.parentId,
       authorIpHash: input.ipHash,
     })
@@ -57,6 +62,7 @@ export async function addVideoComment(input: {
       authorName: videoComments.authorName,
       authorEmail: videoComments.authorEmail,
       body: videoComments.body,
+      atSeconds: videoComments.atSeconds,
       parentId: videoComments.parentId,
       createdAt: videoComments.createdAt,
     })
@@ -116,7 +122,9 @@ export async function countVideoCommentsSince(videoId: string, since: Date): Pro
   const rows = await db
     .select({ value: count() })
     .from(videoComments)
-    .where(and(eq(videoComments.videoId, videoId), gt(videoComments.createdAt, since.toISOString())))
+    .where(
+      and(eq(videoComments.videoId, videoId), gt(videoComments.createdAt, since.toISOString())),
+    )
   return Number(rows[0]?.value ?? 0)
 }
 
@@ -125,10 +133,7 @@ export async function countVideoCommentsSince(videoId: string, since: Date): Pro
  * the comment's video (a join guard so moderation can't touch other teams'
  * threads). Returns whether a row was deleted.
  */
-export async function deleteOwnedVideoComment(
-  userId: string,
-  commentId: string,
-): Promise<boolean> {
+export async function deleteOwnedVideoComment(userId: string, commentId: string): Promise<boolean> {
   const owned = await db
     .select({ id: videoComments.id })
     .from(videoComments)

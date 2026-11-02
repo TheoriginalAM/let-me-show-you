@@ -2,6 +2,7 @@ import 'server-only'
 
 import { and, count, desc, eq, gt, inArray, isNull, sql } from 'drizzle-orm'
 import type { PublicVideo, Video } from '@lmsy/shared'
+import type { Chapter, TranscriptCue } from '../lib/video-notes'
 import { pgErrorCode } from './errors'
 import { db } from './index'
 import { brandColumns, toBrand, type WorkspaceBrand } from './workspaces'
@@ -25,6 +26,8 @@ export type VideoWithViews = Video & {
   hasPassword: boolean
   description: string | null
   approvalEnabled: boolean
+  /** When the share link stops working for viewers (null = never). */
+  expiresAt: string | null
 }
 
 /**
@@ -43,6 +46,15 @@ export type ShareableVideo = PublicVideo & {
   approvalEnabled: boolean
   /** Workspace branding for the public share page (null fields → LMSY branding). */
   brand: WorkspaceBrand
+  /** When the link stops working for viewers (null = never). */
+  expiresAt: string | null
+  /** Auto-captions: null until asked for, then 'pending' | 'ready' | 'failed' | 'none'. */
+  transcriptStatus: string | null
+  transcript: TranscriptCue[] | null
+  /** AI summary and chapters written from the transcript. */
+  summary: string | null
+  chapters: Chapter[] | null
+  notesStatus: string | null
 }
 
 /**
@@ -169,6 +181,12 @@ export async function getShareableVideoBySlug(slug: string): Promise<ShareableVi
       approvalEnabled: videos.approvalEnabled,
       createdAt: videos.createdAt,
       passwordHash: videos.passwordHash,
+      expiresAt: videos.expiresAt,
+      transcriptStatus: videos.transcriptStatus,
+      transcript: videos.transcript,
+      summary: videos.summary,
+      chapters: videos.chapters,
+      notesStatus: videos.notesStatus,
       // Branding now comes from the video's workspace, not the uploader.
       brandWorkspaceId: workspaces.id,
       ...brandColumns,
@@ -270,6 +288,7 @@ export async function listVideosByWorkspaceWithViews(
       ...ownerVideoColumns,
       description: videos.description,
       approvalEnabled: videos.approvalEnabled,
+      expiresAt: videos.expiresAt,
       viewCount: count(videoViews.id),
       hasPassword: sql<boolean>`${videos.passwordHash} is not null`,
     })

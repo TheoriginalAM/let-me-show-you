@@ -431,3 +431,69 @@ export function bookingReminderEmail(opts: {
     text: `Your ${opts.title} with ${opts.businessName} ${lead}.\n\n${textRows(rows)}\n\nJoin: ${opts.joinUrl}\nTo reschedule or cancel, use the link in your booking confirmation email.`,
   }
 }
+
+/** To a video's owner: its share link stops working in a few days. */
+export function linkExpiringEmail(opts: {
+  ownerName: string
+  videoTitle: string
+  workspaceName: string
+  when: string
+  /** Whole days left; 0 when it expires within a day. */
+  daysLeft: number
+  shareUrl: string
+  dashboardUrl: string
+}) {
+  const inDays =
+    opts.daysLeft < 1
+      ? 'within a day'
+      : `in ${opts.daysLeft} ${opts.daysLeft === 1 ? 'day' : 'days'}`
+  return {
+    subject: `Your link to "${opts.videoTitle}" expires ${inDays}`,
+    html: layout({
+      preview: `The share link for ${opts.videoTitle} stops working ${opts.when}.`,
+      heading: 'Your share link expires soon',
+      body: `Hi ${escapeHtml(firstName(opts.ownerName))}, the share link for <strong style="color:${INK};">${escapeHtml(opts.videoTitle)}</strong> in ${escapeHtml(opts.workspaceName)} stops working ${inDays}. After that, viewers can&rsquo;t watch it. You and your team still can.${detailRows(
+        [
+          ['Recording', opts.videoTitle],
+          ['Expires', opts.when],
+          ['Link', opts.shareUrl],
+        ],
+      )}<p style="margin:18px 0 0;">To give it more time, or to make it never expire, change &ldquo;Link expires&rdquo; on the recording in your dashboard.</p>`,
+      cta: { label: 'Open your dashboard', url: opts.dashboardUrl },
+    }),
+    text: `Hi ${firstName(opts.ownerName)}, the share link for "${opts.videoTitle}" in ${opts.workspaceName} stops working ${inDays} (${opts.when}). After that, viewers can't watch it. You and your team still can.\n\nLink: ${opts.shareUrl}\n\nTo give it more time, change "Link expires" on the recording in your dashboard: ${opts.dashboardUrl}`,
+  }
+}
+
+/** To the admins: someone reported a share link. */
+export function linkReportedEmail(opts: {
+  videoTitle: string
+  businessName: string
+  reason: string
+  details: string | null
+  reporterEmail: string | null
+  shareUrl: string
+  adminUrl: string
+}) {
+  const rows: [string, string | null][] = [
+    ['Recording', opts.videoTitle],
+    ['Business', opts.businessName],
+    ['Reason', opts.reason],
+    ['Details', opts.details],
+    ['Reporter', opts.reporterEmail],
+    ['Link', opts.shareUrl],
+  ]
+  return {
+    subject: `Link reported: "${opts.videoTitle}"`,
+    html: layout({
+      preview: `${opts.reason}: ${opts.videoTitle} from ${opts.businessName}.`,
+      heading: 'Someone reported a link',
+      body: `A viewer reported <strong style="color:${INK};">${escapeHtml(opts.videoTitle)}</strong> from ${escapeHtml(opts.businessName)}. Review it, then make it private or dismiss the report.${detailRows(rows)}`,
+      cta: { label: 'Review in admin', url: opts.adminUrl },
+      footNote: opts.reporterEmail
+        ? 'The reporter left an email, so you can follow up with them.'
+        : 'The reporter didn&rsquo;t leave an email.',
+    }),
+    text: `A viewer reported "${opts.videoTitle}" from ${opts.businessName}.\n\n${textRows(rows)}\n\nReview it in admin: ${opts.adminUrl}`,
+  }
+}

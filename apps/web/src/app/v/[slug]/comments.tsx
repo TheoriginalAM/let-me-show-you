@@ -1,14 +1,18 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition, type MutableRefObject } from 'react'
 import { formatRelativeDate } from '@lmsy/shared'
+import { formatTimestamp } from '@/lib/video-notes'
 import { deleteComment, postComment } from './actions'
+import { usePlayer } from './player-context'
+import { usePlayerState } from './reactions'
 
 interface ThreadComment {
   id: string
   authorName: string
   authorEmail: string | null
   body: string
+  atSeconds: number | null
   parentId: string | null
   createdAt: string
 }
@@ -20,6 +24,43 @@ const EMAIL_KEY = 'lmsy-comment-email'
 
 function initial(name: string): string {
   return name.trim().charAt(0).toUpperCase() || '?'
+}
+
+/**
+ * "At 1:23" on a new comment, following the player's live time. On by default
+ * once the viewer has pressed play, off before that; hidden until the player
+ * loads. Its own component so the ticking time doesn't re-render the thread.
+ */
+function MomentToggle({
+  moment,
+  reset,
+}: {
+  moment: MutableRefObject<() => number | null>
+  /** Changes after each post, putting the toggle back to its default. */
+  reset: number
+}) {
+  const { attached, time, started } = usePlayerState()
+  const [choice, setChoice] = useState<boolean | null>(null)
+  const checked = choice ?? started
+
+  useEffect(() => setChoice(null), [reset])
+
+  useEffect(() => {
+    moment.current = () => (attached && checked ? time : null)
+  }, [moment, attached, checked, time])
+
+  if (!attached) return null
+  return (
+    <label className="inline-flex min-h-6 cursor-pointer items-center gap-2 self-start text-sm text-muted">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => setChoice(e.target.checked)}
+        className="h-4 w-4 accent-[var(--color-accent)]"
+      />
+      At {formatTimestamp(time)}
+    </label>
+  )
 }
 
 export function Comments({
@@ -47,6 +88,10 @@ export function Comments({
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const honeypot = useRef<HTMLInputElement>(null)
+  // Reads the "At 1:23" toggle at post time.
+  const moment = useRef<() => number | null>(() => null)
+  const [posted, setPosted] = useState(0)
+  const player = usePlayer()
 
   useEffect(() => {
     try {
@@ -86,6 +131,8 @@ export function Comments({
         email: e,
         body: b,
         parentId: parentId ?? undefined,
+        // Replies never point at a moment.
+        atSeconds: parentId ? null : moment.current(),
         website: honeypot.current?.value ?? '',
       })
       if (res.ok) {
@@ -137,6 +184,19 @@ export function Comments({
             {isOwner && c.authorEmail && (
               <span className="truncate text-xs text-faint">{c.authorEmail}</span>
             )}
+            {!isReply && c.atSeconds != null && (
+              <button
+                type="button"
+                onClick={() => player.seek(c.atSeconds ?? 0)}
+                aria-label={`Play from ${formatTimestamp(c.atSeconds)}`}
+                className="inline-flex min-h-6 shrink-0 items-center gap-1 rounded-full bg-accent/10 px-2 text-xs font-semibold tabular-nums text-accent-ink transition hover:bg-accent/20"
+              >
+                <svg viewBox="0 0 12 12" aria-hidden className="h-2.5 w-2.5" fill="currentColor">
+                  <path d="M3 1.8v8.4c0 .4.4.6.7.4l6.4-4.2a.5.5 0 0 0 0-.8L3.7 1.4c-.3-.2-.7 0-.7.4Z" />
+                </svg>
+                {formatTimestamp(c.atSeconds)}
+              </button>
+            )}
             <span className="shrink-0 text-xs text-faint">{formatRelativeDate(c.createdAt)}</span>
             <span className="ml-auto flex items-center gap-2">
               {!isReply && (
@@ -145,7 +205,7 @@ export function Comments({
                     setReplyingTo((v) => (v === c.id ? null : c.id))
                     setReplyBody('')
                   }}
-                  className="text-xs text-faint transition hover:text-ink"
+                  className="inline-flex min-h-6 items-center text-xs text-faint transition hover:text-ink"
                 >
                   Reply
                 </button>
@@ -154,7 +214,7 @@ export function Comments({
                 <button
                   onClick={() => remove(c.id)}
                   disabled={pending}
-                  className={`text-xs transition disabled:opacity-50 ${
+                  className={`inline-flex min-h-6 items-center text-xs transition disabled:opacity-50 ${
                     confirmDelete === c.id
                       ? 'rounded bg-danger px-1.5 py-0.5 font-semibold text-on-danger'
                       : 'text-faint hover:text-danger'
@@ -189,7 +249,11 @@ export function Comments({
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          if (!pending) post(null, body, () => setBody(''))
+          if (!pending)
+            post(null, body, () => {
+              setBody('')
+              setPosted((n) => n + 1)
+            })
         }}
         className="glass flex flex-col gap-3 rounded-2xl p-4"
       >
@@ -223,6 +287,7 @@ export function Comments({
           aria-label="Your comment"
           className={`${inputCls} resize-y`}
         />
+        <MomentToggle moment={moment} reset={posted} />
         <input
           ref={honeypot}
           type="text"

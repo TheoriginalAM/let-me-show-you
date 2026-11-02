@@ -14,6 +14,7 @@ import {
 } from 'drizzle-orm/pg-core'
 import { VIDEO_STATUSES } from '@lmsy/shared'
 import type { BookingAnswer, BookingQuestion } from '../lib/booking-questions'
+import type { Chapter, TranscriptCue } from '../lib/video-notes'
 import type { WeeklyHours } from '../lib/booking-time'
 
 // Better Auth's generated tables (user, session, account, verification).
@@ -119,6 +120,22 @@ export const videos = pgTable(
     passwordHash: text('password_hash'),
     // When on, the share page shows an Approve / Request-changes control.
     approvalEnabled: boolean('approval_enabled').notNull().default(false),
+    // Transcript from Mux's auto-generated captions: null until asked for, then
+    // 'pending' -> 'ready' | 'failed', or 'none' when the video has no sound.
+    transcriptStatus: text('transcript_status'),
+    transcriptTrackId: text('transcript_track_id'),
+    transcript: jsonb('transcript').$type<TranscriptCue[]>(),
+    // Summary and chapters written from the transcript (needs an Anthropic key).
+    summary: text('summary'),
+    chapters: jsonb('chapters').$type<Chapter[]>(),
+    notesStatus: text('notes_status'), // null | 'pending' | 'ready' | 'failed'
+    notesClaimedAt: timestamp('notes_claimed_at', { withTimezone: true, mode: 'string' }),
+    // After this, the share link stops working for everyone but the business.
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'string' }),
+    expiryReminderSentAt: timestamp('expiry_reminder_sent_at', {
+      withTimezone: true,
+      mode: 'string',
+    }),
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
       .notNull()
       .defaultNow(),
@@ -127,7 +144,85 @@ export const videos = pgTable(
     // The dashboard's hot path is now per-workspace: WHERE workspace_id = ? ORDER BY created_at DESC.
     index('videos_workspace_id_created_at_idx').on(table.workspaceId, table.createdAt.desc()),
     index('videos_owner_id_created_at_idx').on(table.ownerId, table.createdAt.desc()),
+    // Mux track webhooks only carry the asset id.
+    index('videos_mux_asset_id_idx').on(table.muxAssetId),
+    // The expiry-reminder sweep.
+    index('videos_expires_at_idx').on(table.expiresAt),
   ],
+)
+
+/**
+ * A write-up made from a recording (how-to, bug report, follow-up email…), kept
+ * as Markdown so the business can edit it. Viewers see it once it's published.
+ */
+export const videoDocuments = pgTable(
+  'video_documents',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    videoId: uuid('video_id')
+      .notNull()
+      .references(() => videos.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(), // see DOCUMENT_KINDS
+    title: text('title').notNull(),
+    markdown: text('markdown').notNull().default(''),
+    // What the business asked for (the custom kind, or extra guidance).
+    instructions: text('instructions'),
+    status: text('status').notNull().default('pending'), // 'pending' | 'ready' | 'failed'
+    error: text('error'),
+    published: boolean('published').notNull().default(false),
+    createdBy: text('created_by').references(() => user.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index('video_documents_video_id_created_at_idx').on(table.videoId, table.createdAt)],
+)
+
+/** An emoji a viewer left at a moment in the video. */
+export const videoReactions = pgTable(
+  'video_reactions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    videoId: uuid('video_id')
+      .notNull()
+      .references(() => videos.id, { onDelete: 'cascade' }),
+    emoji: text('emoji').notNull(),
+    atSeconds: integer('at_seconds').notNull(),
+    // A random id kept in the viewer's browser, so a repeat tap doesn't count twice.
+    viewerKey: text('viewer_key').notNull(),
+    viewerIpHash: text('viewer_ip_hash'),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('video_reactions_video_id_at_idx').on(table.videoId, table.atSeconds),
+    // Repeat and rate-limit checks look up one viewer's recent reactions.
+    index('video_reactions_video_id_viewer_idx').on(table.videoId, table.viewerKey),
+  ],
+)
+
+/** "Report this link" submissions from a share page, for an admin to review. */
+export const videoReports = pgTable(
+  'video_reports',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    videoId: uuid('video_id')
+      .notNull()
+      .references(() => videos.id, { onDelete: 'cascade' }),
+    reason: text('reason').notNull(),
+    details: text('details'),
+    reporterEmail: text('reporter_email'),
+    reporterIpHash: text('reporter_ip_hash'),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true, mode: 'string' }),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index('video_reports_created_at_idx').on(table.createdAt.desc())],
 )
 
 /** Individual view events for basic per-video analytics. */
@@ -162,6 +257,8 @@ export const videoComments = pgTable(
     // Shown only to the video's owner, never to the public.
     authorEmail: text('author_email'),
     body: text('body').notNull(),
+    // The moment in the video the comment is about (null for a general comment).
+    atSeconds: integer('at_seconds'),
     // A reply points at the comment it answers (one level of threading).
     parentId: uuid('parent_id').references((): AnyPgColumn => videoComments.id, {
       onDelete: 'cascade',

@@ -1,10 +1,25 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { getMux, muxWebhookSecret } from '@/lib/mux'
 import { finishMeetingRecording } from '@/lib/meeting-recording'
+import { writeNotes } from '@/lib/ai-notes'
+import {
+  handleCaptionTrackErrored,
+  handleCaptionTrackReady,
+  requestTranscript,
+} from '@/lib/transcripts'
 import { linkVideoAsset, markVideoErrored, markVideoReady } from '@/db/queries'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+
+/** Runs after the response, so Mux isn't kept waiting (and doesn't retry). */
+function later(label: string, job: () => Promise<unknown>): void {
+  after(() =>
+    job().catch((err) => {
+      console.error(`[mux webhook] ${label} failed`, err instanceof Error ? err.message : err)
+    }),
+  )
+}
 
 export async function POST(request: Request) {
   // Raw body is required for signature verification.
@@ -43,7 +58,14 @@ export async function POST(request: Request) {
       const playbackId = event.data.playback_ids?.[0]?.id
       const duration =
         typeof event.data.duration === 'number' ? Math.round(event.data.duration) : null
-      if (videoId && playbackId) await markVideoReady(videoId, playbackId, duration, event.data.id)
+      if (videoId && playbackId) {
+        await markVideoReady(videoId, playbackId, duration, event.data.id)
+        later('transcript request', async () => {
+          // An existing caption track may already be ready; then go on to the summary.
+          await requestTranscript(videoId)
+          await writeNotes(videoId)
+        })
+      }
       break
     }
     case 'video.asset.live_stream_completed': {
@@ -54,6 +76,31 @@ export async function POST(request: Request) {
       if (videoId && playbackId) {
         await markVideoReady(videoId, playbackId, duration, event.data.id)
         await finishMeetingRecording(videoId, 'completed')
+        later('transcript request', async () => {
+          // An existing caption track may already be ready; then go on to the summary.
+          await requestTranscript(videoId)
+          await writeNotes(videoId)
+        })
+      }
+      break
+    }
+    case 'video.asset.track.ready': {
+      // Auto-generated captions are done: keep the text, then write the summary.
+      const t = event.data
+      if (t.type === 'text' && t.text_source === 'generated_vod' && t.asset_id && t.id) {
+        const assetId = t.asset_id
+        const trackId = t.id
+        later('transcript save', async () => {
+          const videoId = await handleCaptionTrackReady(assetId, trackId)
+          if (videoId) await writeNotes(videoId)
+        })
+      }
+      break
+    }
+    case 'video.asset.track.errored': {
+      const t = event.data
+      if (t.type === 'text' && t.text_source === 'generated_vod' && t.asset_id) {
+        await handleCaptionTrackErrored(t.asset_id)
       }
       break
     }

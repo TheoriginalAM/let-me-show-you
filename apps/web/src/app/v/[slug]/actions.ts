@@ -14,6 +14,9 @@ import {
   getVideoNotificationTarget,
   type PublicComment,
 } from '@/db/comments'
+import { addVideoReaction } from '@/db/reactions'
+import { userCanAccessVideo } from '@/db/workspaces'
+import { formatTimestamp, isReaction } from '@/lib/video-notes'
 import { createNotifications, memberIdsForVideo } from '@/db/app-notifications'
 import { addApproval, countRecentApprovalsByIp } from '@/db/approvals'
 import { notifyApproval, notifyCommentReply } from '@/lib/notifications'
@@ -35,6 +38,15 @@ const RATE_MAX = 6
 /** Collapse bursts: at most one owner email per video per this window. */
 const EMAIL_DEBOUNCE_MS = 2 * 60 * 1000
 
+/** The latest moment a reaction or comment can point at when the length is unknown. */
+const MAX_MOMENT_S = 24 * 60 * 60
+/** Reactions: one per viewer + emoji closer than this (video seconds), and hourly caps. */
+const REACTION_REPEAT_S = 3
+const REACTION_WINDOW_MS = 60 * 60 * 1000
+const REACTION_MAX_PER_VIEWER = 60
+const REACTION_MAX_PER_IP = 200
+const VIEWER_KEY_RE = /^[A-Za-z0-9-]{8,64}$/
+
 /** How long an unlock cookie stays valid (7 days). */
 const UNLOCK_MAX_AGE = 60 * 60 * 24 * 7
 
@@ -47,6 +59,30 @@ async function isUnlocked(video: { id: string; passwordHash: string | null }): P
   if (!video.passwordHash) return true
   const token = (await cookies()).get(unlockCookieName(video.id))?.value
   return Boolean(token && verifyUnlockToken(token, video.id, video.passwordHash))
+}
+
+/**
+ * Whether the current request can see the share, by the page's own rules: an
+ * expired link only works for members of the video's workspace, and a
+ * protected one needs the unlock cookie (members included).
+ */
+async function shareAccess(video: {
+  id: string
+  passwordHash: string | null
+  expiresAt: string | null
+}): Promise<'ok' | 'expired' | 'locked'> {
+  if (video.expiresAt && Date.parse(video.expiresAt) <= Date.now()) {
+    const me = await getCurrentUser()
+    if (!me || !(await userCanAccessVideo(me.id, video.id))) return 'expired'
+  }
+  return (await isUnlocked(video)) ? 'ok' : 'locked'
+}
+
+/** A client-sent moment as whole seconds inside the video; null if it isn't a number. */
+function clampMoment(value: unknown, durationSeconds: number | null): number | null {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null
+  const max = durationSeconds && durationSeconds > 0 ? Math.floor(durationSeconds) : MAX_MOMENT_S
+  return Math.min(Math.max(0, Math.floor(value)), max)
 }
 
 /**
@@ -85,6 +121,8 @@ async function clientIpHash(): Promise<string | null> {
 export async function recordShareView(slug: string): Promise<void> {
   const video = await getShareableVideoBySlug(slug)
   if (!video || video.status !== 'ready') return
+  // An expired link has no viewers to count (a member checking it isn't one).
+  if (video.expiresAt && Date.parse(video.expiresAt) <= Date.now()) return
   if (!(await isUnlocked(video))) return
   const ipHash = await clientIpHash()
   if (!ipHash) return
@@ -95,7 +133,7 @@ export async function recordShareView(slug: string): Promise<void> {
 export async function pollShareStatus(slug: string): Promise<VideoStatus | 'notfound'> {
   const video = await getShareableVideoBySlug(slug)
   // Don't leak a locked recording's status to someone who hasn't unlocked it.
-  if (!video || !(await isUnlocked(video))) return 'notfound'
+  if (!video || (await shareAccess(video)) !== 'ok') return 'notfound'
   return video.status
 }
 
@@ -107,6 +145,7 @@ export async function pollShareStatus(slug: string): Promise<VideoStatus | 'notf
 export async function unlockShare(slug: string, password: string): Promise<{ ok: boolean }> {
   const video = await getShareableVideoBySlug(slug)
   if (!video || !video.passwordHash) return { ok: false }
+  if ((await shareAccess(video)) === 'expired') return { ok: false }
   if (!verifySharePassword(password, video.passwordHash)) return { ok: false }
 
   const cookieStore = await cookies()
@@ -130,7 +169,15 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/
 
 export async function postComment(
   slug: string,
-  input: { name: string; email: string; body: string; parentId?: string; website?: string },
+  input: {
+    name: string
+    email: string
+    body: string
+    parentId?: string
+    /** The moment it's about, in seconds (top-level comments only). */
+    atSeconds?: number | null
+    website?: string
+  },
 ): Promise<{ ok: true; comment: PublicComment } | { ok: false; error: string }> {
   // Honeypot: real users never fill the hidden "website" field. Coerce first so a
   // non-string payload (array/object) can't slip past the check.
@@ -158,7 +205,9 @@ export async function postComment(
   if (!video || video.status === 'errored') {
     return { ok: false, error: 'This recording is unavailable.' }
   }
-  if (!(await isUnlocked(video))) {
+  const access = await shareAccess(video)
+  if (access === 'expired') return { ok: false, error: 'This link has expired.' }
+  if (access === 'locked') {
     return { ok: false, error: 'Unlock the recording before commenting.' }
   }
 
@@ -175,6 +224,12 @@ export async function postComment(
     if (replyTo && replyTo.videoSlug !== slug) replyTo = null
   }
   const effectiveParent = replyTo ? parentId : null
+  // Only a top-level comment on a playable video can point at a moment.
+  const atSeconds =
+    !effectiveParent && video.status === 'ready'
+      ? clampMoment(input.atSeconds, video.durationSeconds)
+      : null
+  const at = atSeconds != null ? formatTimestamp(atSeconds) : null
 
   // Debounce the owner email BEFORE inserting: if this video already had a
   // comment in the last couple of minutes, the owner was just notified, so skip.
@@ -188,6 +243,7 @@ export async function postComment(
     authorName: name,
     authorEmail: email,
     body,
+    atSeconds,
     parentId: effectiveParent,
     ipHash,
   })
@@ -200,7 +256,7 @@ export async function postComment(
     {
       type: 'comment',
       title: `New comment on ${video.title}`,
-      body: `${name}: ${body.length > 120 ? `${body.slice(0, 120)}…` : body}`,
+      body: `${name}${at ? ` at ${at}` : ''}: ${body.length > 120 ? `${body.slice(0, 120)}…` : body}`,
       linkPath: `/${SHARE_PATH}/${slug}`,
     },
   ).catch((error) => console.error('[comments] notification failed:', error))
@@ -226,7 +282,7 @@ export async function postComment(
           ownerEmail: target.ownerEmail,
           videoTitle: target.title,
           authorName: name,
-          body,
+          body: at ? `At ${at}: ${body}` : body,
           shareUrl: buildShareUrl(slug),
         }).catch((error) => console.error('[comments] owner notify failed:', error))
       }
@@ -236,6 +292,50 @@ export async function postComment(
   revalidatePath(`/${SHARE_PATH}/${slug}`)
   // Never echo the email back to the client.
   return { ok: true, comment: { ...comment, authorEmail: null } }
+}
+
+/**
+ * Leave an emoji at a moment in a share's video. Re-resolves the slug, needs a
+ * playable recording the viewer can see, quietly skips the same viewer leaving
+ * the same emoji a few seconds from their last one, and caps each viewer key
+ * and IP hash per video per hour. No page revalidation: the client keeps its
+ * own counts.
+ */
+export async function postReaction(
+  slug: string,
+  input: { emoji: string; atSeconds: number; viewerKey: string },
+): Promise<{ ok: true; added: boolean; atSeconds: number } | { ok: false; error: string }> {
+  const emoji = input.emoji
+  if (!isReaction(emoji)) return { ok: false, error: 'Unable to add your reaction.' }
+  const viewerKey = typeof input.viewerKey === 'string' ? input.viewerKey : ''
+  if (!VIEWER_KEY_RE.test(viewerKey)) return { ok: false, error: 'Unable to add your reaction.' }
+
+  const video = await getShareableVideoBySlug(slug)
+  if (!video || video.status !== 'ready') {
+    return { ok: false, error: 'This recording is unavailable.' }
+  }
+  const access = await shareAccess(video)
+  if (access === 'expired') return { ok: false, error: 'This link has expired.' }
+  if (access === 'locked') return { ok: false, error: 'Unlock the recording before reacting.' }
+
+  const atSeconds = clampMoment(input.atSeconds, video.durationSeconds)
+  if (atSeconds == null) return { ok: false, error: 'Unable to add your reaction.' }
+
+  const result = await addVideoReaction({
+    videoId: video.id,
+    emoji,
+    atSeconds,
+    viewerKey,
+    ipHash: await clientIpHash(),
+    repeatWindow: REACTION_REPEAT_S,
+    since: new Date(Date.now() - REACTION_WINDOW_MS),
+    maxPerViewer: REACTION_MAX_PER_VIEWER,
+    maxPerIp: REACTION_MAX_PER_IP,
+  })
+  if (result === 'limited') {
+    return { ok: false, error: "That's a lot of reactions for one hour. Please try again later." }
+  }
+  return { ok: true, added: result === 'added', atSeconds }
 }
 
 /** Record a client approve / request-changes decision from the share page. */
@@ -259,7 +359,9 @@ export async function postApproval(
   const video = await getShareableVideoBySlug(slug)
   if (!video || !video.approvalEnabled)
     return { ok: false, error: 'Approvals are not enabled here.' }
-  if (!(await isUnlocked(video))) return { ok: false, error: 'Unlock the recording first.' }
+  const access = await shareAccess(video)
+  if (access === 'expired') return { ok: false, error: 'This link has expired.' }
+  if (access === 'locked') return { ok: false, error: 'Unlock the recording first.' }
 
   const ipHash = await clientIpHash()
   const since = new Date(Date.now() - RATE_WINDOW_MS)
